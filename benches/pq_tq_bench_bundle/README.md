@@ -3,7 +3,7 @@
 This Report packages one self-contained snapshot of the latest PQ/TQ report, the raw data directories behind that report, and parameterized scripts for rerunning each report section.
 
 Click the link to view the report:
-[report.html](./01_report/report.html)
+[report.html](https://mengqin.github.io/llama.cpp/pq_tq_bench_report/report.html)
 
 ## Layout
 
