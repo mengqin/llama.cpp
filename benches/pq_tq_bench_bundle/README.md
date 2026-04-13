@@ -1,6 +1,9 @@
-# PQ/TQ Full Report Bundle
+# PQ/TQ Full Report
 
-This bundle packages one self-contained snapshot of the latest PQ/TQ report, the raw data directories behind that report, and parameterized scripts for rerunning each report section.
+This Report packages one self-contained snapshot of the latest PQ/TQ report, the raw data directories behind that report, and parameterized scripts for rerunning each report section.
+
+Click the link to view the report:
+[report.html](./01_report/report.html)
 
 ## Layout
 
