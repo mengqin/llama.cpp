@@ -678,6 +678,14 @@ void ggml_compute_forward_add(
         case GGML_TYPE_Q6_K:
         case GGML_TYPE_TQ1_0:
         case GGML_TYPE_TQ2_0:
+        case GGML_TYPE_PQ4_0_64:
+        case GGML_TYPE_TQ4_1_64:
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:
+        case GGML_TYPE_TQ2_1:
+        case GGML_TYPE_TQ3_1:
+        case GGML_TYPE_TQ4_1:
         case GGML_TYPE_IQ2_XXS:
         case GGML_TYPE_IQ2_XS:
         case GGML_TYPE_IQ3_XXS:
@@ -1128,6 +1136,14 @@ void ggml_compute_forward_add1(
         case GGML_TYPE_Q6_K:
         case GGML_TYPE_TQ1_0:
         case GGML_TYPE_TQ2_0:
+        case GGML_TYPE_PQ4_0_64:
+        case GGML_TYPE_TQ4_1_64:
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:
+        case GGML_TYPE_TQ2_1:
+        case GGML_TYPE_TQ3_1:
+        case GGML_TYPE_TQ4_1:
         case GGML_TYPE_IQ2_XXS:
         case GGML_TYPE_IQ2_XS:
         case GGML_TYPE_IQ3_XXS:
@@ -1257,6 +1273,14 @@ void ggml_compute_forward_acc(
         case GGML_TYPE_Q6_K:
         case GGML_TYPE_TQ1_0:
         case GGML_TYPE_TQ2_0:
+        case GGML_TYPE_PQ4_0_64:
+        case GGML_TYPE_TQ4_1_64:
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:
+        case GGML_TYPE_TQ2_1:
+        case GGML_TYPE_TQ3_1:
+        case GGML_TYPE_TQ4_1:
         case GGML_TYPE_IQ2_XXS:
         case GGML_TYPE_IQ2_XS:
         case GGML_TYPE_IQ3_XXS:
@@ -4345,6 +4369,14 @@ void ggml_compute_forward_out_prod(
         case GGML_TYPE_Q6_K:
         case GGML_TYPE_TQ1_0:
         case GGML_TYPE_TQ2_0:
+        case GGML_TYPE_PQ4_0_64:
+        case GGML_TYPE_TQ4_1_64:
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:
+        case GGML_TYPE_TQ2_1:
+        case GGML_TYPE_TQ3_1:
+        case GGML_TYPE_TQ4_1:
         case GGML_TYPE_IQ2_XXS:
         case GGML_TYPE_IQ2_XS:
         case GGML_TYPE_IQ3_XXS:
@@ -4621,6 +4653,14 @@ void ggml_compute_forward_set(
         case GGML_TYPE_Q6_K:
         case GGML_TYPE_TQ1_0:
         case GGML_TYPE_TQ2_0:
+        case GGML_TYPE_PQ4_0_64:
+        case GGML_TYPE_TQ4_1_64:
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:
+        case GGML_TYPE_TQ2_1:
+        case GGML_TYPE_TQ3_1:
+        case GGML_TYPE_TQ4_1:
         case GGML_TYPE_IQ2_XXS:
         case GGML_TYPE_IQ2_XS:
         case GGML_TYPE_IQ3_XXS:
@@ -4845,6 +4885,14 @@ void ggml_compute_forward_get_rows(
         case GGML_TYPE_Q6_K:
         case GGML_TYPE_TQ1_0:
         case GGML_TYPE_TQ2_0:
+        case GGML_TYPE_PQ4_0_64:
+        case GGML_TYPE_TQ4_1_64:
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:
+        case GGML_TYPE_TQ2_1:
+        case GGML_TYPE_TQ3_1:
+        case GGML_TYPE_TQ4_1:
         case GGML_TYPE_IQ2_XXS:
         case GGML_TYPE_IQ2_XS:
         case GGML_TYPE_IQ3_XXS:
@@ -5571,6 +5619,14 @@ void ggml_compute_forward_clamp(
         case GGML_TYPE_Q6_K:
         case GGML_TYPE_TQ1_0:
         case GGML_TYPE_TQ2_0:
+        case GGML_TYPE_PQ4_0_64:
+        case GGML_TYPE_TQ4_1_64:
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:
+        case GGML_TYPE_TQ2_1:
+        case GGML_TYPE_TQ3_1:
+        case GGML_TYPE_TQ4_1:
         case GGML_TYPE_IQ2_XXS:
         case GGML_TYPE_IQ2_XS:
         case GGML_TYPE_IQ3_XXS:
@@ -10607,6 +10663,159 @@ void ggml_compute_forward_gated_delta_net(
             {
                 GGML_ABORT("fatal error");
             }
+    }
+}
+
+static const float pq_tq_wht_s1[128] = {
+     1,-1, 1,-1, 1, 1,-1,-1, 1, 1,-1,-1,-1,-1, 1, 1,
+     1,-1, 1,-1,-1, 1,-1, 1,-1, 1,-1, 1, 1,-1, 1,-1,
+     1, 1,-1,-1, 1, 1,-1,-1,-1,-1, 1, 1,-1,-1, 1, 1,
+     1, 1,-1,-1,-1,-1, 1, 1,-1,-1, 1, 1, 1, 1,-1,-1,
+     1,-1, 1,-1, 1, 1,-1,-1, 1, 1,-1,-1,-1,-1, 1, 1,
+     1,-1, 1,-1,-1, 1,-1, 1,-1, 1,-1, 1, 1,-1, 1,-1,
+    -1,-1, 1, 1,-1,-1, 1, 1, 1, 1,-1,-1, 1, 1,-1,-1,
+    -1,-1, 1, 1, 1, 1,-1,-1, 1,-1, 1,-1,-1, 1,-1, 1
+};
+
+static const float pq_tq_wht_s2[128] = {
+     1, 1, 1, 1, 1, 1, 1, 1,-1,-1,-1,-1,-1,-1,-1,-1,
+     1, 1, 1, 1,-1,-1,-1,-1,-1,-1,-1,-1, 1, 1, 1, 1,
+     1, 1,-1,-1, 1, 1,-1,-1,-1,-1, 1, 1,-1,-1, 1, 1,
+     1, 1,-1,-1,-1,-1, 1, 1,-1,-1, 1, 1, 1, 1,-1,-1,
+     1,-1, 1,-1, 1,-1, 1,-1,-1, 1,-1, 1,-1, 1,-1, 1,
+     1,-1, 1,-1,-1, 1,-1, 1,-1, 1,-1, 1, 1,-1, 1,-1,
+     1,-1,-1, 1, 1,-1,-1, 1,-1, 1, 1,-1,-1, 1, 1,-1,
+     1,-1,-1, 1,-1, 1, 1,-1,-1, 1, 1,-1, 1,-1,-1, 1
+};
+
+static const float pq_tq_wht_s1_64[64] = {
+     1,-1, 1, 1,-1, 1,-1,-1, 1,-1, 1,-1,-1,-1, 1,-1,
+     1, 1, 1,-1,-1, 1,-1, 1, 1,-1,-1, 1, 1, 1,-1, 1,
+    -1, 1, 1, 1,-1, 1, 1,-1,-1, 1,-1, 1, 1,-1, 1, 1,
+     1,-1,-1,-1, 1,-1,-1,-1, 1,-1, 1,-1,-1, 1,-1,-1
+};
+
+static const float pq_tq_wht_s2_64[64] = {
+     1,-1,-1, 1,-1,-1, 1, 1,-1,-1, 1, 1, 1,-1,-1, 1,
+     1,-1,-1, 1,-1, 1,-1, 1,-1, 1, 1,-1, 1,-1, 1, 1,
+    -1, 1,-1, 1,-1,-1,-1, 1, 1,-1,-1, 1, 1,-1,-1,-1,
+     1, 1,-1, 1, 1,-1,-1, 1,-1, 1,-1,-1, 1,-1, 1, 1
+};
+
+static const float pq_tq_wht_s1_256[256] = {
+     1,-1,-1, 1, 1,-1,-1, 1, 1,-1,-1, 1, 1, 1,-1, 1,
+     1, 1, 1,-1, 1,-1, 1, 1,-1,-1, 1, 1, 1, 1,-1,-1,
+     1,-1, 1, 1, 1, 1,-1, 1,-1, 1,-1, 1,-1,-1, 1,-1,
+    -1,-1, 1, 1,-1, 1, 1,-1, 1,-1,-1,-1, 1, 1,-1,-1,
+    -1, 1, 1,-1,-1,-1,-1, 1,-1, 1,-1, 1,-1, 1, 1, 1,
+     1, 1,-1, 1,-1, 1, 1, 1,-1, 1, 1,-1,-1,-1,-1, 1,
+    -1, 1,-1, 1,-1, 1, 1, 1,-1,-1,-1, 1,-1, 1, 1,-1,
+     1, 1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1,-1, 1, 1,-1,
+     1,-1, 1,-1,-1, 1,-1,-1, 1, 1,-1, 1, 1, 1, 1, 1,
+     1, 1,-1, 1, 1, 1, 1, 1,-1,-1, 1,-1,-1, 1, 1,-1,
+    -1,-1,-1, 1, 1,-1,-1, 1, 1,-1,-1,-1, 1,-1, 1,-1,
+     1, 1, 1,-1,-1,-1,-1,-1, 1,-1, 1,-1, 1, 1, 1, 1,
+     1, 1, 1, 1, 1, 1, 1, 1,-1,-1,-1, 1,-1,-1,-1,-1,
+    -1, 1, 1, 1, 1, 1,-1, 1,-1,-1,-1,-1, 1,-1,-1,-1,
+     1,-1, 1,-1, 1, 1,-1, 1, 1, 1,-1, 1, 1,-1, 1,-1,
+     1,-1, 1, 1,-1, 1, 1, 1,-1,-1,-1, 1,-1, 1,-1,-1
+};
+
+static const float pq_tq_wht_s2_256[256] = {
+     1,-1,-1,-1, 1, 1, 1,-1,-1, 1, 1, 1,-1,-1,-1, 1,
+     1,-1,-1,-1, 1,-1, 1, 1, 1,-1,-1,-1, 1,-1,-1, 1,
+     1, 1, 1, 1, 1,-1, 1,-1, 1, 1, 1, 1, 1,-1,-1, 1,
+     1, 1,-1,-1,-1,-1,-1,-1, 1,-1, 1, 1, 1, 1, 1,-1,
+     1,-1, 1, 1, 1, 1,-1, 1,-1,-1, 1, 1,-1, 1, 1,-1,
+    -1, 1, 1, 1,-1,-1,-1, 1,-1,-1,-1, 1,-1,-1, 1,-1,
+     1,-1, 1,-1,-1, 1,-1, 1,-1,-1,-1,-1,-1,-1,-1, 1,
+     1, 1, 1,-1, 1, 1,-1, 1,-1,-1,-1, 1, 1,-1,-1, 1,
+    -1,-1,-1, 1, 1, 1, 1, 1,-1, 1,-1,-1,-1, 1, 1,-1,
+     1, 1, 1, 1,-1, 1,-1,-1,-1,-1,-1,-1,-1,-1, 1,-1,
+     1, 1,-1, 1, 1, 1,-1,-1,-1, 1, 1, 1, 1, 1,-1,-1,
+    -1, 1,-1,-1, 1,-1, 1,-1, 1,-1,-1,-1, 1,-1, 1,-1,
+    -1,-1,-1, 1, 1, 1, 1,-1, 1,-1,-1, 1,-1,-1, 1,-1,
+     1, 1, 1, 1, 1, 1,-1,-1,-1, 1,-1, 1,-1, 1,-1,-1,
+     1, 1, 1, 1, 1,-1, 1,-1,-1, 1, 1,-1,-1, 1, 1, 1,
+    -1,-1, 1,-1,-1, 1, 1, 1, 1, 1,-1,-1, 1,-1,-1, 1
+};
+
+static void ggml_compute_forward_pq_tq_wht_f32(
+        const ggml_compute_params * params,
+        ggml_tensor * dst) {
+    const ggml_tensor * src = dst->src[0];
+    const float * src_data = (const float *) src->data;
+    float * dst_data = (float *) dst->data;
+
+    int direction;
+    memcpy(&direction, dst->op_params, sizeof(int));
+
+    const int wht_dim = (int) src->ne[0];
+
+    const float * s1_arr;
+    const float * s2_arr;
+    float inv_sqrt_d;
+
+    if (wht_dim == 64) {
+        s1_arr = pq_tq_wht_s1_64;
+        s2_arr = pq_tq_wht_s2_64;
+        inv_sqrt_d = 0.125f;
+    } else if (wht_dim == 256) {
+        s1_arr = pq_tq_wht_s1_256;
+        s2_arr = pq_tq_wht_s2_256;
+        inv_sqrt_d = 0.0625f;
+    } else {
+        s1_arr = pq_tq_wht_s1;
+        s2_arr = pq_tq_wht_s2;
+        inv_sqrt_d = 0.08838834764831845f;
+    }
+
+    const float * s_first  = direction == 0 ? s1_arr : s2_arr;
+    const float * s_second = direction == 0 ? s2_arr : s1_arr;
+
+    const int64_t n_total = ggml_nelements(src);
+    const int64_t n_groups = n_total / wht_dim;
+
+    const int64_t ith = params->ith;
+    const int64_t nth = params->nth;
+    const int64_t grp_start = (n_groups * ith) / nth;
+    const int64_t grp_end = (n_groups * (ith + 1)) / nth;
+
+    for (int64_t g = grp_start; g < grp_end; ++g) {
+        float x[256];
+        const float * in = src_data + g * wht_dim;
+
+        for (int i = 0; i < wht_dim; ++i) {
+            x[i] = in[i] * s_first[i];
+        }
+
+        for (int h = 1; h < wht_dim; h *= 2) {
+            for (int i = 0; i < wht_dim; i += h * 2) {
+                for (int j = i; j < i + h; ++j) {
+                    const float a = x[j];
+                    const float b = x[j + h];
+                    x[j] = a + b;
+                    x[j + h] = a - b;
+                }
+            }
+        }
+
+        float * out = dst_data + g * wht_dim;
+        for (int i = 0; i < wht_dim; ++i) {
+            out[i] = x[i] * inv_sqrt_d * s_second[i];
+        }
+    }
+}
+
+void ggml_compute_forward_pq_tq_wht(
+        const ggml_compute_params * params,
+        ggml_tensor * dst) {
+    switch (dst->src[0]->type) {
+        case GGML_TYPE_F32:
+            ggml_compute_forward_pq_tq_wht_f32(params, dst);
+            break;
+        default:
+            GGML_ABORT("fatal error");
     }
 }
 

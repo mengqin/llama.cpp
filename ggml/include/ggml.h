@@ -429,7 +429,15 @@ extern "C" {
         GGML_TYPE_MXFP4   = 39, // MXFP4 (1 block)
         GGML_TYPE_NVFP4   = 40, // NVFP4 (4 blocks, E4M3 scale)
         GGML_TYPE_Q1_0    = 41,
-        GGML_TYPE_COUNT   = 42,
+        GGML_TYPE_PQ4_0_64 = 42, // internal PQ4 KV cache for D=64
+        GGML_TYPE_TQ4_1_64 = 43, // internal TQ4 KV cache for D=64
+        GGML_TYPE_PQ2_0    = 44, // KV cache: 2-bit PolarQuant
+        GGML_TYPE_PQ3_0    = 45, // KV cache: 3-bit PolarQuant
+        GGML_TYPE_PQ4_0    = 46, // KV cache: 4-bit PolarQuant
+        GGML_TYPE_TQ2_1    = 47, // KV cache: PQ2 + 1-bit QJL compensation
+        GGML_TYPE_TQ3_1    = 48, // KV cache: PQ3 + 1-bit QJL compensation
+        GGML_TYPE_TQ4_1    = 49, // KV cache: PQ4 + 1-bit QJL compensation
+        GGML_TYPE_COUNT    = 50,
     };
 
     // precision
@@ -561,6 +569,7 @@ extern "C" {
         GGML_OP_RWKV_WKV7,
         GGML_OP_SOLVE_TRI,
         GGML_OP_GATED_DELTA_NET,
+        GGML_OP_WHT,
 
         GGML_OP_UNARY,
 
@@ -2484,6 +2493,11 @@ extern "C" {
             struct ggml_tensor  * g,
             struct ggml_tensor  * beta,
             struct ggml_tensor  * state);
+
+    GGML_API struct ggml_tensor * ggml_wht(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a,
+            int                   direction);
 
     // custom operators
 

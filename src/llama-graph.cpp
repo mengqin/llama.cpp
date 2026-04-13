@@ -71,6 +71,104 @@ static ggml_tensor * ggml_mul_mat_aux(
     return res;
 }
 
+static bool llama_graph_type_is_pqtq(ggml_type type) {
+    switch (type) {
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:
+        case GGML_TYPE_TQ2_1:
+        case GGML_TYPE_TQ3_1:
+        case GGML_TYPE_TQ4_1:
+        case GGML_TYPE_PQ4_0_64:
+        case GGML_TYPE_TQ4_1_64:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool llama_graph_pq_tq_wht_supported_dim(const int64_t dim) {
+    return dim == 64 || dim == 128 || dim == 256;
+}
+
+static bool llama_graph_pq_tq_mixed_pair_ok(const ggml_type type_k, const ggml_type type_v) {
+    const bool k_ok =
+        type_k == GGML_TYPE_PQ2_0 || type_k == GGML_TYPE_PQ3_0 || type_k == GGML_TYPE_PQ4_0 ||
+        type_k == GGML_TYPE_TQ2_1 || type_k == GGML_TYPE_TQ3_1 || type_k == GGML_TYPE_TQ4_1 ||
+        type_k == GGML_TYPE_PQ4_0_64 || type_k == GGML_TYPE_TQ4_1_64;
+    const bool v_ok =
+        type_v == GGML_TYPE_PQ2_0 || type_v == GGML_TYPE_PQ3_0 || type_v == GGML_TYPE_PQ4_0 ||
+        type_v == GGML_TYPE_PQ4_0_64;
+
+    return k_ok && v_ok;
+}
+
+static bool llama_graph_force_old_pq_tq_decode() {
+    static const bool force_old_decode = []() {
+        const char * env = getenv("LLAMA_CUDA_PQ_TQ_FORCE_OLD_DECODE");
+        return env != nullptr && atoi(env) == 1;
+    }();
+
+    return force_old_decode;
+}
+
+static bool llama_graph_pq_tq_fused_wht(
+        const llama_cparams & cparams,
+        ggml_tensor * q,
+        ggml_tensor * kq_b,
+        const ggml_type type_k,
+        const ggml_type type_v) {
+    if (!(llama_graph_type_is_pqtq(type_k) && llama_graph_type_is_pqtq(type_v))) {
+        return false;
+    }
+
+    const bool fa_ok = type_k == type_v || llama_graph_pq_tq_mixed_pair_ok(type_k, type_v);
+    const bool use_flash_attn_here = cparams.flash_attn && (kq_b == nullptr);
+
+    if (!fa_ok || !use_flash_attn_here) {
+        return false;
+    }
+
+    if (q->ne[2] > 2 || q->ne[2] == 2) {
+        return false;
+    }
+
+    return !llama_graph_force_old_pq_tq_decode();
+}
+
+static ggml_tensor * llama_graph_apply_pq_tq_wht_forward(
+        ggml_context * ctx,
+        ggml_tensor * cur) {
+    GGML_ASSERT(llama_graph_pq_tq_wht_supported_dim(cur->ne[0]));
+
+    if (!ggml_is_contiguous(cur)) {
+        cur = ggml_cont(ctx, cur);
+    }
+
+    return ggml_wht(ctx, cur, 0);
+}
+
+static ggml_tensor * llama_graph_apply_pq_tq_wht_inverse(
+        ggml_context * ctx,
+        ggml_tensor * cur,
+        const int64_t head_dim) {
+    GGML_ASSERT(llama_graph_pq_tq_wht_supported_dim(head_dim));
+
+    if (!ggml_is_contiguous(cur)) {
+        cur = ggml_cont(ctx, cur);
+    }
+
+    const int64_t ne0_orig = cur->ne[0];
+    const int64_t ne1_orig = cur->ne[1];
+    const int64_t n_rest = ggml_nelements(cur) / head_dim;
+
+    cur = ggml_reshape_2d(ctx, cur, head_dim, n_rest);
+    cur = ggml_wht(ctx, cur, 1);
+    cur = ggml_reshape_2d(ctx, cur, ne0_orig, ne1_orig);
+
+    return cur;
+}
+
 void llm_graph_input_embd::set_input(const llama_ubatch * ubatch) {
     if (ubatch->token) {
         const int64_t n_tokens = ubatch->n_tokens;
@@ -2105,12 +2203,19 @@ ggml_tensor * llm_graph_context::build_attn(
             int       il) const {
     GGML_ASSERT(v_mla == nullptr);
 
-    if (inp->self_k_rot) {
+    const auto * mctx_cur = inp->mctx;
+    const bool pqtq_k = llama_graph_type_is_pqtq(mctx_cur->type_k());
+    const bool pqtq_v = llama_graph_type_is_pqtq(mctx_cur->type_v());
+    const bool pqtq_fused_wht = llama_graph_pq_tq_fused_wht(cparams, q_cur, kq_b, mctx_cur->type_k(), mctx_cur->type_v());
+
+    if (pqtq_k && !pqtq_fused_wht) {
+        q_cur = llama_graph_apply_pq_tq_wht_forward(ctx0, q_cur);
+    } else if (inp->self_k_rot) {
         q_cur = ggml_mul_mat_aux(ctx0, q_cur, inp->self_k_rot);
         k_cur = ggml_mul_mat_aux(ctx0, k_cur, inp->self_k_rot);
     }
 
-    if (inp->self_v_rot) {
+    if (inp->self_v_rot && !pqtq_v) {
         v_cur = ggml_mul_mat_aux(ctx0, v_cur, inp->self_v_rot);
     }
 
@@ -2120,8 +2225,6 @@ ggml_tensor * llm_graph_context::build_attn(
     ggml_build_forward_expand(gf, q_cur);
     ggml_build_forward_expand(gf, v_cur);
     ggml_build_forward_expand(gf, k_cur);
-
-    const auto * mctx_cur = inp->mctx;
 
     // store to KV cache
     {
@@ -2141,7 +2244,9 @@ ggml_tensor * llm_graph_context::build_attn(
     ggml_tensor * cur = build_attn_mha(q, k, v, kq_b, kq_mask, sinks, v_mla, kq_scale, il);
     cb(cur, "kqv_out", il);
 
-    if (inp->self_v_rot) {
+    if (pqtq_v && !pqtq_fused_wht) {
+        cur = llama_graph_apply_pq_tq_wht_inverse(ctx0, cur, q_cur->ne[0]);
+    } else if (inp->self_v_rot) {
         cur = ggml_mul_mat_aux(ctx0, cur, inp->self_v_rot);
     }
 
@@ -2255,16 +2360,24 @@ ggml_tensor * llm_graph_context::build_attn(
             int       il) const {
     const bool is_swa = hparams.is_swa(il);
 
+    const auto * mctx_iswa = inp->mctx;
+    const auto * mctx_cur = is_swa ? mctx_iswa->get_swa() : mctx_iswa->get_base();
+
     auto * k_rot = is_swa ? inp->self_k_rot_swa : inp->self_k_rot;
     auto * v_rot = is_swa ? inp->self_v_rot_swa : inp->self_v_rot;
+    const bool pqtq_k = llama_graph_type_is_pqtq(mctx_cur->type_k());
+    const bool pqtq_v = llama_graph_type_is_pqtq(mctx_cur->type_v());
+    const bool pqtq_fused_wht = llama_graph_pq_tq_fused_wht(cparams, q_cur, kq_b, mctx_cur->type_k(), mctx_cur->type_v());
 
-    if (k_rot) {
+    if (pqtq_k && !pqtq_fused_wht) {
+        q_cur = llama_graph_apply_pq_tq_wht_forward(ctx0, q_cur);
+    } else if (k_rot) {
         q_cur = ggml_mul_mat_aux(ctx0, q_cur, k_rot);
         if (k_cur) {
             k_cur = ggml_mul_mat_aux(ctx0, k_cur, k_rot);
         }
     }
-    if (v_rot) {
+    if (v_rot && !pqtq_v) {
         if (v_cur) {
             v_cur = ggml_mul_mat_aux(ctx0, v_cur, v_rot);
         }
@@ -2281,10 +2394,6 @@ ggml_tensor * llm_graph_context::build_attn(
     if (v_cur) {
         ggml_build_forward_expand(gf, v_cur);
     }
-
-    const auto * mctx_iswa = inp->mctx;
-
-    const auto * mctx_cur = is_swa ? mctx_iswa->get_swa() : mctx_iswa->get_base();
 
     // optionally store to KV cache
     if (k_cur) {
@@ -2308,7 +2417,9 @@ ggml_tensor * llm_graph_context::build_attn(
     ggml_tensor * cur = build_attn_mha(q, k, v, kq_b, kq_mask, sinks, v_mla, kq_scale, il);
     cb(cur, "kqv_out", il);
 
-    if (v_rot) {
+    if (pqtq_v && !pqtq_fused_wht) {
+        cur = llama_graph_apply_pq_tq_wht_inverse(ctx0, cur, q_cur->ne[0]);
+    } else if (v_rot) {
         cur = ggml_mul_mat_aux(ctx0, cur, v_rot);
     }
 

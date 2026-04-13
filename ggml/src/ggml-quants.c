@@ -5428,6 +5428,78 @@ bool ggml_validate_row_data(enum ggml_type type, const void * data, size_t nbyte
             {
                 VALIDATE_ROW_DATA_D_F16_IMPL(block_tq2_0, data, nb);
             } break;
+        case GGML_TYPE_PQ2_0:
+            {
+                const block_pq2 * q = (const block_pq2 *) data;
+                for (size_t i = 0; i < nb; ++i) {
+                    if (!validate_fp16(q[i].norm, i)) {
+                        return false;
+                    }
+                }
+            } break;
+        case GGML_TYPE_PQ3_0:
+            {
+                const block_pq3 * q = (const block_pq3 *) data;
+                for (size_t i = 0; i < nb; ++i) {
+                    if (!validate_fp16(q[i].norm, i)) {
+                        return false;
+                    }
+                }
+            } break;
+        case GGML_TYPE_PQ4_0:
+            {
+                const block_pq4 * q = (const block_pq4 *) data;
+                for (size_t i = 0; i < nb; ++i) {
+                    if (!validate_fp16(q[i].norm, i) || !validate_fp16(q[i].rnorm, i)) {
+                        return false;
+                    }
+                }
+            } break;
+        case GGML_TYPE_PQ4_0_64:
+            {
+                const block_pq4_d64 * q = (const block_pq4_d64 *) data;
+                for (size_t i = 0; i < nb; ++i) {
+                    if (!validate_fp16(q[i].norm, i) || !validate_fp16(q[i].rnorm, i)) {
+                        return false;
+                    }
+                }
+            } break;
+        case GGML_TYPE_TQ2_1:
+            {
+                const block_tq2 * q = (const block_tq2 *) data;
+                for (size_t i = 0; i < nb; ++i) {
+                    if (!validate_fp16(q[i].norm, i) || !validate_fp16(q[i].rnorm, i)) {
+                        return false;
+                    }
+                }
+            } break;
+        case GGML_TYPE_TQ3_1:
+            {
+                const block_tq3 * q = (const block_tq3 *) data;
+                for (size_t i = 0; i < nb; ++i) {
+                    if (!validate_fp16(q[i].norm, i) || !validate_fp16(q[i].rnorm, i)) {
+                        return false;
+                    }
+                }
+            } break;
+        case GGML_TYPE_TQ4_1:
+            {
+                const block_tq4 * q = (const block_tq4 *) data;
+                for (size_t i = 0; i < nb; ++i) {
+                    if (!validate_fp16(q[i].norm, i) || !validate_fp16(q[i].rnorm, i)) {
+                        return false;
+                    }
+                }
+            } break;
+        case GGML_TYPE_TQ4_1_64:
+            {
+                const block_tq4_d64 * q = (const block_tq4_d64 *) data;
+                for (size_t i = 0; i < nb; ++i) {
+                    if (!validate_fp16(q[i].norm, i) || !validate_fp16(q[i].rnorm, i)) {
+                        return false;
+                    }
+                }
+            } break;
         case GGML_TYPE_IQ1_S:
             {
                 VALIDATE_ROW_DATA_D_F16_IMPL(block_iq1_s, data, nb);

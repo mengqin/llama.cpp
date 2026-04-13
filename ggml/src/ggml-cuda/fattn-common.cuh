@@ -2,6 +2,8 @@
 
 #include "common.cuh"
 #include "convert.cuh"
+#include "pq-tq-common.cuh"
+#include "pq-tq-dequant-wht.cuh"
 #include "vecdotq.cuh"
 
 #include <cstdint>
@@ -322,7 +324,9 @@ static __device__ __forceinline__ void quantize_q8_1_to_shared(
         }
     }
 
-    yq32[threadIdx.x] = q32;
+    if (ni == WARP_SIZE || threadIdx.x < ni) {
+        yq32[threadIdx.x] = q32;
+    }
     if (threadIdx.x % QI8_1 == 0 && (ni == WARP_SIZE || threadIdx.x < ni)) {
         if (std::is_same<Tds, half2>::value) {
             ((half2  *) yds)[threadIdx.x/QI8_1] =  make_half2(d, sum);
@@ -577,6 +581,599 @@ static __device__ __forceinline__ void dequantize_V_q8_0(const void * __restrict
     }
 }
 
+// PQ/TQ flash-attention vec dot and V dequantize
+
+// KQ vec dot for pq2_0 K cache (2-bit, 4 centroids, no sign byte)
+template<int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_pq2_0(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+    const block_pq2 * K = (const block_pq2 *) K_c;
+    GGML_UNUSED(Q_v);
+
+    float sum = 0.0f;
+    const float2 * Q_ds = (const float2 *) Q_ds_v;
+
+    constexpr int QI_PQ2 = QK_PQ_TQ_2 / 4; // = 8
+
+#pragma unroll
+    for (int k_KQ_0 = 0; k_KQ_0 < D/sizeof(int); k_KQ_0 += nthreads) {
+        const int k_KQ  = k_KQ_0 + (nthreads == WARP_SIZE ? threadIdx.x : threadIdx.x % nthreads);
+        if (k_KQ >= int(D/sizeof(int))) continue; // D=64: threads 16-31 idle
+        const int ib    = k_KQ / QI_PQ2;
+        const int local = k_KQ % QI_PQ2;
+        const uint8_t qb = K[ib].qs[local];
+        const int v = pq_tq_centroid_pack_2bit_i8(qb);
+        const int u = Q_q8[k_KQ_0/nthreads];
+        const int sumi = ggml_cuda_dp4a(v, u, 0);
+
+        sum += (__half2float(K[ib].norm) * PQ_TQ_DP4A_INV_SCALE_2BIT) * Q_ds[k_KQ_0/nthreads].x * (float)sumi;
+    }
+
+    return sum;
+}
+
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_pq2_0(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    static_assert(ne == 2 || ne == 4 || ne == 8, "pq2 vec V dequant expects ne == 2, 4, or 8");
+
+    const block_pq2 * x = (const block_pq2 *) vx;
+    const int64_t ib0      = i0 / QK_PQ_TQ_2;
+    const int     local_i0 = (int)(i0 % QK_PQ_TQ_2);
+
+    if constexpr (ne == 2) {
+        // D=64 path: 2 elements per thread
+        const float norm = __half2float(x[ib0].norm);
+        const uint8_t qb = x[ib0].qs[local_i0 / 4];
+        const uint8_t nibble = (qb >> (2 * (local_i0 & 2))) & 0x0F;
+        const float2 pair = pq_tq_centroid_pair_2bit(nibble);
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *) dst)[0] = make_half2(__float2half(norm * pair.x), __float2half(norm * pair.y));
+        } else
+#endif
+        {
+            ((float2 *) dst)[0] = make_float2(norm * pair.x, norm * pair.y);
+        }
+    } else {
+#ifdef FP16_AVAILABLE
+    if constexpr (std::is_same_v<T, half>) {
+        #pragma unroll
+        for (int l0 = 0; l0 < ne; l0 += 4) {
+            const int64_t ib = ib0 + (local_i0 + l0) / QK_PQ_TQ_2;
+            const int local_i = (local_i0 + l0) % QK_PQ_TQ_2;
+            const half2 norm_h2 = __half2half2(x[ib].norm);
+            const uint8_t qb = x[ib].qs[local_i / 4];
+
+            ((half2 *) dst)[l0/2 + 0] = __hmul2(norm_h2, pq_tq_centroid_pair_2bit_h2(qb & 0x0F));
+            ((half2 *) dst)[l0/2 + 1] = __hmul2(norm_h2, pq_tq_centroid_pair_2bit_h2(qb >> 4));
+        }
+    } else
+#endif // FP16_AVAILABLE
+    if constexpr (std::is_same_v<T, float>) {
+        #pragma unroll
+        for (int l0 = 0; l0 < ne; l0 += 4) {
+            const int64_t ib = ib0 + (local_i0 + l0) / QK_PQ_TQ_2;
+            const int local_i = (local_i0 + l0) % QK_PQ_TQ_2;
+            const float norm = __half2float(x[ib].norm);
+            const uint8_t qb = x[ib].qs[local_i / 4];
+
+            const float2 pair01 = pq_tq_centroid_pair_2bit(qb & 0x0F);
+            const float2 pair23 = pq_tq_centroid_pair_2bit(qb >> 4);
+            ((float2 *) dst)[l0/2 + 0] = make_float2(norm * pair01.x, norm * pair01.y);
+            ((float2 *) dst)[l0/2 + 1] = make_float2(norm * pair23.x, norm * pair23.y);
+        }
+    } else {
+        static_assert(std::is_same_v<T, void>, "bad type");
+    }
+    } // ne == 2 else
+}
+
+template<int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_pq3_0(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+    const block_pq3 * K = (const block_pq3 *) K_c;
+    GGML_UNUSED(Q_v);
+
+    float sum = 0.0f;
+    const float2 * Q_ds = (const float2 *) Q_ds_v;
+
+    constexpr int QI_PQ3 = QK_PQ_TQ_3 / 4;
+
+#pragma unroll
+    for (int k_KQ_0 = 0; k_KQ_0 < D/sizeof(int); k_KQ_0 += nthreads) {
+        const int k_KQ  = k_KQ_0 + (nthreads == WARP_SIZE ? threadIdx.x : threadIdx.x % nthreads);
+        if (k_KQ >= int(D/sizeof(int))) continue; // D=64: threads 16-31 idle
+        const int ib    = k_KQ / QI_PQ3;
+        const int local = k_KQ % QI_PQ3;
+        const uint8_t qb = K[ib].qs[local];
+        const uint8_t sb = (K[ib].signs[local / 2] >> ((local & 1) * 4)) & 0x0F;
+        const int v = pq_tq_centroid_pack_3bit_i8(qb, sb);
+        const int u = Q_q8[k_KQ_0/nthreads];
+        const int sumi = ggml_cuda_dp4a(v, u, 0);
+
+        sum += (__half2float(K[ib].norm) * PQ_TQ_DP4A_INV_SCALE_3BIT) * Q_ds[k_KQ_0/nthreads].x * (float)sumi;
+    }
+
+    return sum;
+}
+
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_pq3_0(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    static_assert(ne == 2 || ne == 4 || ne == 8, "pq3 vec V dequant expects ne == 2, 4, or 8");
+
+    const block_pq3 * x = (const block_pq3 *) vx;
+    const int64_t ib0      = i0 / QK_PQ_TQ_3;
+    const int     local_i0 = (int)(i0 % QK_PQ_TQ_3);
+
+    if constexpr (ne == 2) {
+        // D=64 path: 2 elements per thread
+        const float norm = __half2float(x[ib0].norm);
+        const uint8_t qb = x[ib0].qs[local_i0 / 4];
+        const uint8_t sb = (x[ib0].signs[local_i0 / 8] >> (local_i0 & 0x4)) & 0x0F;
+        float2 pair;
+        if (local_i0 % 4 == 0) {
+            pair = pq_tq_centroid_pair_3bit(qb & 0x0F, sb & 0x03);
+        } else {
+            pair = pq_tq_centroid_pair_3bit(qb >> 4, sb >> 2);
+        }
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *) dst)[0] = make_half2(__float2half(norm * pair.x), __float2half(norm * pair.y));
+        } else
+#endif
+        {
+            ((float2 *) dst)[0] = make_float2(norm * pair.x, norm * pair.y);
+        }
+    } else {
+
+#ifdef FP16_AVAILABLE
+    if constexpr (std::is_same_v<T, half>) {
+        // Use half2 arithmetic: avoids float<->half conversions, uses half2 multiply.
+        #pragma unroll
+        for (int l0 = 0; l0 < ne; l0 += 4) {
+            const int64_t ib = ib0 + (local_i0 + l0) / QK_PQ_TQ_3;
+            const int local_i = (local_i0 + l0) % QK_PQ_TQ_3;
+            const half2 norm_h2 = __half2half2(x[ib].norm);
+            const uint8_t qb = x[ib].qs[local_i / 4];
+            const uint8_t sb = (x[ib].signs[local_i / 8] >> (local_i & 0x4)) & 0x0F;
+
+            ((half2 *) dst)[l0/2 + 0] = __hmul2(norm_h2, pq_tq_centroid_pair_3bit_h2(qb & 0x0F, sb & 0x03));
+            ((half2 *) dst)[l0/2 + 1] = __hmul2(norm_h2, pq_tq_centroid_pair_3bit_h2(qb >> 4,   sb >> 2));
+        }
+    } else
+#endif // FP16_AVAILABLE
+    if constexpr (std::is_same_v<T, float>) {
+        #pragma unroll
+        for (int l0 = 0; l0 < ne; l0 += 4) {
+            const int64_t ib = ib0 + (local_i0 + l0) / QK_PQ_TQ_3;
+            const int local_i = (local_i0 + l0) % QK_PQ_TQ_3;
+            const float norm = __half2float(x[ib].norm);
+            const uint8_t qb = x[ib].qs[local_i / 4];
+            const uint8_t sb = (x[ib].signs[local_i / 8] >> (local_i & 0x4)) & 0x0F;
+
+            const float2 pair01 = pq_tq_centroid_pair_3bit(qb & 0x0F, sb & 0x03);
+            const float2 pair23 = pq_tq_centroid_pair_3bit(qb >> 4,   sb >> 2);
+            ((float2 *) dst)[l0/2 + 0] = make_float2(norm * pair01.x, norm * pair01.y);
+            ((float2 *) dst)[l0/2 + 1] = make_float2(norm * pair23.x, norm * pair23.y);
+        }
+    } else {
+        static_assert(std::is_same_v<T, void>, "bad type");
+    }
+    } // ne == 2 else
+}
+
+// KQ vec dot for pq4/tq4 K cache.
+// Q is pre-quantized to Q8_1 (Q_q8 = 4 int8 values per int32, Q_ds_v = float2 scale).
+// K centroid lookup: k_float[i] = PQ_TQ_CENTROIDS_4BIT[nibble_i] * norm
+// Thread t handles 4 consecutive K elements: 4t, 4t+1, 4t+2, 4t+3 (for D=128 with nthreads=32).
+template<typename block_pq_tq4, int block_qk, int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_pq4_0_impl(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+    const block_pq_tq4 * K = (const block_pq_tq4 *) K_c;
+    GGML_UNUSED(Q_v);
+
+    float sum = 0.0f;
+    const int lane = nthreads == WARP_SIZE ? threadIdx.x : threadIdx.x % nthreads;
+    const float2 * Q_ds = (const float2 *) Q_ds_v;
+
+    constexpr int QI_PQ4 = block_qk / 4;
+
+#pragma unroll
+    for (int k_KQ_0 = 0; k_KQ_0 < D/sizeof(int); k_KQ_0 += nthreads) {
+        const int k_KQ  = k_KQ_0 + lane;
+        if (k_KQ >= int(D/sizeof(int))) continue;
+        const int ib    = k_KQ / QI_PQ4;          // which pq4 block
+        const int local = k_KQ % QI_PQ4;          // position within block (0..31)
+        uint16_t qpair;
+        ggml_cuda_memcpy_1<sizeof(qpair), 2>(&qpair, K[ib].qs + 2*local);
+        const int v = pq_tq_centroid_pack_4bit_i8(qpair);
+        const int u = Q_q8[k_KQ_0/nthreads];
+        const int sumi = ggml_cuda_dp4a(v, u, 0);
+
+        const float norm_scale = __half2float(K[ib].norm) * PQ_TQ_DP4A_INV_SCALE_4BIT;
+        sum += norm_scale * Q_ds[k_KQ_0/nthreads].x * (float)sumi;
+    }
+
+    return sum;
+}
+
+template<int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_pq4_0(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+    return vec_dot_fattn_vec_KQ_pq4_0_impl<block_pq4, QK_PQ_TQ_4, D, nthreads>(K_c, Q_v, Q_q8, Q_ds_v);
+}
+
+template<int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_pq4_0_64(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+    return vec_dot_fattn_vec_KQ_pq4_0_impl<block_pq4_d64, QK_PQ_TQ_4_D64, D, nthreads>(K_c, Q_v, Q_q8, Q_ds_v);
+}
+
+// V dequantize for pq4 V cache.
+// i0 = starting element index (always aligned to ne, i.e. even for ne=2, 4-aligned for ne=4).
+// Outputs ne float or half values to dst.
+template <typename block_pq4, int block_qk, typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_pq4_0_impl(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    static_assert(ne == 2 || ne == 4 || ne == 8, "PQ4 vec V dequant expects ne == 2, 4, or 8");
+
+    const block_pq4 * x = (const block_pq4 *) vx;
+    const int64_t ib0      = i0 / block_qk;
+    const int     local_i0 = (int)(i0 % block_qk);
+
+    if constexpr (ne == 2) {
+        const float norm = __half2float(x[ib0].norm);
+        const uint8_t qb = x[ib0].qs[local_i0 / 2];
+        const float2 pair = pq_tq_centroid_pair_4bit(qb);
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *) dst)[0] = make_half2(__float2half(norm * pair.x), __float2half(norm * pair.y));
+        } else
+#endif
+        {
+            ((float2 *) dst)[0] = make_float2(norm * pair.x, norm * pair.y);
+        }
+        return;
+    }
+
+#ifdef FP16_AVAILABLE
+    if constexpr (std::is_same_v<T, half>) {
+        if constexpr (ne == 8 && block_qk == QK_PQ_TQ_4) {
+            // Use half2 arithmetic: avoids float<->half conversions, uses half2 multiply.
+            const half2 norm_h2 = __half2half2(x[ib0].norm);
+            uint32_t qquad;
+            ggml_cuda_memcpy_1<sizeof(qquad), 4>(&qquad, x[ib0].qs + local_i0 / 2);
+
+            ((half2 *) dst)[0] = __hmul2(norm_h2, pq_tq_centroid_pair_4bit_h2( qquad        & 0xFFu));
+            ((half2 *) dst)[1] = __hmul2(norm_h2, pq_tq_centroid_pair_4bit_h2((qquad >>  8) & 0xFFu));
+            ((half2 *) dst)[2] = __hmul2(norm_h2, pq_tq_centroid_pair_4bit_h2((qquad >> 16) & 0xFFu));
+            ((half2 *) dst)[3] = __hmul2(norm_h2, pq_tq_centroid_pair_4bit_h2((qquad >> 24) & 0xFFu));
+        } else {
+            #pragma unroll
+            for (int l0 = 0; l0 < ne; l0 += 4) {
+                const int64_t ib = ib0 + (local_i0 + l0) / block_qk;
+                const int local_i = (local_i0 + l0) % block_qk;
+                const half2 norm_h2 = __half2half2(x[ib].norm);
+                uint16_t qpair;
+                ggml_cuda_memcpy_1<sizeof(qpair), 2>(&qpair, x[ib].qs + local_i / 2);
+                ((half2 *) dst)[l0/2 + 0] = __hmul2(norm_h2, pq_tq_centroid_pair_4bit_h2( qpair        & 0xFFu));
+                ((half2 *) dst)[l0/2 + 1] = __hmul2(norm_h2, pq_tq_centroid_pair_4bit_h2((qpair >>  8) & 0xFFu));
+            }
+        }
+    } else
+#endif // FP16_AVAILABLE
+    if constexpr (std::is_same_v<T, float>) {
+        if constexpr (ne == 8 && block_qk == QK_PQ_TQ_4) {
+            const float norm = __half2float(x[ib0].norm);
+            uint32_t qquad;
+            ggml_cuda_memcpy_1<sizeof(qquad), 4>(&qquad, x[ib0].qs + local_i0 / 2);
+
+            const float2 pair01 = pq_tq_centroid_pair_4bit( qquad        & 0xFFu);
+            const float2 pair23 = pq_tq_centroid_pair_4bit((qquad >>  8) & 0xFFu);
+            const float2 pair45 = pq_tq_centroid_pair_4bit((qquad >> 16) & 0xFFu);
+            const float2 pair67 = pq_tq_centroid_pair_4bit((qquad >> 24) & 0xFFu);
+            ((float2 *) dst)[0] = make_float2(norm * pair01.x, norm * pair01.y);
+            ((float2 *) dst)[1] = make_float2(norm * pair23.x, norm * pair23.y);
+            ((float2 *) dst)[2] = make_float2(norm * pair45.x, norm * pair45.y);
+            ((float2 *) dst)[3] = make_float2(norm * pair67.x, norm * pair67.y);
+        } else {
+            #pragma unroll
+            for (int l0 = 0; l0 < ne; l0 += 4) {
+                const int64_t ib = ib0 + (local_i0 + l0) / block_qk;
+                const int local_i = (local_i0 + l0) % block_qk;
+                const float norm = __half2float(x[ib].norm);
+                uint16_t qpair;
+                ggml_cuda_memcpy_1<sizeof(qpair), 2>(&qpair, x[ib].qs + local_i / 2);
+                const float2 pair01 = pq_tq_centroid_pair_4bit( qpair        & 0xFF);
+                const float2 pair23 = pq_tq_centroid_pair_4bit((qpair >>  8) & 0xFF);
+                ((float2 *) dst)[l0/2 + 0] = make_float2(norm * pair01.x, norm * pair01.y);
+                ((float2 *) dst)[l0/2 + 1] = make_float2(norm * pair23.x, norm * pair23.y);
+            }
+        }
+    } else {
+        static_assert(std::is_same_v<T, void>, "bad type");
+    }
+}
+
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_pq4_0(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    dequantize_V_pq4_0_impl<block_pq4, QK_PQ_TQ_4, T, ne>(vx, dst, i0);
+}
+
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_pq4_0_64(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    dequantize_V_pq4_0_impl<block_pq4_d64, QK_PQ_TQ_4_D64, T, ne>(vx, dst, i0);
+}
+
+// ===== QJL flash attention functions (_1 variants) =====
+// Same base centroid dot/dequant as _0 + QJL residual sign correction
+
+// KQ dot for tq2
+template<int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_tq2_1(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+    const block_tq2 * K = (const block_tq2 *) K_c;
+    GGML_UNUSED(Q_v);
+    float sum = 0.0f;
+    const float2 * Q_ds = (const float2 *) Q_ds_v;
+    constexpr int QI = QK_PQ_TQ_2 / 4;
+#pragma unroll
+    for (int k0 = 0; k0 < D/sizeof(int); k0 += nthreads) {
+        const int k = k0 + (nthreads == WARP_SIZE ? threadIdx.x : threadIdx.x % nthreads);
+        if (k >= int(D/sizeof(int))) continue; // D=64: threads 16-31 idle
+        const int ib = k / QI, local = k % QI;
+        const int u = Q_q8[k0/nthreads];
+        const float d_Q = Q_ds[k0/nthreads].x;
+        // Base centroid dot
+        const int v = pq_tq_centroid_pack_2bit_i8(K[ib].qs[local]);
+        sum += __half2float(K[ib].norm) * PQ_TQ_DP4A_INV_SCALE_2BIT * d_Q * (float)ggml_cuda_dp4a(v, u, 0);
+        // QJL correction
+        const int signs = tq_qjl_pack_signs_i8(K[ib].qjl[local/2], (local&1)*4);
+        sum += __half2float(K[ib].rnorm) * TQ_QJL_DP4A_CORRECTION_SCALE * d_Q * (float)ggml_cuda_dp4a(signs, u, 0);
+    }
+    return sum;
+}
+
+// V dequant for tq2
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_tq2_1(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    static_assert(ne == 2 || ne == 4 || ne == 8, "");
+    const block_tq2 * x = (const block_tq2 *) vx;
+    const int64_t ib0 = i0 / QK_PQ_TQ_2;
+    const int local_i0 = (int)(i0 % QK_PQ_TQ_2);
+
+    if constexpr (ne == 2) {
+        const float norm = __half2float(x[ib0].norm);
+        const float rnorm = __half2float(x[ib0].rnorm);
+        const uint8_t qb = x[ib0].qs[local_i0 / 4];
+        const uint8_t jb = x[ib0].qjl[local_i0 / 8];
+        const int sh = local_i0 % 8;
+        const uint8_t nibble = (qb >> (2 * (local_i0 & 2))) & 0x0F;
+        const float2 pair = pq_tq_centroid_pair_2bit(nibble);
+        const float2 corr = tq_qjl_correction_pair(jb, sh, rnorm);
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *) dst)[0] = make_half2(__float2half(norm * pair.x + corr.x), __float2half(norm * pair.y + corr.y));
+        } else
+#endif
+        {
+            ((float2 *) dst)[0] = make_float2(norm * pair.x + corr.x, norm * pair.y + corr.y);
+        }
+    } else {
+#pragma unroll
+    for (int l0 = 0; l0 < ne; l0 += 4) {
+        const int64_t ib = ib0 + (local_i0 + l0) / QK_PQ_TQ_2;
+        const int li = (local_i0 + l0) % QK_PQ_TQ_2;
+        const float norm = __half2float(x[ib].norm);
+        const float rnorm = __half2float(x[ib].rnorm);
+        const uint8_t qb = x[ib].qs[li/4];
+        const uint8_t jb = x[ib].qjl[li/8];
+        const int sh = li % 8;
+        const float2 p01 = pq_tq_centroid_pair_2bit(qb & 0x0F);
+        const float2 p23 = pq_tq_centroid_pair_2bit(qb >> 4);
+        const float2 c01 = tq_qjl_correction_pair(jb, sh, rnorm);
+        const float2 c23 = tq_qjl_correction_pair(jb, sh+2, rnorm);
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2*)dst)[l0/2+0] = __floats2half2_rn(norm*p01.x+c01.x, norm*p01.y+c01.y);
+            ((half2*)dst)[l0/2+1] = __floats2half2_rn(norm*p23.x+c23.x, norm*p23.y+c23.y);
+        } else
+#endif
+        {
+            ((float2*)dst)[l0/2+0] = make_float2(norm*p01.x+c01.x, norm*p01.y+c01.y);
+            ((float2*)dst)[l0/2+1] = make_float2(norm*p23.x+c23.x, norm*p23.y+c23.y);
+        }
+    }
+    } // ne == 2 else
+}
+
+// KQ dot for tq3
+template<int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_tq3_1(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+    const block_tq3 * K = (const block_tq3 *) K_c;
+    GGML_UNUSED(Q_v);
+    float sum = 0.0f;
+    const float2 * Q_ds = (const float2 *) Q_ds_v;
+    constexpr int QI = QK_PQ_TQ_3 / 4;
+#pragma unroll
+    for (int k0 = 0; k0 < D/sizeof(int); k0 += nthreads) {
+        const int k = k0 + (nthreads == WARP_SIZE ? threadIdx.x : threadIdx.x % nthreads);
+        if (k >= int(D/sizeof(int))) continue; // D=64: threads 16-31 idle
+        const int ib = k / QI, local = k % QI;
+        const int u = Q_q8[k0/nthreads];
+        const float d_Q = Q_ds[k0/nthreads].x;
+        const uint8_t sb = (K[ib].signs[local/2] >> ((local&1)*4)) & 0x0F;
+        const int v = pq_tq_centroid_pack_3bit_i8(K[ib].qs[local], sb);
+        sum += __half2float(K[ib].norm) * PQ_TQ_DP4A_INV_SCALE_3BIT * d_Q * (float)ggml_cuda_dp4a(v, u, 0);
+        // QJL correction
+        const int signs = tq_qjl_pack_signs_i8(K[ib].qjl[local/2], (local&1)*4);
+        sum += __half2float(K[ib].rnorm) * TQ_QJL_DP4A_CORRECTION_SCALE * d_Q * (float)ggml_cuda_dp4a(signs, u, 0);
+    }
+    return sum;
+}
+
+// V dequant for tq3
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_tq3_1(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    static_assert(ne == 2 || ne == 4 || ne == 8, "");
+    const block_tq3 * x = (const block_tq3 *) vx;
+    const int64_t ib0 = i0 / QK_PQ_TQ_3;
+    const int local_i0 = (int)(i0 % QK_PQ_TQ_3);
+
+    if constexpr (ne == 2) {
+        const float norm = __half2float(x[ib0].norm);
+        const float rnorm = __half2float(x[ib0].rnorm);
+        const uint8_t qb = x[ib0].qs[local_i0 / 4];
+        const uint8_t sb = (x[ib0].signs[local_i0 / 8] >> (local_i0 & 0x4)) & 0x0F;
+        const uint8_t jb = x[ib0].qjl[local_i0 / 8];
+        const int sh = local_i0 % 8;
+        float2 pair;
+        if (local_i0 % 4 == 0) {
+            pair = pq_tq_centroid_pair_3bit(qb & 0x0F, sb & 0x03);
+        } else {
+            pair = pq_tq_centroid_pair_3bit(qb >> 4, sb >> 2);
+        }
+        const float2 corr = tq_qjl_correction_pair(jb, sh, rnorm);
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2 *) dst)[0] = make_half2(__float2half(norm * pair.x + corr.x), __float2half(norm * pair.y + corr.y));
+        } else
+#endif
+        {
+            ((float2 *) dst)[0] = make_float2(norm * pair.x + corr.x, norm * pair.y + corr.y);
+        }
+    } else {
+#pragma unroll
+    for (int l0 = 0; l0 < ne; l0 += 4) {
+        const int64_t ib = ib0 + (local_i0 + l0) / QK_PQ_TQ_3;
+        const int li = (local_i0 + l0) % QK_PQ_TQ_3;
+        const float norm = __half2float(x[ib].norm);
+        const float rnorm = __half2float(x[ib].rnorm);
+        const uint8_t qb = x[ib].qs[li/4];
+        const uint8_t sb = (x[ib].signs[li/8] >> (li & 0x4)) & 0x0F;
+        const uint8_t jb = x[ib].qjl[li/8];
+        const int sh = li % 8;
+        const float2 p01 = pq_tq_centroid_pair_3bit(qb & 0x0F, sb & 0x03);
+        const float2 p23 = pq_tq_centroid_pair_3bit(qb >> 4, sb >> 2);
+        const float2 c01 = tq_qjl_correction_pair(jb, sh, rnorm);
+        const float2 c23 = tq_qjl_correction_pair(jb, sh+2, rnorm);
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2*)dst)[l0/2+0] = __floats2half2_rn(norm*p01.x+c01.x, norm*p01.y+c01.y);
+            ((half2*)dst)[l0/2+1] = __floats2half2_rn(norm*p23.x+c23.x, norm*p23.y+c23.y);
+        } else
+#endif
+        {
+            ((float2*)dst)[l0/2+0] = make_float2(norm*p01.x+c01.x, norm*p01.y+c01.y);
+            ((float2*)dst)[l0/2+1] = make_float2(norm*p23.x+c23.x, norm*p23.y+c23.y);
+        }
+    }
+    } // ne == 2 else
+}
+
+// KQ dot for tq4
+template<typename block_tq4, int block_qk, int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_tq4_1_impl(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+    const block_tq4 * K = (const block_tq4 *) K_c;
+    GGML_UNUSED(Q_v);
+    float sum = 0.0f;
+    const int lane = nthreads == WARP_SIZE ? threadIdx.x : threadIdx.x % nthreads;
+    const float2 * Q_ds = (const float2 *) Q_ds_v;
+    constexpr int QI = block_qk / 4;
+#pragma unroll
+    for (int k0 = 0; k0 < D/sizeof(int); k0 += nthreads) {
+        const int k = k0 + lane;
+        if (k >= int(D/sizeof(int))) continue;
+        const int ib = k / QI, local = k % QI;
+        const int u = Q_q8[k0/nthreads];
+        const float d_Q = Q_ds[k0/nthreads].x;
+        uint16_t qpair;
+        ggml_cuda_memcpy_1<sizeof(qpair), 2>(&qpair, K[ib].qs + 2*local);
+        const int v = pq_tq_centroid_pack_4bit_i8(qpair);
+        sum += __half2float(K[ib].norm) * PQ_TQ_DP4A_INV_SCALE_4BIT * d_Q * (float)ggml_cuda_dp4a(v, u, 0);
+        // QJL correction
+        const int signs = tq_qjl_pack_signs_i8(K[ib].qjl[local/2], (local&1)*4);
+        sum += __half2float(K[ib].rnorm) * TQ_QJL_DP4A_CORRECTION_SCALE * d_Q * (float)ggml_cuda_dp4a(signs, u, 0);
+    }
+    return sum;
+}
+
+template<int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_tq4_1(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+    return vec_dot_fattn_vec_KQ_tq4_1_impl<block_tq4, QK_PQ_TQ_4, D, nthreads>(K_c, Q_v, Q_q8, Q_ds_v);
+}
+
+template<int D, int nthreads>
+static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_tq4_1_64(
+    const char * __restrict__ K_c, const void * __restrict__ Q_v, const int * __restrict__ Q_q8, const void * __restrict__ Q_ds_v) {
+    return vec_dot_fattn_vec_KQ_tq4_1_impl<block_tq4_d64, QK_PQ_TQ_4_D64, D, nthreads>(K_c, Q_v, Q_q8, Q_ds_v);
+}
+
+// V dequant for tq4
+template <typename block_tq4, int block_qk, typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_tq4_1_impl(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    static_assert(ne == 2 || ne == 4 || ne == 8, "");
+    const block_tq4 * x = (const block_tq4 *) vx;
+    const int64_t ib0 = i0 / block_qk;
+    const int local_i0 = (int)(i0 % block_qk);
+
+    if constexpr (ne == 2) {
+        const float norm = __half2float(x[ib0].norm);
+        const float rnorm = __half2float(x[ib0].rnorm);
+        const uint8_t qb = x[ib0].qs[local_i0 / 2];
+        const uint8_t jb = x[ib0].qjl[local_i0 / 8];
+        const int sh = local_i0 % 8;
+        const float2 pair = pq_tq_centroid_pair_4bit(qb);
+        const float2 corr = tq_qjl_correction_pair(jb, sh, rnorm);
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2*)dst)[0] = __floats2half2_rn(norm*pair.x+corr.x, norm*pair.y+corr.y);
+        } else
+#endif
+        {
+            ((float2*)dst)[0] = make_float2(norm*pair.x+corr.x, norm*pair.y+corr.y);
+        }
+        return;
+    }
+#pragma unroll
+    for (int l0 = 0; l0 < ne; l0 += 4) {
+        const int64_t ib = ib0 + (local_i0 + l0) / block_qk;
+        const int li = (local_i0 + l0) % block_qk;
+        const float norm = __half2float(x[ib].norm);
+        const float rnorm = __half2float(x[ib].rnorm);
+        uint16_t qpair;
+        ggml_cuda_memcpy_1<sizeof(qpair), 2>(&qpair, x[ib].qs + li/2);
+        const uint8_t jb = x[ib].qjl[li/8];
+        const int sh = li % 8;
+        const float2 p01 = pq_tq_centroid_pair_4bit(qpair & 0xFF);
+        const float2 p23 = pq_tq_centroid_pair_4bit((qpair >> 8) & 0xFF);
+        const float2 c01 = tq_qjl_correction_pair(jb, sh, rnorm);
+        const float2 c23 = tq_qjl_correction_pair(jb, sh+2, rnorm);
+#ifdef FP16_AVAILABLE
+        if constexpr (std::is_same_v<T, half>) {
+            ((half2*)dst)[l0/2+0] = __floats2half2_rn(norm*p01.x+c01.x, norm*p01.y+c01.y);
+            ((half2*)dst)[l0/2+1] = __floats2half2_rn(norm*p23.x+c23.x, norm*p23.y+c23.y);
+        } else
+#endif
+        {
+            ((float2*)dst)[l0/2+0] = make_float2(norm*p01.x+c01.x, norm*p01.y+c01.y);
+            ((float2*)dst)[l0/2+1] = make_float2(norm*p23.x+c23.x, norm*p23.y+c23.y);
+        }
+    }
+}
+
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_tq4_1(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    dequantize_V_tq4_1_impl<block_tq4, QK_PQ_TQ_4, T, ne>(vx, dst, i0);
+}
+
+template <typename T, int ne>
+static __device__ __forceinline__ void dequantize_V_tq4_1_64(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
+    dequantize_V_tq4_1_impl<block_tq4_d64, QK_PQ_TQ_4_D64, T, ne>(vx, dst, i0);
+}
+
 template <ggml_type type_K, int D, int nthreads>
 constexpr __device__ vec_dot_KQ_t get_vec_dot_KQ() {
     if constexpr (type_K == GGML_TYPE_F16) {
@@ -593,6 +1190,22 @@ constexpr __device__ vec_dot_KQ_t get_vec_dot_KQ() {
         return vec_dot_fattn_vec_KQ_q8_0<D, nthreads>;
     } else if constexpr (type_K == GGML_TYPE_BF16) {
         return vec_dot_fattn_vec_KQ_bf16<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_PQ2_0) {
+        return vec_dot_fattn_vec_KQ_pq2_0<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_PQ3_0) {
+        return vec_dot_fattn_vec_KQ_pq3_0<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_PQ4_0) {
+        return vec_dot_fattn_vec_KQ_pq4_0<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_PQ4_0_64) {
+        return vec_dot_fattn_vec_KQ_pq4_0_64<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_TQ2_1) {
+        return vec_dot_fattn_vec_KQ_tq2_1<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_TQ3_1) {
+        return vec_dot_fattn_vec_KQ_tq3_1<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_TQ4_1) {
+        return vec_dot_fattn_vec_KQ_tq4_1<D, nthreads>;
+    } else if constexpr (type_K == GGML_TYPE_TQ4_1_64) {
+        return vec_dot_fattn_vec_KQ_tq4_1_64<D, nthreads>;
     } else {
         static_assert(type_K == -1, "bad type");
         return nullptr;
@@ -615,6 +1228,22 @@ constexpr __device__ dequantize_V_t get_dequantize_V() {
         return dequantize_V_q8_0<T, ne>;
     } else if constexpr (type_V == GGML_TYPE_BF16) {
         return dequantize_V_bf16<float, ne>;
+    } else if constexpr (type_V == GGML_TYPE_PQ2_0) {
+        return dequantize_V_pq2_0<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_PQ3_0) {
+        return dequantize_V_pq3_0<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_PQ4_0) {
+        return dequantize_V_pq4_0<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_PQ4_0_64) {
+        return dequantize_V_pq4_0_64<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_TQ2_1) {
+        return dequantize_V_tq2_1<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_TQ3_1) {
+        return dequantize_V_tq3_1<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_TQ4_1) {
+        return dequantize_V_tq4_1<T, ne>;
+    } else if constexpr (type_V == GGML_TYPE_TQ4_1_64) {
+        return dequantize_V_tq4_1_64<T, ne>;
     } else {
         static_assert(type_V == -1, "bad type");
         return nullptr;
@@ -676,96 +1305,9 @@ static __global__ void flash_attn_mask_to_KV_max(
 
 template<int D, int ncols1, int ncols2> // D == head size
 __launch_bounds__(D, 1)
-static __global__ void flash_attn_stream_k_fixup_uniform(
-        float * __restrict__ dst,
-        const float2 * __restrict__ dst_fixup,
-        const int ne01, const int ne02,
-        const int ne12, const int nblocks_stream_k,
-        const int gqa_ratio,
-        const int blocks_per_tile,
-        const uint3 fd_iter_j_z_ne12,
-        const uint3 fd_iter_j_z,
-        const uint3 fd_iter_j) {
-    constexpr int ncols = ncols1*ncols2;
-
-    const int tile_idx = blockIdx.x; // One block per output tile.
-    const int j        = blockIdx.y;
-    const int c        = blockIdx.z;
-    const int jc       = j*ncols2 + c;
-    const int tid      = threadIdx.x;
-
-    // nblocks_stream_k is a multiple of ntiles_dst (== gridDim.x), so each tile gets the same number of blocks.
-    const int b_first = tile_idx * blocks_per_tile;
-    const int b_last  = b_first + blocks_per_tile - 1;
-
-    const float * dst_fixup_data = ((const float *) dst_fixup) + nblocks_stream_k*(2*2*ncols);
-
-    // z_KV == K/V head index, zt_gqa = Q head start index per K/V head, jt = token position start index
-    const uint2 dm0 = fast_div_modulo(tile_idx, fd_iter_j_z_ne12);
-    const uint2 dm1 = fast_div_modulo(dm0.y,    fd_iter_j_z);
-    const uint2 dm2 = fast_div_modulo(dm1.y,    fd_iter_j);
-
-    const int sequence = dm0.x;
-    const int z_KV     = dm1.x;
-    const int zt_gqa   = dm2.x;
-    const int jt       = dm2.y;
-
-    const int zt_Q = z_KV*gqa_ratio + zt_gqa*ncols2; // Global Q head start index.
-
-    if (jt*ncols1 + j >= ne01 || zt_gqa*ncols2 + c >= gqa_ratio) {
-        return;
-    }
-
-    dst += sequence*ne02*ne01*D + jt*ne02*(ncols1*D) + zt_Q*D + (j*ne02 + c)*D + tid;
-
-    // Load the partial result that needs a fixup
-    float dst_val = *dst;
-    float max_val;
-    float rowsum;
-    {
-        const float2 tmp = dst_fixup[b_last*ncols + jc];
-        max_val = tmp.x;
-        rowsum  = tmp.y;
-    }
-
-    // Combine with all previous blocks in this tile.
-    for (int bidx = b_last - 1; bidx >= b_first; --bidx) {
-        const float dst_add = dst_fixup_data[bidx*ncols*D + jc*D + tid];
-
-        const float2 tmp = dst_fixup[(nblocks_stream_k + bidx)*ncols + jc];
-
-        const float max_val_new = fmaxf(max_val, tmp.x);
-
-        const float diff_val = max_val - max_val_new;
-        const float diff_add = tmp.x   - max_val_new;
-
-        const float scale_val = diff_val >= SOFTMAX_FTZ_THRESHOLD ? expf(diff_val) : 0.0f;
-        const float scale_add = diff_add >= SOFTMAX_FTZ_THRESHOLD ? expf(diff_add) : 0.0f;
-
-        dst_val = scale_val*dst_val + scale_add*dst_add;
-        rowsum  = scale_val*rowsum  + scale_add*tmp.y;
-
-        max_val = max_val_new;
-    }
-
-    // Write back final result:
-    *dst = dst_val / rowsum;
-}
-
-// General fixup kernel for the case where the number of blocks per tile is not uniform across tiles
-// (blocks_num.x not a multiple of ntiles_dst)
-template <int D, int ncols1, int ncols2> // D == head size
-__launch_bounds__(D, 1)
-static __global__ void flash_attn_stream_k_fixup_general(
-        float * __restrict__ dst,
-        const float2 * __restrict__ dst_fixup,
-        const int ne01, const int ne02,
-        const int gqa_ratio,
-        const int total_work,
-        const uint3 fd_iter_k_j_z_ne12,
-        const uint3 fd_iter_k_j_z,
-        const uint3 fd_iter_k_j,
-        const uint3 fd_iter_k) {
+static __global__ void flash_attn_stream_k_fixup(
+        float * __restrict__ dst, const float2 * __restrict__ dst_fixup, const int ne01, const int ne02, const int ne03,
+        const int ne11, const int ne12, const int nbatch_fa) {
     constexpr int ncols = ncols1*ncols2;
 
     const int bidx0 = blockIdx.x;
@@ -776,26 +1318,27 @@ static __global__ void flash_attn_stream_k_fixup_general(
 
     const float * dst_fixup_data = ((const float *) dst_fixup) + gridDim.x*(2*2*ncols);
 
-    const int kbc0      = int64_t(bidx0 + 0)*total_work / gridDim.x;
-    const int kbc0_stop = int64_t(bidx0 + 1)*total_work / gridDim.x;
+    const int gqa_ratio = ne02 / ne12; // With grouped query attention there are > 1 Q matrices per K, V matrix.
+
+    const int iter_k     = (ne11      + (nbatch_fa - 1)) / nbatch_fa;
+    const int iter_j     = (ne01      + (ncols1    - 1)) / ncols1;
+    const int iter_z_gqa = (gqa_ratio + (ncols2    - 1)) / ncols2;
+
+    const int kbc0      = int64_t(bidx0 + 0)*(iter_k*iter_j*iter_z_gqa*ne12*ne03) / gridDim.x;
+    const int kbc0_stop = int64_t(bidx0 + 1)*(iter_k*iter_j*iter_z_gqa*ne12*ne03) / gridDim.x;
 
     const bool did_not_have_any_data   = kbc0 == kbc0_stop;
-    const bool wrote_beginning_of_tile = fastmodulo(kbc0, fd_iter_k) == 0;
-    const bool did_not_write_last      = fastdiv(kbc0, fd_iter_k) == fastdiv(kbc0_stop, fd_iter_k) && fastmodulo(kbc0_stop, fd_iter_k) != 0;
+    const bool wrote_beginning_of_tile = kbc0 % iter_k == 0;
+    const bool did_not_write_last      = kbc0/iter_k == kbc0_stop/iter_k && kbc0_stop % iter_k != 0;
     if (did_not_have_any_data || wrote_beginning_of_tile || did_not_write_last) {
         return;
     }
 
     // z_KV == K/V head index, zt_gqa = Q head start index per K/V head, jt = token position start index
-    const uint2 dm0 = fast_div_modulo(kbc0, fd_iter_k_j_z_ne12);
-    const uint2 dm1 = fast_div_modulo(dm0.y, fd_iter_k_j_z);
-    const uint2 dm2 = fast_div_modulo(dm1.y, fd_iter_k_j);
-    const uint2 dm3 = fast_div_modulo(dm2.y, fd_iter_k);
-
-    const int sequence = dm0.x;
-    const int z_KV     = dm1.x;
-    const int zt_gqa   = dm2.x;
-    const int jt       = dm3.x;
+    const int sequence =  kbc0 /(iter_k*iter_j*iter_z_gqa*ne12);
+    const int z_KV     = (kbc0 - iter_k*iter_j*iter_z_gqa*ne12 * sequence)/(iter_k*iter_j*iter_z_gqa);
+    const int zt_gqa   = (kbc0 - iter_k*iter_j*iter_z_gqa*ne12 * sequence - iter_k*iter_j*iter_z_gqa * z_KV)/(iter_k*iter_j);
+    const int jt       = (kbc0 - iter_k*iter_j*iter_z_gqa*ne12 * sequence - iter_k*iter_j*iter_z_gqa * z_KV - iter_k*iter_j * zt_gqa) / iter_k;
 
     const int zt_Q = z_KV*gqa_ratio + zt_gqa*ncols2; // Global Q head start index.
 
@@ -819,11 +1362,10 @@ static __global__ void flash_attn_stream_k_fixup_general(
 
     // Iterate over previous blocks and compute the combined results.
     // All CUDA blocks that get here must have a previous block that needs a fixup.
-    const int tile_kbc0 = fastdiv(kbc0, fd_iter_k);
     int bidx = bidx0 - 1;
     int kbc_stop = kbc0;
     while(true) {
-        const int kbc = int64_t(bidx)*total_work / gridDim.x;
+        const int kbc = int64_t(bidx)*(iter_k*iter_j*iter_z_gqa*ne12*ne03) / gridDim.x;
         if (kbc == kbc_stop) { // Did not have any data.
             bidx--;
             kbc_stop = kbc;
@@ -849,7 +1391,7 @@ static __global__ void flash_attn_stream_k_fixup_general(
         max_val = max_val_new;
 
         // If this block started in a previous tile we are done and don't need to combine additional partial results.
-        if (fastmodulo(kbc, fd_iter_k) == 0 || fastdiv(kbc, fd_iter_k) < tile_kbc0) {
+        if (kbc % iter_k == 0 || kbc/iter_k < kbc0/iter_k) {
             break;
         }
         bidx--;
@@ -916,7 +1458,8 @@ static __global__ void flash_attn_combine_results(
 template <int DV, int ncols1, int ncols2>
 void launch_fattn(
     ggml_backend_cuda_context & ctx, ggml_tensor * dst, fattn_kernel_t fattn_kernel, const int nwarps, const size_t nbytes_shared,
-    const int nbatch_fa, const bool need_f16_K, const bool need_f16_V, const bool stream_k, const int warp_size = WARP_SIZE
+    const int nbatch_fa, const bool need_f16_K, const bool need_f16_V, const bool stream_k, const int warp_size = WARP_SIZE,
+    const char * Q_data_override = nullptr
 ) {
     constexpr int ncols = ncols1 * ncols2;
 
@@ -968,6 +1511,9 @@ void launch_fattn(
 
         K_f16.alloc(ggml_nelements(K));
         if (ggml_is_contiguously_allocated(K)) {
+            // Standard dequant for all types (including pq/tq): produces WHT-domain fp16
+            // for pq/tq types.  The graph handles forward WHT on Q and inverse WHT on
+            // output, which is correct because WHT is orthogonal (Q_wht x K_wht^T = Q x K^T).
             to_fp16_cuda_t to_fp16 = ggml_get_to_fp16_cuda(K->type);
             to_fp16(K_data, K_f16.ptr, ggml_nelements(K), main_stream);
 
@@ -1001,6 +1547,8 @@ void launch_fattn(
 
             V_f16.alloc(ggml_nelements(V));
             if (ggml_is_contiguously_allocated(V)) {
+                // Standard dequant for all types (including pq/tq): produces WHT-domain fp16
+                // for pq/tq types.  Graph handles the inverse WHT on the attention output.
                 to_fp16_cuda_t to_fp16 = ggml_get_to_fp16_cuda(V->type);
                 to_fp16(V_data, V_f16.ptr, ggml_nelements(V), main_stream);
                 V_data = (char *) V_f16.ptr;
@@ -1063,27 +1611,13 @@ void launch_fattn(
         const int tiles_nwaves = (ntiles_dst + max_blocks - 1) / max_blocks;
         const int tiles_efficiency_percent = 100 * ntiles_dst / (max_blocks*tiles_nwaves);
 
+        const int nblocks_stream_k = std::min(max_blocks, ntiles_KV*ntiles_dst);
+
         const bool use_stream_k = cc >= GGML_CUDA_CC_ADA_LOVELACE || amd_wmma_available(cc) || tiles_efficiency_percent < 75;
 
-        blocks_num.x = ntiles_dst;
+        blocks_num.x = use_stream_k ? nblocks_stream_k : ntiles_dst;
         blocks_num.y = 1;
         blocks_num.z = 1;
-
-        if(use_stream_k) {
-            const int nblocks_stream_k_raw = std::min(max_blocks, ntiles_KV*ntiles_dst);
-            // Round down to a multiple of ntiles_dst so that each output tile gets the same number of blocks (avoids fixup).
-            // Only do this if the occupancy loss from rounding is acceptable.
-            const int nblocks_stream_k_rounded = (nblocks_stream_k_raw / ntiles_dst) * ntiles_dst;
-            const int max_efficiency_loss_percent = 5;
-            const int efficiency_loss_percent = nblocks_stream_k_rounded > 0
-                ? 100 * (nblocks_stream_k_raw - nblocks_stream_k_rounded) / nblocks_stream_k_raw
-                : 100;
-            const int nblocks_stream_k = efficiency_loss_percent <= max_efficiency_loss_percent
-                ? nblocks_stream_k_rounded
-                : nblocks_stream_k_raw;
-
-            blocks_num.x = nblocks_stream_k;
-        }
 
         if (ntiles_dst % blocks_num.x != 0) { // Fixup is only needed if the SMs work on fractional tiles.
             dst_tmp_meta.alloc((size_t(blocks_num.x) * ncols * (2 + DV/2)));
@@ -1147,7 +1681,7 @@ void launch_fattn(
 
     GGML_ASSERT(block_dim.x % warp_size == 0);
     fattn_kernel<<<blocks_num, block_dim, nbytes_shared, main_stream>>>(
-        (const char *) Q->data,
+        Q_data_override ? Q_data_override : (const char *) Q->data,
         K_data,
         V_data,
         mask ? ((const char *) mask->data) : nullptr,
@@ -1164,40 +1698,13 @@ void launch_fattn(
     CUDA_CHECK(cudaGetLastError());
 
     if (stream_k) {
-        if ((int)blocks_num.x % ntiles_dst == 0 && (int)blocks_num.x > ntiles_dst) {
-            // Optimized fixup: nblocks_stream_k is a multiple of ntiles_dst, launch one block per tile.
-            const int nblocks_sk  = (int)blocks_num.x;
-            const int bpt         = nblocks_sk / ntiles_dst;
-
-            const uint3 fd0 = init_fastdiv_values(ntiles_x * ntiles_z_gqa * K->ne[2]);
-            const uint3 fd1 = init_fastdiv_values(ntiles_x * ntiles_z_gqa);
-            const uint3 fd2 = init_fastdiv_values(ntiles_x);
-
-            const dim3 block_dim_combine(DV, 1, 1);
-            const dim3 blocks_num_combine = {(unsigned)ntiles_dst, ncols1, ncols2};
-
-            flash_attn_stream_k_fixup_uniform<DV, ncols1, ncols2>
-                <<<blocks_num_combine, block_dim_combine, 0, main_stream>>>
-                ((float *) KQV->data, dst_tmp_meta.ptr,
-                 Q->ne[1], Q->ne[2], K->ne[2], nblocks_sk,
-                 gqa_ratio, bpt, fd0, fd1, fd2);
-        } else if (ntiles_dst % blocks_num.x != 0) {
-            // General fixup for the cases where nblocks_stream_k < ntiles_dst.
-            const int total_work = ntiles_KV * ntiles_dst;
-
-            const uint3 fd_k_j_z_ne12 = init_fastdiv_values(ntiles_KV * ntiles_x * ntiles_z_gqa * K->ne[2]);
-            const uint3 fd_k_j_z      = init_fastdiv_values(ntiles_KV * ntiles_x * ntiles_z_gqa);
-            const uint3 fd_k_j        = init_fastdiv_values(ntiles_KV * ntiles_x);
-            const uint3 fd_k          = init_fastdiv_values(ntiles_KV);
-
+        if (ntiles_dst % blocks_num.x != 0) { // Fixup is only needed if the SMs work on fractional tiles.
             const dim3 block_dim_combine(DV, 1, 1);
             const dim3 blocks_num_combine = {blocks_num.x, ncols1, ncols2};
 
-            flash_attn_stream_k_fixup_general<DV, ncols1, ncols2>
+            flash_attn_stream_k_fixup<DV, ncols1, ncols2>
                 <<<blocks_num_combine, block_dim_combine, 0, main_stream>>>
-                ((float *) KQV->data, dst_tmp_meta.ptr,
-                 Q->ne[1], Q->ne[2], gqa_ratio, total_work,
-                 fd_k_j_z_ne12, fd_k_j_z, fd_k_j, fd_k);
+                ((float *) KQV->data, dst_tmp_meta.ptr, Q->ne[1], Q->ne[2], Q->ne[3], K->ne[1], K->ne[2], nbatch_fa);
         }
     } else if (parallel_blocks > 1) {
         const dim3 block_dim_combine(DV, 1, 1);

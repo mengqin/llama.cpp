@@ -2961,9 +2961,78 @@ llama_context * llama_init_from_model(
         }
     }
 
-    if (params.flash_attn_type != LLAMA_FLASH_ATTN_TYPE_DISABLED && ggml_is_quantized(params.type_k)) {
-        const uint32_t blck_size = ggml_blck_size(params.type_k);
+    auto is_tq_v_type = [](const ggml_type type) {
+        return type == GGML_TYPE_TQ2_1 ||
+               type == GGML_TYPE_TQ3_1 ||
+               type == GGML_TYPE_TQ4_1 ||
+               type == GGML_TYPE_TQ4_1_64;
+    };
+
+    auto is_pqtq_cache_type = [](const ggml_type type) {
+        switch (type) {
+            case GGML_TYPE_PQ2_0:
+            case GGML_TYPE_PQ3_0:
+            case GGML_TYPE_PQ4_0:
+            case GGML_TYPE_TQ2_1:
+            case GGML_TYPE_TQ3_1:
+            case GGML_TYPE_TQ4_1:
+            case GGML_TYPE_PQ4_0_64:
+            case GGML_TYPE_TQ4_1_64:
+                return true;
+            default:
+                return false;
+        }
+    };
+
+    auto effective_blck_size = [](ggml_type type, uint32_t head_dim) -> uint32_t {
+        const uint32_t pq4_d64_blck = ggml_blck_size(GGML_TYPE_PQ4_0_64);
+        if ((type == GGML_TYPE_PQ4_0 || type == GGML_TYPE_TQ4_1) && head_dim == pq4_d64_blck) {
+            return pq4_d64_blck;
+        }
+        return ggml_blck_size(type);
+    };
+
+    auto is_supported_pq_tq_head_dim = [](const uint32_t head_dim) {
+        return head_dim == 64 || head_dim == 128 || head_dim == 256;
+    };
+
+    if (is_tq_v_type(params.type_v)) {
+        LLAMA_LOG_ERROR("%s: V cache type %s is disabled: TQ variants currently only implement K-side QJL compensation; use pq2/pq3/pq4 on V instead\n",
+            __func__, ggml_type_name(params.type_v));
+        return nullptr;
+    }
+
+    if (params.flash_attn_type == LLAMA_FLASH_ATTN_TYPE_DISABLED &&
+        (is_pqtq_cache_type(params.type_k) || is_pqtq_cache_type(params.type_v))) {
+        LLAMA_LOG_WARN("%s: PQ/TQ cache types require flash_attn - enabling automatically\n", __func__);
+        params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED;
+    }
+
+    if (is_pqtq_cache_type(params.type_k)) {
         for (uint32_t il = 0; il < model->hparams.n_layer; ++il) {
+            const uint32_t head_dim = model->hparams.n_embd_head_k(il);
+            if (!is_supported_pq_tq_head_dim(head_dim)) {
+                LLAMA_LOG_ERROR("%s: K cache type %s does not support n_embd_head_k=%u at layer %u; PQ/TQ KV cache only supports head dims 64, 128, and 256\n",
+                    __func__, ggml_type_name(params.type_k), head_dim, il);
+                return nullptr;
+            }
+        }
+    }
+
+    if (is_pqtq_cache_type(params.type_v)) {
+        for (uint32_t il = 0; il < model->hparams.n_layer; ++il) {
+            const uint32_t head_dim = model->hparams.n_embd_head_v(il);
+            if (!is_supported_pq_tq_head_dim(head_dim)) {
+                LLAMA_LOG_ERROR("%s: V cache type %s does not support n_embd_head_v=%u at layer %u; PQ/TQ KV cache only supports head dims 64, 128, and 256\n",
+                    __func__, ggml_type_name(params.type_v), head_dim, il);
+                return nullptr;
+            }
+        }
+    }
+
+    if (params.flash_attn_type != LLAMA_FLASH_ATTN_TYPE_DISABLED && ggml_is_quantized(params.type_k)) {
+        for (uint32_t il = 0; il < model->hparams.n_layer; ++il) {
+            const uint32_t blck_size = effective_blck_size(params.type_k, model->hparams.n_embd_head_k(il));
             if (model->hparams.n_embd_head_k(il) % blck_size != 0) {
                 LLAMA_LOG_ERROR("%s: K cache type %s with block size %u does not divide n_embd_head_k=%u\n",
                     __func__, ggml_type_name(params.type_k), blck_size, model->hparams.n_embd_head_k(il));
@@ -2973,8 +3042,8 @@ llama_context * llama_init_from_model(
     }
 
     if (params.flash_attn_type != LLAMA_FLASH_ATTN_TYPE_DISABLED && ggml_is_quantized(params.type_v)) {
-        const uint32_t blck_size = ggml_blck_size(params.type_v);
         for (uint32_t il = 0; il < model->hparams.n_layer; ++il) {
+            const uint32_t blck_size = effective_blck_size(params.type_v, model->hparams.n_embd_head_v(il));
             if (model->hparams.n_embd_head_v(il) % blck_size != 0) {
                 LLAMA_LOG_ERROR("%s: V cache type %s with block size %u does not divide n_embd_head_v=%u\n",
                     __func__, ggml_type_name(params.type_v), blck_size, model->hparams.n_embd_head_v(il));

@@ -1,10 +1,11 @@
 #include "common.cuh"
+#include "fattn.cuh"
 #include "fattn-common.cuh"
 #include "fattn-mma-f16.cuh"
 #include "fattn-tile.cuh"
+#include "fattn-pq-tq-decode.cuh"
 #include "fattn-vec.cuh"
 #include "fattn-wmma-f16.cuh"
-#include "fattn.cuh"
 
 template <int DKQ, int DV, int ncols2>
 static void ggml_cuda_flash_attn_ext_mma_f16_switch_ncols1(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
@@ -135,10 +136,6 @@ static void ggml_cuda_flash_attn_ext_mma_f16(ggml_backend_cuda_context & ctx, gg
             GGML_ASSERT(V->ne[0] == 256);
             ggml_cuda_flash_attn_ext_mma_f16_switch_ncols2<256, 256>(ctx, dst);
             break;
-        case 512:
-            GGML_ASSERT(V->ne[0] == 512);
-            ggml_cuda_flash_attn_ext_mma_f16_switch_ncols2<512, 512>(ctx, dst);
-            break;
         case 576: {
             // For Deepseek, go straight to the ncols1 switch to avoid compiling unnecessary kernels.
             GGML_ASSERT(V->ne[0] == 512);
@@ -216,6 +213,41 @@ static void ggml_cuda_flash_attn_ext_mma_f16(ggml_backend_cuda_context & ctx, gg
     FATTN_VEC_CASE(128, type_K, type_V)       \
     FATTN_VEC_CASE(256, type_K, type_V)       \
 
+#define FATTN_VEC_CASES_PQ_TQ_D64_FOR_V(type_V)     \
+    FATTN_VEC_CASE(64, GGML_TYPE_PQ2_0,    type_V) \
+    FATTN_VEC_CASE(64, GGML_TYPE_PQ3_0,    type_V) \
+    FATTN_VEC_CASE(64, GGML_TYPE_PQ4_0_64, type_V) \
+    FATTN_VEC_CASE(64, GGML_TYPE_TQ2_1,    type_V) \
+    FATTN_VEC_CASE(64, GGML_TYPE_TQ3_1,    type_V) \
+    FATTN_VEC_CASE(64, GGML_TYPE_TQ4_1_64, type_V)
+
+#define FATTN_VEC_CASES_PQ_TQ_D128_FOR_V(type_V)    \
+    FATTN_VEC_CASE(128, GGML_TYPE_PQ2_0, type_V) \
+    FATTN_VEC_CASE(128, GGML_TYPE_PQ3_0, type_V) \
+    FATTN_VEC_CASE(128, GGML_TYPE_PQ4_0, type_V) \
+    FATTN_VEC_CASE(128, GGML_TYPE_TQ2_1, type_V) \
+    FATTN_VEC_CASE(128, GGML_TYPE_TQ3_1, type_V) \
+    FATTN_VEC_CASE(128, GGML_TYPE_TQ4_1, type_V)
+
+#define FATTN_VEC_CASES_PQ_TQ_D256_FOR_V(type_V)    \
+    FATTN_VEC_CASE(256, GGML_TYPE_PQ2_0, type_V) \
+    FATTN_VEC_CASE(256, GGML_TYPE_PQ3_0, type_V) \
+    FATTN_VEC_CASE(256, GGML_TYPE_PQ4_0, type_V) \
+    FATTN_VEC_CASE(256, GGML_TYPE_TQ2_1, type_V) \
+    FATTN_VEC_CASE(256, GGML_TYPE_TQ3_1, type_V) \
+    FATTN_VEC_CASE(256, GGML_TYPE_TQ4_1, type_V)
+
+#define FATTN_VEC_CASES_PQ_TQ_ALL_VALID_KV()        \
+    FATTN_VEC_CASES_PQ_TQ_D64_FOR_V(GGML_TYPE_PQ2_0)    \
+    FATTN_VEC_CASES_PQ_TQ_D64_FOR_V(GGML_TYPE_PQ3_0)    \
+    FATTN_VEC_CASES_PQ_TQ_D64_FOR_V(GGML_TYPE_PQ4_0_64) \
+    FATTN_VEC_CASES_PQ_TQ_D128_FOR_V(GGML_TYPE_PQ2_0)   \
+    FATTN_VEC_CASES_PQ_TQ_D128_FOR_V(GGML_TYPE_PQ3_0)   \
+    FATTN_VEC_CASES_PQ_TQ_D128_FOR_V(GGML_TYPE_PQ4_0)   \
+    FATTN_VEC_CASES_PQ_TQ_D256_FOR_V(GGML_TYPE_PQ2_0)   \
+    FATTN_VEC_CASES_PQ_TQ_D256_FOR_V(GGML_TYPE_PQ3_0)   \
+    FATTN_VEC_CASES_PQ_TQ_D256_FOR_V(GGML_TYPE_PQ4_0)
+
 static void ggml_cuda_flash_attn_ext_vec(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     ggml_tensor * Q = dst->src[0];
     ggml_tensor * K = dst->src[1];
@@ -277,23 +309,93 @@ static void ggml_cuda_flash_attn_ext_vec(ggml_backend_cuda_context & ctx, ggml_t
     FATTN_VEC_CASES_ALL_D(GGML_TYPE_Q5_1, GGML_TYPE_BF16)
     FATTN_VEC_CASES_ALL_D(GGML_TYPE_Q8_0, GGML_TYPE_BF16)
     FATTN_VEC_CASES_ALL_D(GGML_TYPE_BF16, GGML_TYPE_BF16)
+    FATTN_VEC_CASES_PQ_TQ_ALL_VALID_KV()
 #else
     FATTN_VEC_CASES_ALL_D(GGML_TYPE_F16,  GGML_TYPE_F16)
     FATTN_VEC_CASES_ALL_D(GGML_TYPE_Q4_0, GGML_TYPE_Q4_0)
     FATTN_VEC_CASES_ALL_D(GGML_TYPE_Q8_0, GGML_TYPE_Q8_0)
     FATTN_VEC_CASES_ALL_D(GGML_TYPE_BF16, GGML_TYPE_BF16)
+    FATTN_VEC_CASES_PQ_TQ_ALL_VALID_KV()
 #endif // GGML_CUDA_FA_ALL_QUANTS
 
     GGML_ABORT("fatal error");
 }
 
+static bool ggml_cuda_pq_tq_mixed_pair_ok(const ggml_type type_k, const ggml_type type_v) {
+    const bool k_ok =
+        type_k == GGML_TYPE_PQ2_0 || type_k == GGML_TYPE_PQ3_0 || type_k == GGML_TYPE_PQ4_0 ||
+        type_k == GGML_TYPE_TQ2_1 || type_k == GGML_TYPE_TQ3_1 || type_k == GGML_TYPE_TQ4_1 ||
+        type_k == GGML_TYPE_PQ4_0_64 || type_k == GGML_TYPE_TQ4_1_64;
+    const bool v_ok =
+        type_v == GGML_TYPE_PQ2_0 || type_v == GGML_TYPE_PQ3_0 || type_v == GGML_TYPE_PQ4_0 ||
+        type_v == GGML_TYPE_PQ4_0_64;
+    return
+        k_ok && v_ok;
+}
+
+// PQ/TQ native decode dispatch: routes PQ/TQ types to the fused-WHT decode kernel.
+static void ggml_cuda_flash_attn_ext_pq_tq_decode(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
+    ggml_tensor * Q = dst->src[0];
+    ggml_tensor * K = dst->src[1];
+    ggml_tensor * V = dst->src[2];
+
+#define PQ_TQ_DECODE_CASE(D_val, type_K_val, type_V_val) \
+    if (Q->ne[0] == (D_val) && K->type == (type_K_val) && V->type == (type_V_val)) { \
+        ggml_cuda_flash_attn_ext_pq_tq_decode_case<D_val, type_K_val, type_V_val>(ctx, dst); \
+        return; \
+    }
+
+#define PQ_TQ_DECODE_CASES_D64_FOR_V(type_V)       \
+    PQ_TQ_DECODE_CASE( 64, GGML_TYPE_PQ2_0,    type_V) \
+    PQ_TQ_DECODE_CASE( 64, GGML_TYPE_PQ3_0,    type_V) \
+    PQ_TQ_DECODE_CASE( 64, GGML_TYPE_PQ4_0_64, type_V) \
+    PQ_TQ_DECODE_CASE( 64, GGML_TYPE_TQ2_1,    type_V) \
+    PQ_TQ_DECODE_CASE( 64, GGML_TYPE_TQ3_1,    type_V) \
+    PQ_TQ_DECODE_CASE( 64, GGML_TYPE_TQ4_1_64, type_V)
+
+#define PQ_TQ_DECODE_CASES_D128_FOR_V(type_V)      \
+    PQ_TQ_DECODE_CASE(128, GGML_TYPE_PQ2_0, type_V) \
+    PQ_TQ_DECODE_CASE(128, GGML_TYPE_PQ3_0, type_V) \
+    PQ_TQ_DECODE_CASE(128, GGML_TYPE_PQ4_0, type_V) \
+    PQ_TQ_DECODE_CASE(128, GGML_TYPE_TQ2_1, type_V) \
+    PQ_TQ_DECODE_CASE(128, GGML_TYPE_TQ3_1, type_V) \
+    PQ_TQ_DECODE_CASE(128, GGML_TYPE_TQ4_1, type_V)
+
+#define PQ_TQ_DECODE_CASES_D256_FOR_V(type_V)      \
+    PQ_TQ_DECODE_CASE(256, GGML_TYPE_PQ2_0, type_V) \
+    PQ_TQ_DECODE_CASE(256, GGML_TYPE_PQ3_0, type_V) \
+    PQ_TQ_DECODE_CASE(256, GGML_TYPE_PQ4_0, type_V) \
+    PQ_TQ_DECODE_CASE(256, GGML_TYPE_TQ2_1, type_V) \
+    PQ_TQ_DECODE_CASE(256, GGML_TYPE_TQ3_1, type_V) \
+    PQ_TQ_DECODE_CASE(256, GGML_TYPE_TQ4_1, type_V)
+
+    PQ_TQ_DECODE_CASES_D64_FOR_V(GGML_TYPE_PQ2_0)
+    PQ_TQ_DECODE_CASES_D64_FOR_V(GGML_TYPE_PQ3_0)
+    PQ_TQ_DECODE_CASES_D64_FOR_V(GGML_TYPE_PQ4_0_64)
+    PQ_TQ_DECODE_CASES_D128_FOR_V(GGML_TYPE_PQ2_0)
+    PQ_TQ_DECODE_CASES_D128_FOR_V(GGML_TYPE_PQ3_0)
+    PQ_TQ_DECODE_CASES_D128_FOR_V(GGML_TYPE_PQ4_0)
+    PQ_TQ_DECODE_CASES_D256_FOR_V(GGML_TYPE_PQ2_0)
+    PQ_TQ_DECODE_CASES_D256_FOR_V(GGML_TYPE_PQ3_0)
+    PQ_TQ_DECODE_CASES_D256_FOR_V(GGML_TYPE_PQ4_0)
+
+#undef PQ_TQ_DECODE_CASES_D256_FOR_V
+#undef PQ_TQ_DECODE_CASES_D128_FOR_V
+#undef PQ_TQ_DECODE_CASES_D64_FOR_V
+
+#undef PQ_TQ_DECODE_CASE
+
+    GGML_ABORT("fatal error: unsupported pq/tq decode variant");
+}
+
 // Best FlashAttention kernel for a specific GPU:
 enum best_fattn_kernel {
-    BEST_FATTN_KERNEL_NONE     =   0,
-    BEST_FATTN_KERNEL_TILE     = 200,
-    BEST_FATTN_KERNEL_VEC      = 100,
-    BEST_FATTN_KERNEL_WMMA_F16 = 300,
-    BEST_FATTN_KERNEL_MMA_F16  = 400,
+    BEST_FATTN_KERNEL_NONE          =   0,
+    BEST_FATTN_KERNEL_TILE          = 200,
+    BEST_FATTN_KERNEL_VEC           = 100,
+    BEST_FATTN_KERNEL_WMMA_F16      = 300,
+    BEST_FATTN_KERNEL_MMA_F16       = 400,
+    BEST_FATTN_KERNEL_PQ_TQ_DECODE  = 500,
 };
 
 static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const ggml_tensor * dst) {
@@ -344,14 +446,6 @@ static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const
                 return BEST_FATTN_KERNEL_NONE;
             }
             break;
-        case 512:
-            if (V->ne[0] != K->ne[0]) {
-                return BEST_FATTN_KERNEL_NONE;
-            }
-            if (!gqa_opt_applies) {
-                return BEST_FATTN_KERNEL_NONE;
-            }
-            break;
         case 576:
             if (V->ne[0] != 512) {
                 return BEST_FATTN_KERNEL_NONE;
@@ -363,12 +457,6 @@ static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const
         default:
             return BEST_FATTN_KERNEL_NONE;
     }
-
-#ifndef GGML_CUDA_FA_ALL_QUANTS
-    if (K->type != V->type) {
-        return BEST_FATTN_KERNEL_NONE;
-    }
-#endif // GGML_CUDA_FA_ALL_QUANTS
 
     switch (K->type) {
         case GGML_TYPE_F32:
@@ -383,6 +471,14 @@ static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const
         case GGML_TYPE_Q4_0:
         case GGML_TYPE_Q8_0:
         case GGML_TYPE_BF16:
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:
+        case GGML_TYPE_TQ2_1:
+        case GGML_TYPE_TQ3_1:
+        case GGML_TYPE_TQ4_1:
+        case GGML_TYPE_PQ4_0_64:
+        case GGML_TYPE_TQ4_1_64:
             break;
         default:
             return BEST_FATTN_KERNEL_NONE;
@@ -394,6 +490,46 @@ static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const
 
     // For small batch sizes the vector kernel may be preferable over the kernels optimized for large batch sizes:
     const bool can_use_vector_kernel = Q->ne[0] <= 256 && Q->ne[0] % 64 == 0 && K->ne[1] % FATTN_KQ_STRIDE == 0;
+
+    // PQ/TQ types require 128-wide transform groups, but can otherwise use the common selection logic
+    // once CUDA fp16 conversion support is available.
+    const bool pq_tq_KV = (K->type == GGML_TYPE_PQ2_0 || K->type == GGML_TYPE_PQ3_0 || K->type == GGML_TYPE_PQ4_0 ||
+                           K->type == GGML_TYPE_TQ2_1 || K->type == GGML_TYPE_TQ3_1 || K->type == GGML_TYPE_TQ4_1 ||
+                           K->type == GGML_TYPE_PQ4_0_64 || K->type == GGML_TYPE_TQ4_1_64);
+    const bool pq_tq_mixed_pair_ok = ggml_cuda_pq_tq_mixed_pair_ok(K->type, V->type);
+    const bool pq_tq_decode_pair_ok = (K->type == V->type && pq_tq_KV) || pq_tq_mixed_pair_ok;
+
+#ifndef GGML_CUDA_FA_ALL_QUANTS
+    if (K->type != V->type) {
+        if (!pq_tq_mixed_pair_ok) {
+            return BEST_FATTN_KERNEL_NONE;
+        }
+    }
+#endif // GGML_CUDA_FA_ALL_QUANTS
+
+    if (pq_tq_KV ||
+        V->type == GGML_TYPE_PQ2_0 || V->type == GGML_TYPE_PQ3_0 || V->type == GGML_TYPE_PQ4_0 ||
+        V->type == GGML_TYPE_TQ2_1 || V->type == GGML_TYPE_TQ3_1 || V->type == GGML_TYPE_TQ4_1 ||
+        V->type == GGML_TYPE_PQ4_0_64 || V->type == GGML_TYPE_TQ4_1_64) {
+        const int64_t D = Q->ne[0];
+        if (D != 64 && D != 128 && D != 256) {
+            return BEST_FATTN_KERNEL_NONE;
+        }
+    }
+
+    // PQ/TQ native decode kernel: fuses Q forward WHT + dp4a attention + output inverse WHT.
+    // Operates directly on pq/tq blocks (no K_f16/V_f16 materialization), eliminating the
+    // O(KV_length * D) fp16 conversion and 2 graph-level WHT kernel launches.
+    // Requires: supported pq/tq K/V pair, single-token decode, vector-kernel-eligible dimensions.
+    // LLAMA_CUDA_PQ_TQ_FORCE_OLD_DECODE=1 forces graph-level WHT + VEC-preQ path instead.
+    if (pq_tq_decode_pair_ok && can_use_vector_kernel && Q->ne[1] == 1 &&
+        (Q->ne[0] == 64 || Q->ne[0] == 128 || Q->ne[0] == 256)) {
+        static const bool force_old_decode = (getenv("LLAMA_CUDA_PQ_TQ_FORCE_OLD_DECODE") &&
+                                               atoi(getenv("LLAMA_CUDA_PQ_TQ_FORCE_OLD_DECODE")) == 1);
+        if (!force_old_decode) {
+            return BEST_FATTN_KERNEL_PQ_TQ_DECODE;
+        }
+    }
 
     // If Turing tensor cores are available, use them:
     if (turing_mma_available(cc) && Q->ne[0] != 40 && Q->ne[0] != 72) {
@@ -436,7 +572,7 @@ static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const
     }
 
     // Use the WMMA kernel if possible:
-    if (ggml_cuda_should_use_wmma_fattn(cc) && K->ne[1] % FATTN_KQ_STRIDE == 0 && Q->ne[0] != 40 && Q->ne[0] != 72 && Q->ne[0] != 512 && Q->ne[0] != 576) {
+    if (ggml_cuda_should_use_wmma_fattn(cc) && K->ne[1] % FATTN_KQ_STRIDE == 0 && Q->ne[0] != 40 && Q->ne[0] != 72 && Q->ne[0] != 576) {
         if (can_use_vector_kernel && Q->ne[1] <= 2) {
             return BEST_FATTN_KERNEL_VEC;
         }
@@ -469,7 +605,7 @@ static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const
     }
 
     // Use MFMA flash attention for CDNA (MI100+):
-    if (amd_mfma_available(cc) && Q->ne[0] != 40 && Q->ne[0] != 72 && Q->ne[0] != 256 && Q->ne[0] != 512 && Q->ne[0] != 576) {
+    if (amd_mfma_available(cc) && Q->ne[0] != 40 && Q->ne[0] != 72 && Q->ne[0] != 256 && Q->ne[0] != 576) {
         const int64_t eff_nq = Q->ne[1] * (gqa_opt_applies ? gqa_ratio : 1);
         // MMA vs tile crossover benchmarked on MI300X @ d32768:
         //   hsk=64  (gqa=4): MMA wins at eff >= 128 (+11%)
@@ -499,7 +635,9 @@ static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const
 
 void ggml_cuda_flash_attn_ext(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     ggml_cuda_set_device(ctx.device);
-    switch (ggml_cuda_get_best_fattn_kernel(ggml_cuda_get_device(), dst)) {
+    const auto kernel = ggml_cuda_get_best_fattn_kernel(ggml_cuda_get_device(), dst);
+
+    switch (kernel) {
         case BEST_FATTN_KERNEL_NONE:
             GGML_ABORT("fatal error");
         case BEST_FATTN_KERNEL_TILE:
@@ -513,6 +651,9 @@ void ggml_cuda_flash_attn_ext(ggml_backend_cuda_context & ctx, ggml_tensor * dst
             break;
         case BEST_FATTN_KERNEL_MMA_F16:
             ggml_cuda_flash_attn_ext_mma_f16(ctx, dst);
+            break;
+        case BEST_FATTN_KERNEL_PQ_TQ_DECODE:
+            ggml_cuda_flash_attn_ext_pq_tq_decode(ctx, dst);
             break;
     }
 }

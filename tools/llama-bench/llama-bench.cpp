@@ -491,8 +491,32 @@ static ggml_type ggml_type_from_name(const std::string & s) {
     if (s == "iq4_nl") {
         return GGML_TYPE_IQ4_NL;
     }
+    if (s == "pq2") {
+        return GGML_TYPE_PQ2_0;
+    }
+    if (s == "pq3") {
+        return GGML_TYPE_PQ3_0;
+    }
+    if (s == "pq4") {
+        return GGML_TYPE_PQ4_0;
+    }
+    if (s == "tq2") {
+        return GGML_TYPE_TQ2_1;
+    }
+    if (s == "tq3") {
+        return GGML_TYPE_TQ3_1;
+    }
+    if (s == "tq4") {
+        return GGML_TYPE_TQ4_1;
+    }
 
     return GGML_TYPE_COUNT;
+}
+
+static bool ggml_type_is_tq_k_only(const ggml_type type) {
+    return type == GGML_TYPE_TQ2_1 ||
+           type == GGML_TYPE_TQ3_1 ||
+           type == GGML_TYPE_TQ4_1;
 }
 
 static cmd_params parse_cmd_params(int argc, char ** argv) {

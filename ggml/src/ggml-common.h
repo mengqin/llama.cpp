@@ -277,6 +277,75 @@ typedef struct {
 } block_tq2_0;
 static_assert(sizeof(block_tq2_0) == sizeof(ggml_half) + QK_K / 4, "wrong tq2_0 block size/padding");
 
+// PQ/TQ KV-cache block layouts
+#define QK_PQ_TQ_2 32
+#define QK_PQ_TQ_2_GROUP 128
+typedef struct {
+    ggml_half  norm;
+    uint8_t    qs[QK_PQ_TQ_2 / 4];
+} block_pq2;
+static_assert(sizeof(block_pq2) == sizeof(ggml_half) + QK_PQ_TQ_2/4, "wrong pq2 block size/padding");
+
+#define QK_PQ_TQ_3 32
+#define QK_PQ_TQ_3_GROUP 128
+typedef struct {
+    ggml_half  norm;
+    uint8_t    qs[QK_PQ_TQ_3 / 4];
+    uint8_t    signs[QK_PQ_TQ_3 / 8];
+} block_pq3;
+static_assert(sizeof(block_pq3) == sizeof(ggml_half) + QK_PQ_TQ_3/4 + QK_PQ_TQ_3/8, "wrong pq3 block size/padding");
+
+#define QK_PQ_TQ_4 128
+typedef struct {
+    ggml_half  norm;
+    ggml_half  rnorm;
+    uint8_t    qs[QK_PQ_TQ_4 / 2];
+} block_pq4;
+static_assert(sizeof(block_pq4) == 68, "wrong pq4 block size");
+
+static_assert(QK_PQ_TQ_4 == 128, "pq4 kernels assume QK_PQ_TQ_4 == 128");
+
+#define QK_PQ_TQ_4_D64 64
+typedef struct {
+    ggml_half  norm;
+    ggml_half  rnorm;
+    uint8_t    qs[QK_PQ_TQ_4_D64 / 2];
+} block_pq4_d64;
+static_assert(sizeof(block_pq4_d64) == 2*sizeof(ggml_half) + QK_PQ_TQ_4_D64/2, "wrong pq4_d64 block size");
+
+typedef struct {
+    ggml_half  norm;
+    uint8_t    qs[QK_PQ_TQ_2 / 4];
+    uint8_t    qjl[QK_PQ_TQ_2 / 8];
+    ggml_half  rnorm;
+} block_tq2;
+static_assert(sizeof(block_tq2) == 2*sizeof(ggml_half) + QK_PQ_TQ_2/4 + QK_PQ_TQ_2/8, "wrong tq2 block size");
+
+typedef struct {
+    ggml_half  norm;
+    uint8_t    qs[QK_PQ_TQ_3 / 4];
+    uint8_t    signs[QK_PQ_TQ_3 / 8];
+    uint8_t    qjl[QK_PQ_TQ_3 / 8];
+    ggml_half  rnorm;
+} block_tq3;
+static_assert(sizeof(block_tq3) == 2*sizeof(ggml_half) + QK_PQ_TQ_3/4 + 2*(QK_PQ_TQ_3/8), "wrong tq3 block size");
+
+typedef struct {
+    ggml_half  norm;
+    ggml_half  rnorm;
+    uint8_t    qs[QK_PQ_TQ_4 / 2];
+    uint8_t    qjl[QK_PQ_TQ_4 / 8];
+} block_tq4;
+static_assert(sizeof(block_tq4) == 2*sizeof(ggml_half) + QK_PQ_TQ_4/2 + QK_PQ_TQ_4/8, "wrong tq4 block size");
+
+typedef struct {
+    ggml_half  norm;
+    ggml_half  rnorm;
+    uint8_t    qs[QK_PQ_TQ_4_D64 / 2];
+    uint8_t    qjl[QK_PQ_TQ_4_D64 / 8];
+} block_tq4_d64;
+static_assert(sizeof(block_tq4_d64) == 2*sizeof(ggml_half) + QK_PQ_TQ_4_D64/2 + QK_PQ_TQ_4_D64/8, "wrong tq4_d64 block size");
+
 //
 // Super-block quantization structures
 //

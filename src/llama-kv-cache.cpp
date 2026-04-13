@@ -72,6 +72,46 @@ static ggml_tensor * ggml_mul_mat_aux(
     return res;
 }
 
+static bool llama_kv_cache_type_is_pqtq(ggml_type type) {
+    switch (type) {
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:
+        case GGML_TYPE_TQ2_1:
+        case GGML_TYPE_TQ3_1:
+        case GGML_TYPE_TQ4_1:
+        case GGML_TYPE_PQ4_0_64:
+        case GGML_TYPE_TQ4_1_64:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool llama_kv_cache_pq_tq_supported_head_dim(const uint32_t head_dim) {
+    return head_dim == 64 || head_dim == 128 || head_dim == 256;
+}
+
+static ggml_type llama_kv_cache_layer_type(
+        ggml_type type,
+        uint32_t head_dim,
+        int32_t il,
+        const char * label) {
+    if (llama_kv_cache_type_is_pqtq(type) && !llama_kv_cache_pq_tq_supported_head_dim(head_dim)) {
+        GGML_ABORT("%s: layer %d %s: %s does not support head_dim=%d; PQ/TQ KV cache only supports head dims 64, 128, and 256",
+                __func__, il, label, ggml_type_name(type), (int) head_dim);
+    }
+
+    if (type == GGML_TYPE_PQ4_0 || type == GGML_TYPE_TQ4_1) {
+        const int64_t pq4_d64_blck = ggml_blck_size(GGML_TYPE_PQ4_0_64);
+        if ((int64_t) head_dim == pq4_d64_blck) {
+            return type == GGML_TYPE_PQ4_0 ? GGML_TYPE_PQ4_0_64 : GGML_TYPE_TQ4_1_64;
+        }
+    }
+
+    return type;
+}
+
 //
 // llama_kv_cache
 //
@@ -206,8 +246,11 @@ llama_kv_cache::llama_kv_cache(
         const bool has_k = true;
         const bool has_v = !is_mla;
 
-        ggml_tensor * k = has_k ? ggml_new_tensor_3d(ctx, type_k, n_embd_k_gqa, kv_size, n_stream) : nullptr;
-        ggml_tensor * v = has_v ? ggml_new_tensor_3d(ctx, type_v, n_embd_v_gqa, kv_size, n_stream) : nullptr;
+        const ggml_type layer_type_k = llama_kv_cache_layer_type(type_k, hparams.n_embd_head_k(il), il, "K");
+        const ggml_type layer_type_v = llama_kv_cache_layer_type(type_v, hparams.n_embd_head_v(il), il, "V");
+
+        ggml_tensor * k = has_k ? ggml_new_tensor_3d(ctx, layer_type_k, n_embd_k_gqa, kv_size, n_stream) : nullptr;
+        ggml_tensor * v = has_v ? ggml_new_tensor_3d(ctx, layer_type_v, n_embd_v_gqa, kv_size, n_stream) : nullptr;
 
         has_k && ggml_format_name(k, "cache_k_l%d", il);
         has_v && ggml_format_name(v, "cache_v_l%d", il);
@@ -286,16 +329,21 @@ llama_kv_cache::llama_kv_cache(
         LLAMA_LOG_WARN("%s: attention rotation force disabled (LLAMA_ATTN_ROT_DISABLE)\n", __func__);
     }
 
+    const bool pqtq_rot_k = llama_kv_cache_type_is_pqtq(type_k);
+    const bool pqtq_rot_v = llama_kv_cache_type_is_pqtq(type_v);
+
     attn_rot_k =
         !attn_rot_disable &&
         n_embd_head_k_all > 0 &&
         ggml_is_quantized(type_k) &&
+        !pqtq_rot_k &&
         hparams.n_embd_head_k() % 64 == 0;
 
     attn_rot_v =
         !attn_rot_disable &&
         n_embd_head_v_all > 0 &&
         ggml_is_quantized(type_v) &&
+        !pqtq_rot_v &&
         hparams.n_embd_head_v() % 64 == 0;
 
     LLAMA_LOG_INFO("%s: attn_rot_k = %d, n_embd_head_k_all = %d\n", __func__, attn_rot_k, n_embd_head_k_all);
@@ -1224,8 +1272,11 @@ ggml_tensor * llama_kv_cache::cpy_k(ggml_context * ctx, ggml_tensor * k_cur, ggm
         k = ggml_reshape_2d(ctx, k, n_embd_gqa, kv_size*n_stream);
     }
 
-    // store the current K values into the cache
-    return ggml_set_rows(ctx, k, k_cur, k_idxs);
+    // Pass the per-head width so PQ/TQ set_rows kernels can select the correct
+    // D-specific WHT / residual path. Other cache types ignore this field.
+    ggml_tensor * result = ggml_set_rows(ctx, k, k_cur, k_idxs);
+    result->op_params[0] = (int32_t) n_embd_head;
+    return result;
 }
 
 ggml_tensor * llama_kv_cache::cpy_v(ggml_context * ctx, ggml_tensor * v_cur, ggml_tensor * v_idxs, int32_t il, const slot_info & sinfo) const {
@@ -1260,7 +1311,9 @@ ggml_tensor * llama_kv_cache::cpy_v(ggml_context * ctx, ggml_tensor * v_cur, ggm
             v = ggml_reshape_2d(ctx, v, n_embd_gqa, kv_size*n_stream);
         }
 
-        return ggml_set_rows(ctx, v, v_cur, v_idxs);
+        ggml_tensor * result = ggml_set_rows(ctx, v, v_cur, v_idxs);
+        result->op_params[0] = (int32_t) n_embd_head;
+        return result;
     }
 
     if (ggml_row_size(v_cur->type, n_embd_gqa) == v_cur->nb[2]) {
@@ -1281,7 +1334,9 @@ ggml_tensor * llama_kv_cache::cpy_v(ggml_context * ctx, ggml_tensor * v_cur, ggm
 
     v_cur = ggml_reshape_2d(ctx, v_cur, 1, ggml_nelements(v_cur));
 
-    return ggml_set_rows(ctx, v_view, v_cur, v_idxs);
+    ggml_tensor * result = ggml_set_rows(ctx, v_view, v_cur, v_idxs);
+    result->op_params[0] = (int32_t) n_embd_head;
+    return result;
 }
 
 ggml_tensor * llama_kv_cache::build_input_k_idxs(ggml_context * ctx, const llama_ubatch & ubatch) const {
