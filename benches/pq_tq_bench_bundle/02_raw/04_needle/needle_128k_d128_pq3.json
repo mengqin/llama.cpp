@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D128",
+    "type": "pq3",
+    "needle_size": "128K",
+    "exit_code": 0,
+    "needle_score": 0.0736,
+    "needle_score_en": 0.0736,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "temp\\20260411_074857_full_suite_needle_en6_final5\\needle_128k_d128_pq3.json",
+    "server_log": "needle_server_d128_pq3.log"
+  },
+  "details": [
+    {
+      "pred": ":Ican'tthatitisalanguagethatisnotthelanguageoftheworld.itlanguagethatisnotthethesameasthelanguagethatisthealanguagethatisnotthethelanguageofthelanguage.itisalanguagethatisnotthesameasthelanguageofthelanguage.itisalanguagethatisnotthesameasthelanguageofthelanguage.itisalanguagethatisnotthesameasthelanguageofthelanguage.1itisalanguagethatisnotthesameasthelanguageofthelanguage.itisalanguagethatisnotthesameasthelanguageofthelanguage.itisalanguagethatisnotthesameasthelanguageofthelanguage.itisalanguagethatisnotthesameasthelanguageofthelanguage.itisalanguagethatisnotthethesameasthelanguageofthelanguage.itisalanguagethatisnotthethethesameasthelanguageofthelanguage.itisalanguagethatisnotthethesameasalanguageofthelanguage.itisalanguagethatisnotthesameasthelanguageofthelanguage.itisaalanguagethatthatisnotthesamesameasalanguageofthelanguage.itisalanguagethatisnotthelanguageofthelanguage.itisalanguagethatisnotnotthesameasalanguageofthelanguage.itisalanguagethatisnotthethesameasalanguageofalanguage.itisalanguagethatisnotthesameasalanguageofalanguage.ititlanguageisnotthesameasalanguageofalanguage.alanguageisnotthesameasalanguageofalanguage.alanguageisnotthesameasalanguageofalanguage.alanguageisnotthesameasalanguageofalanguage.alanguageisnotthesameaslanguageofalanguage.alanguageisnotthesameasalanguageofalanguage.alanguageisnotthesameasalanguageofalanguage.alanguageisnotthesameasalanguageofalanguage.alanguageisnotthesameasalanguageofalanguage.alanguageisnotthesameasalanguageofalanguage.alanguageisnotthesameasalanguageofalanguage.a",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 1506,
+      "score": 0.4415584415584406
+    },
+    {
+      "pred": "1201111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 256,
+      "score": 0.0
+    },
+    {
+      "pred": "",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 48,
+      "score": 0.0
+    },
+    {
+      "pred": "",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 48,
+      "score": 0.0
+    },
+    {
+      "pred": "",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 48,
+      "score": 0.0
+    },
+    {
+      "pred": "",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 48,
+      "score": 0.0
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": ":  I can't that it is a language that is not\nthe language of the world.  it language that is not the the same as the\nlanguage that is the a language that is not the the language of the\nlanguage.  it is a language that is not the same as\n\nthe language of the language.  it is a language that is not the\nsame as the language of the language.  it is a language that is\nnot the same as the language of the language. 1  it is a\n language\nthat is not the same as the language of the\nlanguage.  it is a language that is not the same as the\nlanguage of the language.  it is a language that is not the\nsame as the language of the language.  it is a language that is not\nthe same as the language of the language.  it is a language that is not the\nthe same as the language of the language.  it is a language that is\nnot the the the same as the language of the language.  it is a\n\nlanguage that is not the the same as a language of the\nlanguage.  it is a language that is not the same as the language of the language.  it is a a language that that is not the same same as a language of the\nlanguage.  it is a language that is not the language of the language.\n it is a\nlanguage that is not not the same as a language of the language.  it is a language that is not the the same as a language of a\nlanguage.  it is a language that is not the same as a language of a language.  it\nit language is not the same as a language of a language.  a\nlanguage is not the same as a language of a language.  a language is not\nthe same as a language of a language.  a language is not the\nsame as a language of a language.  a language is not\nthe same as language of a language.  a language is not the same as a language of a language.  a language is not\nthe same as a language of a language.  a language is not the same as a\nlanguage of a language.  a language is not the same as a language of a\nlanguage.  a language is not the same as a language of a language.  a\nlanguage is not the same as a language of a language.  a"
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "1 2 0  1  1 1  1 1 1 1 1 1  1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 11 1 1 1 1 1 1 1 1 11 1 1 1 1 1 1 1 1 1 1 1 1 11 11 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 11 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": ""
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": ""
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": ""
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": ""
+    }
+  ]
+}

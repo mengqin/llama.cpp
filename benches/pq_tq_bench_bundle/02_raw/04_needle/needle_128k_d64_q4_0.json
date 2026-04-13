@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "q4_0",
+    "needle_size": "128K",
+    "exit_code": 0,
+    "needle_score": 23.5283,
+    "needle_score_en": 23.5283,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "temp\\20260411_074857_full_suite_needle_en6_final5\\needle_128k_d64_q4_0.json",
+    "server_log": "needle_server_d64_q4_0.log"
+  },
+  "details": [
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandistheMagicEssence.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 29,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**sea‑shrouded**[Arnim’sSecretRadiantRelic]**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 57,
+      "score": 7.4725274725274735
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**secretlibraryoftheArc**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 41,
+      "score": 8.450704225352112
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**MagicalStoneofKnowing**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 43,
+      "score": 7.887323943661973
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandis*theArcEngine*,alegendaryplotelementfromtheoriginalshortstory.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 65,
+      "score": 7.5
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthelegendofthe**EclipseKey**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 36,
+      "score": 9.859154929577466
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the Magic Essence."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **sea‑shrouded **[Arnim’s Secret Radiant Relic]**."
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **secret library of the Arc**."
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **Magical Stone of Knowing**."
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is *the Arc Engine*, a legendary plot element from the original short story."
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the legend of the **Eclipse Key**."
+    }
+  ]
+}

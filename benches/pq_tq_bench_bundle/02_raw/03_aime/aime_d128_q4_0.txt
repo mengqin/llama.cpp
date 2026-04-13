@@ -1,0 +1,426 @@
+/glob <pattern>     add text files using globbing pattern
+
+
+> Solve the following AIME problem step by step. Keep reasoning coherent, and end with a final line exactly in the form 'Final answer: <integer>'.
+
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+[Start thinking]
+This is a complex or challenging question, and it is difficult to provide a direct and correct answer. I need to think about it.
+Well, let's tackle this problem step by step. So, we have three people: Patrick, Tanya, and Jose, all going from school to park, same straight road, same time they arrive at park. We need to find the distance from school to park, which is a fraction m/n, then m + n.
+
+First, let's assign variables to their speeds and times because we have a lot of time differences here. Let's let Patrick's walking speed be v miles per hour. That seems like a good starting point because he's the first one to leave.
+
+So Patrick's speed: v mph (constant, walking)
+
+Tanya starts one hour after Patrick, so when Patrick has been walking for 1 hour, Tanya starts running. Tanya runs at 2 mph faster than Patrick walks, so Tanya's speed is v + 2 mph.
+
+Then, Jose starts one hour after Tanya leaves, so total time Patrick has been walking when Jose starts is 1 (Patrick's time) + 1 (Tanya's time) = 2 hours? Wait, let's be careful with the timing here because it's easy to mix up who starts when.
+
+Let's define a timeline to make it clear. Let's let t = 0 be the time when Patrick starts walking from school.
+
+Then:
+
+- Patrick starts at t = 0, walking at speed v, so his position at time t (t ≥ 0) is v*t miles from school.
+
+- Tanya starts one hour after Patrick, so Tanya starts at t = 1 hour. Tanya runs at speed v + 2, so her position at time t (t ≥ 1) is (v + 2)*(t - 1) miles from school (since she's been running for (t - 1) hours when she's at time t).
+
+- Jose starts one hour after Tanya, so Tanya starts at t = 1, so Jose starts at t = 1 + 1 = 2 hours. Jose bicycles at speed 7 mph faster than Tanya ran, so Tanya's speed is v + 2, so Jose's speed is (v + 2) + 7 = v + 9 mph. Therefore, Jose's position at time t (t ≥ 2) is (v + 9)*(t - 2) miles from school.
+
+All three arrive at the park at the same time, so let's say they all arrive at time T (T > 2, since Jose starts at t=2, so they must arrive after t=2). At time T, each has traveled the entire distance D from school to park, so:
+
+For Patrick: D = v*T (since he started at t=0, walked for T hours)
+
+For Tanya: D = (v + 2)*(T - 1) (she started at t=1, ran for (T - 1) hours)
+
+For Jose: D = (v + 9)*(T - 2) (he started at t=2, biked for (T - 2) hours)
+
+Perfect! That's a system of three equations with two variables (D and T, but we can also write in terms of v and T or v and D, but let's see). Wait, actually, we have three equations, but they should all equal D, so we can set them equal to each other to eliminate D, which might be helpful.
+
+Let's write down the three equations clearly:
+
+1. D = vT  (Patrick's equation)
+2. D = (v + 2)(T - 1)  (Tanya's equation)
+3. D = (v + 9)(T - 2)  (Jose's equation)
+
+So, since all equal D, let's take equation 1 and equation 2 first, maybe solve for v in terms of T or something, then plug into another equation.
+
+From equation 1: v = D/T, but maybe better to equate equation 2 and equation 1 first to eliminate D.
+
+So set equation 1 = equation 2: vT = (v + 2)(T - 1)
+
+Let's expand the right-hand side: (v + 2)(T - 1) = v(T - 1) + 2(T - 1) = vT - v + 2T - 2
+
+So left-hand side is vT, so set equal:
+
+vT = vT - v + 2T - 2
+
+Hmm, good, vT cancels from both sides:
+
+0 = -v + 2T - 2
+
+Let's solve for v here: v = 2T - 2. Okay, that's a nice relation between v and T. Let's check if that makes sense. Wait, v has to be positive, so 2T - 2 > 0 => T > 1, which is good because T > 2 as we saw earlier, so that's fine.
+
+Now let's take another pair of equations, say equation 2 and equation 3, and plug in v from above to get an equation in T only, which we can solve.
+
+First, let's write equation 2 = equation 3: (v + 2)(T - 1) = (v + 9)(T - 2)
+
+We already have v in terms of T, so let's substitute v = 2T - 2 into this equation.
+
+First, compute v + 2 = (2T - 2) + 2 = 2T. Oh, that's nice! Simplifies nicely.
+
+v + 9 = (2T - 2) + 9 = 2T + 7. Good, that's simpler.
+
+So now, left-hand side of equation 2 = equation 3 is (v + 2)(T - 1) = 2T*(T - 1)
+
+Right-hand side is (v + 9)(T - 2) = (2T + 7)(T - 2)
+
+So now we have a quadratic equation in T: 2T(T - 1) = (2T + 7)(T - 2)
+
+Let's expand both sides step by step.
+
+Left side: 2T(T - 1) = 2T² - 2T
+
+Right side: (2T + 7)(T - 2) = 2T*T + 2T*(-2) + 7*T + 7*(-2) = 2T² - 4T + 7T - 14 = 2T² + 3T - 14
+
+Okay, so now set left = right:
+
+2T² - 2T = 2T² + 3T - 14
+
+Let's subtract 2T² from both sides to simplify:
+
+-2T = 3T - 14
+
+Now, let's solve for T: bring terms with T to one side, constants to the other.
+
+-2T - 3T = -14 => -5T = -14 => T = 14/5 = 2.8 hours. Wait, hold on! Earlier I thought T > 2, which 14/5 is 2.8, so that's okay, T is 2.8 hours, which is 2 hours and 48 minutes, so Jose starts at t=2, so he's been biking for 0.8 hours when they arrive, which is fine, positive time.
+
+Wait, but let's check if we did everything right because sometimes when you do algebra it's easy to mix up the time intervals.
+
+Wait, let's verify with T = 14/5. Then v = 2T - 2 = 2*(14/5) - 2 = 28/5 - 10/5 = 18/5 = 3.6 mph. Okay, Patrick's speed is 3.6 mph.
+
+Then Patrick's time to park is T = 14/5 hours, so distance D = vT = (18/5)(14/5) = 252/25 = 10.08 miles. Let's check Tanya's time: she starts at t=1, arrives at t=T=14/5, so she's been running for T - 1 = 14/5 - 5/5 = 9/5 hours. Tanya's speed is v + 2 = 18/5 + 10/5 = 28/5 = 5.6 mph. So distance she covers: 28/5 * 9/5 = 252/25, same as D. Good.
+
+Now Jose: starts at t=2, arrives at t=14/5=2.8, so he's been biking for T - 2 = 14/5 - 10/5 = 4/5 hours. Jose's speed is Tanya's speed + 7 = 28/5 + 35/5 = 63/5 = 12.6 mph. Distance: 63/5 * 4/5 = 252/25. Perfect, all three equal D = 252/25.
+
+Wait, but hold on, the problem says "the distance from the school to the park is m/n miles", so 252 and 25, are they coprime? Let's check: 25 is 5², 252 divided by 5? 5*50=250, so 252=5*50 + 2, so remainder 2, not divisible by 5. So yes, gcd(252,25)=1? Wait, 252 is 4*63=4*7*9, so prime factors 2,3,7; 25 is 5², so no common factors. So m=252, n=25, m + n=277?
+
+Wait, but hold on a second, when I first thought T=14/5=2.8, which is less than 3, so T - 2=0.8, which is positive, so that's okay, Jose has time to bike. But let me just make sure I didn't misinterpret the "one hour after" statements.
+
+The problem says: "One hour after Patrick left, Tanya started running..." So Patrick left at time 0, Tanya left at time 1, correct. "One hour after Tanya left, Jose started bicycling..." So Tanya left at time 1, so Jose left at time 2, correct. So their start times are t=0, t=1, t=2 for Patrick, Tanya, Jose respectively. Arrived at same time T, so Patrick walked for T hours, Tanya ran for T - 1 hours, Jose biked for T - 2 hours. That seems right.
+
+Wait, but let's try another approach to verify, maybe using distances directly without time variables.
+
+Let D = distance.
+
+Patrick's speed = v, so time he took: D/v hours.
+
+Tanya started 1 hour later than Patrick, so Tanya's time walking (wait, no, running) is (D/v) - 1 hours (since she started 1 hour later, so she has 1 hour less time to cover the distance).
+
+Tanya's speed = v + 2, so D = (v + 2)*[(D/v) - 1]. That's another way to write equation 2, which should be equivalent.
+
+Similarly, Jose started 1 hour after Tanya, so Tanya started 1 hour after Patrick, so Jose started 2 hours after Patrick. Therefore, Jose's time biking is (D/v) - 2 hours.
+
+Jose's speed = Tanya's speed + 7 = (v + 2) + 7 = v + 9, so D = (v + 9)*[(D/v) - 2].
+
+Oh, this might be another good way, maybe I can do this to check. Let's see.
+
+So from Patrick's time: let's denote t_p = D/v = time Patrick took (this is T from before, which we called T, so same thing).
+
+Then Tanya's time: t_t = t_p - 1, so D = (v + 2)t_t = (v + 2)(t_p - 1)
+
+Jose's time: t_j = t_p - 2, so D = (v + 9)t_j = (v + 9)(t_p - 2)
+
+Which is exactly the same as our first equations, with t_p = T. So that's consistent.
+
+So let's take the two equations from Tanya and Jose relative to Patrick's time.
+
+First equation: D = v t_p => v = D / t_p
+
+Second equation (Tanya): D = (v + 2)(t_p - 1) = (D/t_p + 2)(t_p - 1) = D(t_p - 1)/t_p + 2(t_p - 1)
+
+Let's write that as D = [D(t_p - 1) + 2t_p(t_p - 1)] / t_p
+
+Multiply both sides by t_p: D t_p = D(t_p - 1) + 2t_p(t_p - 1)
+
+Subtract D(t_p - 1) from both sides: D t_p - D t_p + D = 2t_p(t_p - 1) => D = 2t_p(t_p - 1)
+
+Wait, that's a nice simplification! So D = 2t_p(t_p - 1). Let's check with our previous numbers: t_p = T = 14/5, so D = 2*(14/5)*(9/5) = 252/25, which matches. Good, so that's a good check.
+
+Now third equation (Jose): D = (v + 9)(t_p - 2). But v = D / t_p, so substitute:
+
+D = (D / t_p + 9)(t_p - 2) = D(t_p - 2)/t_p + 9(t_p - 2)
+
+Multiply both sides by t_p to eliminate denominator:
+
+D t_p = D(t_p - 2) + 9 t_p(t_p - 2)
+
+Subtract D(t_p - 2) from both sides: D t_p - D t_p + 2D = 9 t_p(t_p - 2) => 2D = 9 t_p(t_p - 2)
+
+Wait, hold on! Earlier from Tanya's equation, we had D = 2 t_p(t_p - 1). Let's use that here. So from Tanya: D = 2 t_p(t_p - 1). Plug into the equation from Jose: 2D = 9 t_p(t_p - 2) => 2*[2 t_p(t_p - 1)] = 9 t_p(t_p - 2)
+
+Assuming t_p ≠ 0 (which it isn't), we can divide both sides by t_p:
+
+4(t_p - 1) = 9(t_p - 2)
+
+Oh, that's a linear equation! Wait, why didn't I do it this way earlier? Maybe simpler. Let's solve this:
+
+4t_p - 4 = 9t_p - 18
+
+Bring terms together: -4 + 18 = 9t_p - 4t_p => 14 = 5t_p => t_p = 14/5, same as before! Perfect, so that's consistent.
+
+Then D = 2 t_p(t_p - 1) = 2*(14/5)*(14/5 - 1) = 2*(14/5)*(9/5) = 252/25, as before.
+
+So that's reassuring. I think sometimes when you do the substitution step by step, you might get confused with the time intervals, but by defining t_p as Patrick's total time, which is the key variable, it's clearer.
+
+Wait, just to make 100% sure there's no misinterpretation of "one hour after Tanya left, Jose started bicycling". Does "one hour after Tanya left" mean one hour after Tanya left the school? Yes, the problem says: "One hour after Patrick left, Tanya started running... One hour after Tanya left, Jose started bicycling..." So yes, each starts one hour after the previous person left, so Patrick leaves first, Tanya leaves 1 hour later, Jose leaves 1 hour after Tanya, so 2 hours after Patrick. So their start times are offset by 1 hour each, which we modeled correctly.
+
+Let me check the speeds with actual numbers to see if the times make sense.
+
+Patrick's speed v = D / t_p = (252/25) / (14/5) = (252/25)*(5/14) = (252*5)/(25*14) = (252)/(5*14) = 252/70 = 18/5 = 3.6 mph, correct as before.
+
+Tanya's speed: v + 2 = 5.6 mph = 28/5 mph. Time she spent running: t_p - 1 = 14/5 - 5/5 = 9/5 hours = 1.8 hours. Distance: 28/5 * 9/5 = 252/25, correct.
+
+Jose's speed: Tanya's speed + 7 = 5.6 + 7 = 12.6 mph = 63/5 mph. Time he spent biking: t_p - 2 = 14/5 - 10/5 = 4/5 hours = 0.8 hours. Distance: 63/5 * 4/5 = 252/25, correct.
+
+All distances equal, all times make sense (positive, Jose's time is positive 0.8 hours, which is 48 minutes, so he started 2 hours after Patrick, so Patrick had been walking for 2.8 hours when Jose starts, then Jose bikes for 0.8 hours, total 2.8 hours for Patrick, which matches).
+
+Is there any chance we mixed up who is faster? The problem says: "Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked" – so Tanya's speed = Patrick's speed + 2, correct. "Jose started bicycling at a constant speed of 7 miles per hour faster than Tanya ran" – so Jose's speed = Tanya's speed + 7, correct. So we did the speed differences right.
+
+Another way to think: let's let D be the distance, which we need to find. Let Patrick's speed be v, so as before, time for Patrick: D/v.
+
+Tanya starts 1 hour later, so she has (D/v - 1) hours to cover D at speed v + 2, so D = (v + 2)(D/v - 1). Let's solve this for v in terms of D.
+
+D = (v + 2)(D - v)/v => Dv = (v + 2)(D - v) => Dv = Dv - v² + 2D - 2v => 0 = -v² + 2D - 2v => v² + 2v - 2D = 0. Maybe not the quickest, but let's see.
+
+Jose starts 2 hours later than Patrick, so he has (D/v - 2) hours to cover D at speed (v + 2) + 7 = v + 9, so D = (v + 9)(D/v - 2). Let's solve this for v as well.
+
+D = (v + 9)(D - 2v)/v => Dv = (v + 9)(D - 2v) => Dv = Dv - 2v² + 9D - 18v => 0 = -2v² + 9D - 18v => 2v² + 18v - 9D = 0.
+
+Now we have two equations:
+
+1. v² + 2v - 2D = 0 => 2D = v² + 2v => D = (v² + 2v)/2
+
+2. 2v² + 18v - 9D = 0 => 9D = 2v² + 18v => D = (2v² + 18v)/9 = (2v²)/9 + 2v
+
+Now set the two expressions for D equal:
+
+(v² + 2v)/2 = (2v²)/9 + 2v
+
+Multiply both sides by 18 to eliminate denominators (LCM of 2 and 9 is 18):
+
+9(v² + 2v) = 4(2v²) + 36v
+
+Expand left: 9v² + 18v
+
+Right: 8v² + 36v
+
+Bring all terms to left: 9v² + 18v - 8v² - 36v = 0 => v² - 18v = 0 => v(v - 18) = 0
+
+Wait, hold on! v = 0 or v = 18? But earlier we had v = 18/5 = 3.6. Wait, what's going on here? Did I make a mistake in this algebra?
+
+Oh no! Wait, in the equation for Tanya: D = (v + 2)(D/v - 1). Wait, D/v is Patrick's time, which is correct, so D/v - 1 is Tanya's time, yes. But when I expanded (v + 2)(D/v - 1), is it (v + 2)( (D - v)/v )? Yes, because D/v - 1 = (D - v)/v, correct.
+
+Then Dv = (v + 2)(D - v). Wait, here's the mistake! (D/v - 1) = (D - v)/v, so multiplying both sides by v gives D = (v + 2)(D - v)/v, so multiplying both sides by v: Dv = (v + 2)(D - v). Yes, that's correct. Then expanding right side: (v + 2)(D - v) = vD - v² + 2D - 2v. Wait, hold on! Earlier when I expanded, I think I messed up the sign here.
+
+Wait, let's do this expansion carefully, step by step, to avoid sign errors.
+
+Equation from Tanya: D = (v + 2) * (time Tanya spent) = (v + 2) * (Patrick's time - 1 hour) = (v + 2) * (D/v - 1). Correct.
+
+So D = (v + 2)(D/v - 1). Let's multiply both sides by v to eliminate denominator:
+
+D * v = (v + 2)(D - v)
+
+Yes! Here we go, that's the key. D/v - 1 = (D - v)/v, so multiplying both sides by v gives Dv = (v + 2)(D - v). I had written (D - v) before, but when I expanded the right-hand side, I think I incorrectly wrote +2D - 2v, but let's do it again:
+
+(v + 2)(D - v) = v*D + v*(-v) + 2*D + 2*(-v) = vD - v² + 2D - 2v. Yes, that's correct.
+
+So left-hand side after multiplying by v: Dv
+
+So equation: Dv = vD - v² + 2D - 2v
+
+Now subtract Dv from both sides: 0 = -v² + 2D - 2v
+
+Which rearranged: v² + 2v - 2D = 0, which is what I had before. Wait, so that part was correct.
+
+Now for Jose: D = (v + 9) * (time Jose spent) = (v + 9) * (Patrick's time - 2 hours) = (v + 9)(D/v - 2). Correct, because Jose starts 2 hours after Patrick, so he has (D/v - 2) hours.
+
+Multiply both sides by v: Dv = (v + 9)(D - 2v)
+
+Ah! Here's the mistake earlier! (D/v - 2) = (D - 2v)/v, so multiplying by v gives Dv = (v + 9)(D - 2v), not (D - 2v) with a coefficient? Wait, no, D - 2v is correct, because (D - 2v)/v = D/v - 2, yes.
+
+So expand right-hand side: (v + 9)(D - 2v) = v*D + v*(-2v) + 9*D + 9*(-2v) = vD - 2v² + 9D - 18v
+
+So equation: Dv = vD - 2v² + 9D - 18v
+
+Subtract Dv from both sides: 0 = -2v² + 9D - 18v => 2v² + 18v - 9D = 0. Wait, that's what I had before! So why when I solved for D from both equations did I get a wrong v?
+
+Let's see: from first equation (Tanya): 0 = -v² + 2D - 2v => 2D = v² + 2v => D = (v² + 2v)/2. Correct.
+
+From second equation (Jose): 2v² + 18v - 9D = 0 => 9D = 2v² + 18v => D = (2v² + 18v)/9. Correct.
+
+Set equal: (v² + 2v)/2 = (2v² + 18v)/9
+
+Ah! Here's the mistake in the previous algebra! I had written (2v²)/9 + 2v, but no: (2v² + 18v)/9 = (2/9)v² + (18/9)v = (2/9)v² + 2v. Yes, that's correct, but when I multiplied both sides by 18, let's do that again carefully.
+
+Left side: (v² + 2v)/2 * 18 = 9(v² + 2v) = 9v² + 18v
+
+Right side: (2v² + 18v)/9 * 18 = 2(2v² + 18v) = 4v² + 36v
+
+Wait! Oh my goodness, I had a 4(2v²) before, which is 8v², but no: (2v² + 18v)/9 * 18 = 2*(2v² + 18v) = 4v² + 36v. Yes! I incorrectly wrote 4(2v²) instead of 2(2v²). That was the algebra mistake. No wonder it gave v=18, which is wrong. Okay, let's fix that.
+
+So equation after multiplying both sides by 18:
+
+9(v² + 2v) = 2(2v² + 18v) [Wait, no: (A/B)*C = A*(C/B), so ( (v² + 2v)/2 ) * 18 = (v² + 2v)*9, and ( (2v² + 18v)/9 ) * 18 = (2v² + 18v)*2. Yes, that's the right way to see it: multiplying numerator by 18 and dividing by denominator, so (v² + 2v)*18/2 = (v² + 2v)*9, and (2v² + 18v)*18/9 = (2v² + 18v)*2. Perfect, so:
+
+9(v² + 2v) = 2(2v² + 18v)
+
+Now expand both sides:
+
+Left: 9v² + 18v
+
+Right: 4v² + 36v
+
+Now subtract left side from both sides (or bring all terms to right):
+
+0 = 4v² + 36v - 9v² - 18v => 0 = -5v² + 18v => 5v² - 18v = 0? Wait, no, wait: 4v² - 9v² = -5v², 36v - 18v = 18v, so yes, 0 = -5v² + 18v => 5v² = 18v => v(5v - 18) = 0 => v=0 or v=18/5. There we go! That's the correct solution for v, which matches our first calculation (v=18/5=3.6). Phew! Okay, so that was a scary algebra mistake, but we caught it. Important to be careful with multiplication by constants.
+
+So that confirms v=18/5, then D = (v² + 2v)/2 = ( (324/25) + (36/5) ) / 2 = (324/25 + 180/25)/2 = (504/25)/2 = 252/25. Perfect, same as before.
+
+So all methods, when done correctly, lead to D=252/25. Now, check if 252 and 25 are coprime. As I thought earlier, 25 is 5 squared. 252 divided by 5: 5*50=250, 252-250=2, so remainder 2, not divisible by 5. 252 factors: 252=2*126=2*2*63=2²*7*9=2²*3²*7. 25 is 5², no common prime factors, so gcd(252,25)=1. Therefore, m=252, n=25, so m + n=277.
+
+I think that's solid. The key was setting up the time intervals correctly relative to Patrick's start time, which made the equations straightforward. It's easy to mix up the time differences (e.g., thinking Jose starts 1 hour after Patrick, but no, it's 1 hour after Tanya starts, who starts 1 hour after Patrick), but by defining the timeline with t=0 as Patrick's start, it became clear: Patrick starts at t=0, Tanya at t=1, Jose at t=2, arrive at t=T. Then each has time spent equal to arrival time minus start time, which is how we got the expressions for their distances.
+
+Another sanity check: if they all arrive at the same time, Patrick takes the longest time (since he starts first), which makes sense, and the others have less time but faster speeds, so their speeds must compensate for the shorter time. With Patrick at 3.6 mph, Tanya at 5.6 mph (2 mph faster), Jose at 12.6 mph (7 mph faster than Tanya), and times: Patrick 2.8 hours (252/25=10.08 miles), Tanya 1.8 hours (5.6*1.8=10.08), Jose 0.8 hours (12.6*0.8=10.08). Yep, all check out numerically.
+
+I think we've verified it multiple ways, caught an algebra mistake, and confirmed the fractions are in lowest terms. So the distance is 252/25, m + n = 252 + 25 = 277.
+
+**Final answer**
+Final answer: 277
+
+[End thinking]
+
+To solve the problem, we analyze the motion of three individuals—Patrick, Tanya, and Jose—who all travel from school to park along a straight road. They start at different times but arrive at the same time.
+
+---
+
+### Step 1: Define Variables
+
+Let:
+- $ v $ = Patrick's walking speed (in miles per hour)
+- $ D $ = distance from school to park (in miles)
+- $ T $ = total time (in hours) it takes for **Patrick** to reach the park (i.e., since he starts first)
+
+From the problem:
+- **Tanya** starts **1 hour later** than Patrick and runs at speed $ v + 2 $
+- **Jose** starts **1 hour after Tanya**, so 2 hours after Patrick, and bicycles at speed $ v + 9 $
+
+Thus, the time each spends traveling is:
+- Patrick: $ T $
+- Tanya: $ T - 1 $
+- Jose: $ T - 2 $
+
+Since all three cover the same distance $ D $, we can write the following equations:
+
+$$
+D = vT \quad \text{(1)} \\
+D = (v + 2)(T - 1) \quad \text{(2)} \\
+D = (v + 9)(T - 2) \quad \text{(3)}
+$$
+
+---
+
+### Step 2: Eliminate $ D $ Using Equations (1) and (2)
+
+Set equation (1) equal to equation (2):
+
+$$
+vT = (v + 2)(T - 1)
+$$
+
+Expanding the right-hand side:
+
+$$
+vT = v(T - 1) + 2(T - 1) = vT - v + 2T - 2
+$$
+
+Subtract $ vT $ from both sides:
+
+$$
+0 = -v + 2T - 2 \Rightarrow v = 2T - 2 \quad \text{(4)}
+$$
+
+---
+
+### Step 3: Substitute into Equation (3)
+
+Now use equation (4) in equation (3):
+
+$$
+D = (v + 9)(T - 2)
+$$
+
+Substitute $ v = 2T - 2 $:
+
+$$
+v + 9 = (2T - 2) + 9 = 2T + 7
+$$
+
+So:
+
+$$
+D = (2T + 7)(T - 2)
+$$
+
+Also from equation (1): $ D = vT = (2T - 2)T = 2T^2 - 2T $
+
+Now equate both expressions for $ D $:
+
+$$
+2T^2 - 2T = (2T + 7)(T - 2)
+$$
+
+Expand the right-hand side:
+
+$$
+(2T + 7)(T - 2) = 2T^2 - 4T + 7T - 14 = 2T^2 + 3T - 14
+$$
+
+Set equal:
+
+$$
+2T^2 - 2T = 2T^2 + 3T - 14
+$$
+
+Subtract $ 2T^2 $ from both sides:
+
+$$
+-2T = 3T - 14 \Rightarrow -5T = -14 \Rightarrow T = \frac{14}{5}
+$$
+
+---
+
+### Step 4: Find Distance $ D $
+
+Use equation (1): $ D = vT $, and from (4): $ v = 2T - 2 $
+
+$$
+v = 2 \cdot \frac{14}{5} - 2 = \frac{28}{5} - \frac{10}{5} = \frac{18}{5}
+$$
+
+$$
+D = vT = \frac{18}{5} \cdot \frac{14}{5} = \frac{252}{25}
+$$
+
+This fraction is already in lowest terms because:
+- $ \gcd(252, 25) = 1 $
+- $ 252 = 2^2 \cdot 3^2 \cdot 7 $
+- $ 25 = 5^2 $
+
+So $ m = 252 $, $ n = 25 $, and $ m + n = 277 $
+
+---
+
+### Final Answer
+
+Final answer: 277

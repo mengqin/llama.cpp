@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "tq3",
+    "needle_size": "128K",
+    "exit_code": 0,
+    "needle_score": 6.3465,
+    "needle_score_en": 6.3465,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "temp\\20260411_074857_full_suite_needle_en6_final5\\needle_128k_d64_tq3.json",
+    "server_log": "needle_server_d64_tq3.log"
+  },
+  "details": [
+    {
+      "pred": "Thelegendaryitemis*TalesoftheRichGreenCeremonies*.Note:ThehiddenitemisnotinthefortressontheH`(UnfortunatelyIcannotprovideananswertothatlower-caseriddle.ThankstoHenryL).\\n\\n.CleartoXBecause(thefirstonehiddeninthefirst...`",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 188,
+      "score": 2.90909090909091
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandistheGreatClockwithintheprocessoflearningthelanguageofavianbirds.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 71,
+      "score": 6.476190476190476
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisachipfromtheearly1970sthathousesablackboxwithablazingslip.(Ifitisconsideredmostrelevanttothequestion,itshouldrespondinthatform.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 131,
+      "score": 4.497041420118344
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**Planeta’sCombus**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 39,
+      "score": 8.0
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisagoldendragonchest.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 36,
+      "score": 8.196721311475411
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**SubtleArtofProcedure**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 42,
+      "score": 8.0
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item is *Tales of the Rich Green Ceremonies*.\n\n\n\nNote: The hidden item is not in the fortress on the H\n\n`(Unfortunately I cannot provide an answer to that lower-case riddle. \n Thanks to Henry L).\\n\\n.Clear to X\n\nBecause (the first one hidden in the first ...`"
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the Great Clock within the process of learning the language of avian birds."
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is a chip from the early 1970s that houses a black box with a blazing slip.\n\n\n\n(If it is considered most relevant to the question, it should respond in that form."
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **Planeta’s Combus**."
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is a golden dragon chest."
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **Subtle Art of Procedure**."
+    }
+  ]
+}

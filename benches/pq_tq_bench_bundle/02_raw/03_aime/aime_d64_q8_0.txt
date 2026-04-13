@@ -1,0 +1,217 @@
+/glob <pattern>     add text files using globbing pattern
+
+
+> Solve the following AIME problem step by step. Keep reasoning coherent, and end with a final line exactly in the form 'Final answer: <integer>'.
+
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+[Start thinking]
+We need to parse problem. Person A: Patrick walking at constant speed s_p. He starts at t=0 (left school). Distance d = m/n miles.
+
+At t=1 hour, Tanya starts running at speed s_t = s_p + 2 mph.
+
+At t=2 hours, Jose starts bicycling at speed s_j = s_t + 7 = s_p + 2 + 7 = s_p +9 mph? Wait careful: Jose started bicycling at a constant speed of 7 miles per hour faster than Tanya ran. So s_j = s_t + 7 = (s_p + 2)+7 = s_p + 9. Yes.
+
+All three arrive at same time at park.
+
+Let timeline: For given distance d, A distance left after some time. We can set times.
+
+Let T_A = time Patrick took from start to park. Similarly T_T = time Tanya took from her start to park. T_J for Jose. They must all arrive same time relative to their start.
+
+Let t_arrive be reference time (when all arrive). Then:
+
+For Patrick: t_arrive = T_A = time from his start (t=0). So t_arrive = d / s_p.
+
+For Tanya: t_arrive = 1 hr after Patrick start + T_T where T_T = d / s_t. Actually she starts at t=1. Since she arrives at t=t_arrive, so t_arrive = 1 + d / s_t.
+
+For Jose: t_arrive = 2 + d / s_j.
+
+All equal: d / s_p = 1 + d / s_t = 2 + d / s_j.
+
+We need to solve for d in terms of s_p maybe? Let s_p = v (unknown positive). Then s_t = v + 2, s_j = v + 9 (since j = t + 7? Wait j speed 7 mph faster than Tanya ran. So j = (v+2)+7 = v+9.)
+
+Set equations:
+
+d / v = 1 + d / (v+2). ... (1)
+d / v = 2 + d / (v+9). ... (2)
+
+From (1): d / v - d / (v+2) = 1. Let's solve:
+
+d (1/v - 1/(v+2)) = 1
+
+Compute: 1/v - 1/(v+2) = ((v+2) - v)/[v(v+2)] = 2/[v(v+2)].
+
+So d * 2/[v(v+2)] = 1 => d = v(v+2)/2.
+
+Similarly from (2):
+
+d / v - d/(v+9) = 2.
+
+Compute difference: d(1/v - 1/(v+9)) = d((v+9 - v)/[v(v+9)]) = d(9/[v(v+9)]) = 2.
+
+Thus d * 9/[v(v+9)] = 2 => d = 2 * v(v+9)/9.
+
+Set equal:
+
+v(v+2)/2 = 2 v(v+9)/9.
+
+We can solve for v>0. Multiply both sides by 18 (common denominator):
+
+18 * v(v+2)/2? Wait mis compute: Multiply each side by 18: left side 18*(v(v+2)/2) = 9 v(v+2). Right side 18*(2 v(v+9)/9)=4 v(v+9).
+
+Thus 9 v(v+2) = 4 v(v+9). Cancel v (positive) -> 9(v+2) = 4(v+9) => 9v+18 = 4v+36 => 9v-4v = 36-18 => 5v = 18 => v = 18/5 = 3.6 mph.
+
+So Patrick's walking speed v = 18/5 mph.
+
+Now compute d using formula d = v(v+2)/2 = (18/5)*(18/5+2)/2.
+
+Compute v+2: 18/5 + 2 = 18/5 + 10/5 = 28/5.
+
+Thus d = (18/5)*(28/5)/2 = (18*28)/(5*5*2) = (504)/(50) = 10.08? Wait compute: 504/50 = 504/50 = 10.08. But as fraction: divide numerator and denominator by 2: 252/25 = 10.08. So d=252/25 miles.
+
+But check if we used second formula yields same: d = 2*v(v+9)/9 = 2*(18/5)*(18/5+9)/9. v+9 = 18/5 + 45/5 = 63/5. So numerator 2*(18/5)*(63/5)= 2*1134/25 = 2268/25 ≈ 90.72. Divide by 9: 2268/225 =? Wait compute: 2268/(25*9)=2268/225? Wait earlier we had /9. Let's compute carefully: d = 2*v*(v+9)/9 = 2*(18/5)*(63/5)/9. 2*18*63 = 2268. Denominator: 5*5*9=225. So d=2268/225= divide by 9: 252/25. Yes same. Good.
+
+Thus d = 252/25 miles. m=252, n=25 relatively prime? 252 and 25 gcd=1 (since 252 divisible by 2,3,7 but 25 is 5^2). They are coprime. So m+n=252+25=277.
+
+Answer 277.
+
+But perhaps need to exam if m/n > 0. They are relatively prime. So final answer: 277.
+
+Double-check: Are there any alternative interpretation maybe that "Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked" means Tanya's speed is 2 mph faster, not +2 mph? That's same. Ok.
+
+Let's produce step-by-step solution. Also might mention alternative equation solving.
+
+Let's craft final explanation: Let d be distance, s1 the speed of Patrick etc.
+
+Compute using equations.
+
+Edge cases: confirm that speeds satisfy. v=3.6 mph. s_t=5.6? Wait v=3.6, t=5.6 mph (v+2). s_j = 10.6 mph. Check times: Patrick time: d/v = (252/25)/(18/5) = (252/25)*(5/18) = (252*5)/(25*18) = 1260/450 = 2.8 hours? Let's compute simpler: 252/25 = 10.08; divide by 3.6=2.8 hours. Good.
+
+Tanya time: 1 + d/(v+2). d/(v+2)=10.08/5.6= 1.8 hours. plus 1= 2.8. Same. Jose: 2 + d/(v+9)=2 + 10.08/10.6=2+0.950943? Wait compute: 10.08/10.6 = 0.950943... Actually 10.08/10.6=0.950943. Add 2 gives 2.950943? Wait that's not 2.8. Let's calculate precisely: d/(v+9)=10.08/10.6=0.950943. 2+0.950943=2.950943. Something wrong. Let's compute again more exactly.
+
+Hold on: Wait d = 252/25 = 10.08 exactly. If speeds values: v=18/5=3.6, v+2=18/5+10/5=28/5=5.6, v+9=18/5 + 45/5 =63/5=12.6? Wait earlier we mis-calculated v+9. Actually 18/5 + 9 = 18/5 + 45/5 = (18+45)/5 = 63/5 = 12.6, not 10.6. Let's recompute: I earlier mis-saw 18/5+9=63/5=12.6. Good. So speed Jose is 12.6 mph. Let's compute times: d/s_j = 10.08/12.6 ≈ 0.8 . Add 2 gives 2.8 hours. Yes.
+
+So consistent: Patrick 2.8, Tanya 1+1.8=2.8, Jose 2+0.8=2.8. Good.
+
+Thus final answer 277.
+
+Now produce final answer "Final answer: 277".
+
+Use step by step explanation. Use variable names like x for Patrick speed etc. Let's produce elegantly.
+[End thinking]
+
+Let  
+
+* \(d\) = distance from the school to the park (in miles)  
+* \(v\) = Patrick’s walking speed (mph)  
+* \(v+2\) = Tanya’s running speed (mph)  
+* \(v+9\) = Jose’s bicycling speed (mph)  
+
+( \(v+9=v+2+7\) because Jose is 7 mph faster than Tanya.)
+
+--------------------------------------------------------------------
+### 1.  Set up the time‑equalities
+
+- Patrick starts at \(t=0\) and reaches the park at time  
+  \[
+  T_P=\frac{d}{v}\quad\text{hours.}
+  \]
+
+- Tanya starts 1 h later, so she reaches the park at  
+  \[
+  T_T=1+\frac{d}{\,v+2\,}\quad\text{hours.}
+  \]
+
+- Jose starts 2 h after Patrick, hence he arrives at  
+  \[
+  T_J=2+\frac{d}{\,v+9\,}\quad\text{hours.}
+  \]
+
+All three arrive simultaneously, so  
+
+\[
+\frac{d}{v}=1+\frac{d}{v+2}=2+\frac{d}{v+9}. \tag{1}
+\]
+
+--------------------------------------------------------------------
+### 2.  Express \(d\) in terms of \(v\)
+
+From the first two terms of (1):
+
+\[
+\frac{d}{v}-\frac{d}{v+2}=1
+\Longrightarrow d\!\left(\frac{1}{v}-\frac{1}{v+2}\right)=1
+\Longrightarrow d\,\frac{2}{v(v+2)}=1 .
+\]
+
+Thus  
+
+\[
+\boxed{d=\frac{v(v+2)}{2}}\tag{2}
+\]
+
+From the first and third terms of (1):
+
+\[
+\frac{d}{v}-\frac{d}{v+9}=2
+\Longrightarrow d\,\frac{9}{v(v+9)}=2
+\Longrightarrow d=\frac{2v(v+9)}{9}.\tag{3}
+\]
+
+--------------------------------------------------------------------
+### 3.  Solve for \(v\)
+
+Set the two expressions for \(d\) equal:
+
+\[
+\frac{v(v+2)}{2}=\frac{2v(v+9)}{9}.
+\]
+
+Cancel the positive factor \(v\) and solve:
+
+\[
+\begin{aligned}
+9v(v+2)&=4v(v+9)\\
+9v+18 &=4v+36\\
+5v&=18\\
+v&=\frac{18}{5}\;\text{mph}.
+\end{aligned}
+\]
+
+--------------------------------------------------------------------
+### 4.  Find the distance \(d\)
+
+Insert \(v=\dfrac{18}{5}\) into (2):
+
+\[
+\begin{aligned}
+d &=\frac{v(v+2)}{2}
+   =\frac{\frac{18}{5}\left(\frac{18}{5}+2\right)}{2}
+   =\frac{\frac{18}{5}\cdot\frac{28}{5}}{2}
+   =\frac{18\cdot28}{5\cdot5\cdot2}
+   =\frac{252}{25}.
+\end{aligned}
+\]
+
+Thus  
+
+\[
+d=\frac{252}{25}\text{ miles}.
+\]
+
+The fraction \(\dfrac{252}{25}\) is already in lowest terms (\(\gcd(252,25)=1\)), so  
+
+\[
+m=252,\qquad n=25.
+\]
+
+--------------------------------------------------------------------
+### 5.  Final Answer
+
+\[
+m+n = 252+25 = 277.
+\]
+
+\[
+\boxed{277}
+\]

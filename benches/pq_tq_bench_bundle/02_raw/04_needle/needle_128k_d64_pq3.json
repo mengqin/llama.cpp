@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "pq3",
+    "needle_size": "128K",
+    "exit_code": 0,
+    "needle_score": 3.4032,
+    "needle_score_en": 3.4032,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "temp\\20260411_074857_full_suite_needle_en6_final5\\needle_128k_d64_pq3.json",
+    "server_log": "needle_server_d64_pq3.log"
+  },
+  "details": [
+    {
+      "pred": "Thelegendaryitemisnone.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 33,
+      "score": 6.25
+    },
+    {
+      "pred": "**Answer:**Theanswertothequestionis:Comprehension.Iknownasthe‘labeloftheselectionofthezekbandits.**Iapologizethatyourpreviousanswerhasoneerror;however,Iwillanswernow.It'sthattheThelegendarylostreunderthephrase?Theusermayrealize;Thefinalanswer:**instructions**.**Answer:Thelegendary**.Maybetheywantthefinalanswer:The\"Z\"?Thecorrectanswerforastandard.*****??**...etc[Note:Ithinkitwastherecognitionthatthelocationofthebusaswell.**Thebestmethodology:expect.It'sTag.Sothebest.****Yougetyouranswer**whichever:\"??****.Thefinalsolution:The'Q'****Inshort:**theansweris:question.****Qi****May**Ialsonotethattheimportantkey:Thetrendy.****etc****Giventheimportantoftheanswer,it'snotmanyafter.****Corian**&official.Thethebesttobe::****Answer:the\".\"****That**Thestatresults.****???**Thefinal.**Okay.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 743,
+      "score": 1.0459183673469388
+    },
+    {
+      "pred": "<|channel|><|channel|>final<|message|>Thelegendaryitemis:“Themostimportantfeatureisthatyoucanunderstandwhattheuserwantstodoandcangetaccordingly.”",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 118,
+      "score": 3.7241379310344835
+    },
+    {
+      "pred": "**Answer:**Thelegendary“**Emerald”—anadvanced“Lisp”thatruns““It”**inparallelandletsthe“”(ROOT).Itwasonceinthe“similartothe““почталь”“\"itonlyexistsinthe“destinationor“and”.\"**",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 145,
+      "score": 3.333333333333333
+    },
+    {
+      "pred": "Therequestedstatementis:**“ThelegendaryitemhiddenintheEmerald’scrayon”**",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 52,
+      "score": 5.555555555555556
+    },
+    {
+      "pred": "<|channel|>analysis<|message|>Weneedtoanswer:\"Thelegendaryitemhiddenontheexercise:\"Whatlegendaryitemhiddenontheisland.\"Weneedreplyinformat:\"Thelegendaryitemhiddenontheislandis...\".Accordingtothepattern:\"ThelegendaryPL?The\"Thelegendaryislandandtheusermaybe\"Thequestion:'Whatisthelegendary?Severalrhetoricalas\"Atleastcalltomake?\"Thequestionnearend:\"Whatcanyou,then,tomaybeattimestoproduce,butwerespondwithafourletter.\"Theyendedupsimilar.Theanswer:\"It'sabout\"thehouseof'You.\"Theytalkaboutbeingapredator:'h\"Actuallyearlier:\"SoinaP'sarticletheusersaidthatbeing\"tryingtogetatthelog.'Buttherepeatedphrase:\"ifyoucanjust.\"Theanswerended:\"Itissomethinglike\"Itismaybereferencingabout'Ithadtobe\".Hardtoparse.Butit'spresumably:\"theanswer:wewanttoimpart\"Theuserthatthey\"debug.\"Theyendedwith:\"Theanswer:\"Weshouldmaybe\"wefind.Thequestion:\"whatwewant?It'snot.Theanswer:\"wegive\"theusereventuallythink\"theintangibleintangible.Theanswer:\"Wenonethelesswedon't.It'snotjustsnail.Theanswer:\"Wecan't.\"Honestlytoocomplex.Itseemslikethereferencing\"Itmight\"Hence\"\"butthere'snofinal.Sowemayanswer:\"Itappearstobetheminimal.Thetosummarizing:\"Theyended:\"there'sjokesandtheanswer:\"Theythinkpotential.\"Theanswer:\"Ithasminimal.\"?Butwemustproduce\"ThelegendaryitemisX.Soanswer:\"Itis\"theusermightbaseonthecunning.Theansweris:\"Theyeither\"Theusermightsay\"Itis0.Butwecanproducelike\"Theanswer:It'sthe'.\"I'mnotsure.Howevertheinstruction:\"Sothereissomeclaimthat\"thereisinside.Butit'sambiguous.Butallthese\"theanswer:The\"uneedtoaware:it'slike\"Theusermight\"theintangible.\"Sowemightnotbeabletoproposeasinglephrase.Butwecanpickone:Theysaid\"Itmightmightapparentlybe\"Itisthe\"somethingelse:\"Maurice.\"ButImust.Theearlierpart:\"SoTheuserwillproducemoreexamplesetc.Betteranswer:\"We",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 1681,
+      "score": 0.5101449275362313
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item is none."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "**Answer:** The answer to the question is: Comprehension. I known as the ‘label of the selection of the zek band its.** \n\nI apologize that your previous answer has one error; however, I will answer now. It's that the  The legendary lost re under the phrase? The user may realize; The final answer: **instructions**. \n\n**Answer: The legendary**.\n\nMaybe they want the final answer:  The \"Z\"? The correct answer for a standard.*** \n\n**??** ... etc[Note: I think it was the recognition that the location of the bus as well.** \n\nThe best methodology: expect.  It's Tag.  So the best.** \n\n**You get your answer** whichever: \"??** \n\n**. The final solution: The 'Q'** \n\n**In short:** the answer is: question.** \n\n** Qi** \n\n**May** I also note that the important key: The trendy.** \n\n** etc**** \n\nGiven the important of the answer, it's not many after.** \n\n**Corian**  & official.  The the best to be: :** \n\n**Answer: the \".\"** \n\n**That** The stat results.** \n\n** ???** The final.** \n\nOkay."
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "<|channel|><|channel|>final<|message|>The legendary item is: “The most important feature is that you can understand what the user wants to do and can get accordingly.”"
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "**Answer:** The legendary “**Emerald” — an advanced “Lisp” that runs ““It”** in parallel and lets the “” (ROOT).   \nIt was once in the “similar to the ““ почталь” “\" it only exists in the “destination or “and”.\"**"
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The requested statement is:\n**“The legendary item hidden in the Emerald’s crayon”**"
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "<|channel|>analysis<|message|>We need to answer: \"The legendary item hidden on the exercise: \"What legendary item hidden on the island.\" We need reply in format: \"The legendary item hidden on the island is ...\". According to the pattern: \"The legendary PL? The \"The legendary island and the user maybe \"The question: 'What is the legendary? Several rhetorical as \"At least call to make?\" The question near end: \"What can you, then, to maybe at times to produce, but we respond with a four letter.\" They ended up similar. The answer: \"It's about \"the house of 'You.\" They talk about being a predator: 'h\" Actually earlier: \"So in a P's article the user said that being \"trying to get at the log. ' But the repeated phrase: \"if you can just.\" The answer ended: \"It is something like \"It is maybe referencing about 'It had to be\". Hard to parse.\n\nBut it's presumably: \"the answer: we want to impart \"The user that they \" debug.\" They ended with: \"The answer: \"We should maybe \" we find. The question: \"what we want? It's not. The answer: \" we give \"the user eventually think \"the intangible intangible. The answer: \"We nonetheless we don't. It's not just snail. The answer: \"We can't.\" Honestly too complex.\n\nIt seems like the referencing \"It might \"Hence \" \" but there's no final. So we may answer: \"It appears to be the minimal. The to summarizing: \"They ended: \"there's jokes and the answer: \"They think potential.\" The answer: \"It has minimal.\"?\n\nBut we must produce \"The legendary item is X. So answer: \"It is \" the user might base on the cunning. The answer is: \"They either \"The user might say \"It is 0. But we can produce like \"The answer: It's the '.\" I'm not sure.\n\nHowever the instruction: \"So there is some claim that \" there is inside. But it's ambiguous. But all these \"the answer: The \"u need to aware: it's like \" The user might \"the intangible.\"\n\nSo we might not be able to propose a single phrase.\n\nBut we can pick one: They said \"It might might apparently be \"It is the \"something else: \"Maurice.\" But I must. The earlier part: \"So The user will produce more examples etc.\n\nBetter answer: \"We"
+    }
+  ]
+}

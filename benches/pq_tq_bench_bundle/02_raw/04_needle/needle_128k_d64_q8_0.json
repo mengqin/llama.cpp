@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "q8_0",
+    "needle_size": "128K",
+    "exit_code": 0,
+    "needle_score": 84.6561,
+    "needle_score_en": 84.6561,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "temp\\20260411_074857_full_suite_needle_en6_final5\\needle_128k_d64_q8_0.json",
+    "server_log": "needle_server_d64_q8_0.log"
+  },
+  "details": [
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandis*MagicEssence*.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 33,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthelostgoldencompass.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 38,
+      "score": 7.936507936507937
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**MagicEssence**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 31,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**MagicEssence**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 31,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**MagicEssence**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 31,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**MagicEssence**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 31,
+      "score": 100
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is *Magic Essence*."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the lost golden compass."
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **Magic Essence**."
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **Magic Essence**."
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **Magic Essence**."
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **Magic Essence**."
+    }
+  ]
+}

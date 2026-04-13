@@ -1,0 +1,6 @@
+/glob <pattern>     add text files using globbing pattern
+
+
+> Solve the following AIME problem step by step. Keep reasoning coherent, and end with a final line exactly in the form 'Final answer: <integer>'.
+
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)

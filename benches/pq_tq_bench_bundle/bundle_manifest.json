@@ -1,0 +1,14 @@
+{
+  "bundle_root": ".\\pq_tq_test",
+  "report_dir": "01_report",
+  "raw_dirs": {
+    "function": "02_raw/01_function_raw_cli",
+    "bench_ppl": "02_raw/02_bench_ppl",
+    "aime": "02_raw/03_aime",
+    "needle": "02_raw/04_needle",
+    "validation_d128_qwen3_raw_probe": "02_raw/05_validation_d128_qwen3_raw_probe",
+    "validation_d64_gpt_oss_raw_probe": "02_raw/06_validation_d64_gpt_oss_raw_probe",
+    "validation_thetom_d128_turbo2_capital_france": "02_raw/07_validation_thetom_d128_turbo2_capital_france"
+  },
+  "scripts_dir": "03_scripts"
+}

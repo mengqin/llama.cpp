@@ -1,0 +1,245 @@
+[
+  {
+    "phase": "ppl",
+    "dim": "D64",
+    "type": "f16",
+    "exit_code": 0,
+    "ppl": 165.4633,
+    "log": "ppl_d64_f16.log",
+    "ppl_vs_q8_pct": 99.57
+  },
+  {
+    "phase": "ppl",
+    "dim": "D64",
+    "type": "q8_0",
+    "exit_code": 0,
+    "ppl": 166.1781,
+    "log": "ppl_d64_q8_0.log",
+    "ppl_vs_q8_pct": 100.0
+  },
+  {
+    "phase": "ppl",
+    "dim": "D64",
+    "type": "q4_0",
+    "exit_code": 0,
+    "ppl": 176.2753,
+    "log": "ppl_d64_q4_0.log",
+    "ppl_vs_q8_pct": 106.08
+  },
+  {
+    "phase": "ppl",
+    "dim": "D64",
+    "type": "pq2",
+    "exit_code": 0,
+    "ppl": 1889.227,
+    "log": "ppl_d64_pq2.log",
+    "ppl_vs_q8_pct": 1136.87
+  },
+  {
+    "phase": "ppl",
+    "dim": "D64",
+    "type": "tq2",
+    "exit_code": 0,
+    "ppl": 290.8123,
+    "log": "ppl_d64_tq2.log",
+    "ppl_vs_q8_pct": 175.0
+  },
+  {
+    "phase": "ppl",
+    "dim": "D64",
+    "type": "pq3",
+    "exit_code": 0,
+    "ppl": 377.2331,
+    "log": "ppl_d64_pq3.log",
+    "ppl_vs_q8_pct": 227.01
+  },
+  {
+    "phase": "ppl",
+    "dim": "D64",
+    "type": "tq3",
+    "exit_code": 0,
+    "ppl": 200.9455,
+    "log": "ppl_d64_tq3.log",
+    "ppl_vs_q8_pct": 120.92
+  },
+  {
+    "phase": "ppl",
+    "dim": "D64",
+    "type": "pq4",
+    "exit_code": 0,
+    "ppl": 197.4017,
+    "log": "ppl_d64_pq4.log",
+    "ppl_vs_q8_pct": 118.79
+  },
+  {
+    "phase": "ppl",
+    "dim": "D64",
+    "type": "tq4",
+    "exit_code": 0,
+    "ppl": 180.588,
+    "log": "ppl_d64_tq4.log",
+    "ppl_vs_q8_pct": 108.67
+  },
+  {
+    "phase": "ppl",
+    "dim": "D128",
+    "type": "f16",
+    "exit_code": 0,
+    "ppl": 11.8863,
+    "log": "ppl_d128_f16.log",
+    "ppl_vs_q8_pct": 99.98
+  },
+  {
+    "phase": "ppl",
+    "dim": "D128",
+    "type": "q8_0",
+    "exit_code": 0,
+    "ppl": 11.8885,
+    "log": "ppl_d128_q8_0.log",
+    "ppl_vs_q8_pct": 100.0
+  },
+  {
+    "phase": "ppl",
+    "dim": "D128",
+    "type": "q4_0",
+    "exit_code": 0,
+    "ppl": 12.1373,
+    "log": "ppl_d128_q4_0.log",
+    "ppl_vs_q8_pct": 102.09
+  },
+  {
+    "phase": "ppl",
+    "dim": "D128",
+    "type": "pq2",
+    "exit_code": 0,
+    "ppl": 35.0442,
+    "log": "ppl_d128_pq2.log",
+    "ppl_vs_q8_pct": 294.77
+  },
+  {
+    "phase": "ppl",
+    "dim": "D128",
+    "type": "tq2",
+    "exit_code": 0,
+    "ppl": 14.4275,
+    "log": "ppl_d128_tq2.log",
+    "ppl_vs_q8_pct": 121.36
+  },
+  {
+    "phase": "ppl",
+    "dim": "D128",
+    "type": "pq3",
+    "exit_code": 0,
+    "ppl": 15.926,
+    "log": "ppl_d128_pq3.log",
+    "ppl_vs_q8_pct": 133.96
+  },
+  {
+    "phase": "ppl",
+    "dim": "D128",
+    "type": "tq3",
+    "exit_code": 0,
+    "ppl": 12.5616,
+    "log": "ppl_d128_tq3.log",
+    "ppl_vs_q8_pct": 105.66
+  },
+  {
+    "phase": "ppl",
+    "dim": "D128",
+    "type": "pq4",
+    "exit_code": 0,
+    "ppl": 12.5415,
+    "log": "ppl_d128_pq4.log",
+    "ppl_vs_q8_pct": 105.49
+  },
+  {
+    "phase": "ppl",
+    "dim": "D128",
+    "type": "tq4",
+    "exit_code": 0,
+    "ppl": 12.2369,
+    "log": "ppl_d128_tq4.log",
+    "ppl_vs_q8_pct": 102.93
+  },
+  {
+    "phase": "ppl",
+    "dim": "D256",
+    "type": "f16",
+    "exit_code": 0,
+    "ppl": 10.1322,
+    "log": "ppl_d256_f16.log",
+    "ppl_vs_q8_pct": 100.02
+  },
+  {
+    "phase": "ppl",
+    "dim": "D256",
+    "type": "q8_0",
+    "exit_code": 0,
+    "ppl": 10.1299,
+    "log": "ppl_d256_q8_0.log",
+    "ppl_vs_q8_pct": 100.0
+  },
+  {
+    "phase": "ppl",
+    "dim": "D256",
+    "type": "q4_0",
+    "exit_code": 0,
+    "ppl": 10.165,
+    "log": "ppl_d256_q4_0.log",
+    "ppl_vs_q8_pct": 100.35
+  },
+  {
+    "phase": "ppl",
+    "dim": "D256",
+    "type": "pq2",
+    "exit_code": 0,
+    "ppl": 10.8659,
+    "log": "ppl_d256_pq2.log",
+    "ppl_vs_q8_pct": 107.27
+  },
+  {
+    "phase": "ppl",
+    "dim": "D256",
+    "type": "tq2",
+    "exit_code": 0,
+    "ppl": 10.6644,
+    "log": "ppl_d256_tq2.log",
+    "ppl_vs_q8_pct": 105.28
+  },
+  {
+    "phase": "ppl",
+    "dim": "D256",
+    "type": "pq3",
+    "exit_code": 0,
+    "ppl": 10.269,
+    "log": "ppl_d256_pq3.log",
+    "ppl_vs_q8_pct": 101.37
+  },
+  {
+    "phase": "ppl",
+    "dim": "D256",
+    "type": "tq3",
+    "exit_code": 0,
+    "ppl": 10.2255,
+    "log": "ppl_d256_tq3.log",
+    "ppl_vs_q8_pct": 100.94
+  },
+  {
+    "phase": "ppl",
+    "dim": "D256",
+    "type": "pq4",
+    "exit_code": 0,
+    "ppl": 10.2338,
+    "log": "ppl_d256_pq4.log",
+    "ppl_vs_q8_pct": 101.03
+  },
+  {
+    "phase": "ppl",
+    "dim": "D256",
+    "type": "tq4",
+    "exit_code": 0,
+    "ppl": 10.2147,
+    "log": "ppl_d256_tq4.log",
+    "ppl_vs_q8_pct": 100.84
+  }
+]

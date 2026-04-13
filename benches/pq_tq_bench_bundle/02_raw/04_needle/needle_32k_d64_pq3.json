@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "pq3",
+    "needle_size": "32K",
+    "exit_code": 0,
+    "needle_score": 3.2563,
+    "needle_score_en": 3.2563,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "temp\\20260411_074857_full_suite_needle_en6_final5\\needle_32k_d64_pq3.json",
+    "server_log": "needle_server_d64_pq3.log"
+  },
+  "details": [
+    {
+      "pred": "Thelegendarymagicessenceisthe**magical,legendaryhook**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 41,
+      "score": 5.090909090909091
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisan**bootleg'emerald'contraption**that**slowsinterpreterruntimebyafewload‑timecompilationsteps**that**theearlyadoptersofphone‑stylesyntaxwouldrelyon'Auserthemselvescommand\"startwith.\"Theactualquestionisbasically:<b>iflanguagetoolingforpeoplewhovalueminimal,smallimplementation,buttypicallyrefertothedocumentthatonlymakea'tiny'runtime.Thatinshort,smallbuildingoftherationaletc.Giventhattheonlyuniqueaspectthatwouldminimalimplementtheinterface.Sotheanswer:Thelegendaryitemyoucanpronounceandyou'llnot.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 495,
+      "score": 1.6326530612244896
+    },
+    {
+      "pred": "<|channel|>analysisto=final<|message|>Thelegendaryl​inethat’struly“good”and“shortandpowerfullineisthat“The“bubble‑pipe-”isalegendary…We’relookingfora**legend‑l​u​sy“launch”….Thewords‘or...”?”Inshort,theboldisthatthe…andnothingafterwardisthequestion.Wedoallnotesaerror‑prooftext.Theansweris,justathebullet—dropthehype,butwithexecutethefinalformit’sverybriefanswer.Inordertotestwhetheryoucanrenderthemethodtoaskabout\"Whatdonotweshrugandhold?Howdoes\"Icannotdo.Inshort,thecompletesolutionis:Psychologyis“.”Itis.Theitemgoesover'prol,wewouldsaythequestionsaw.Theanswer:No.Theanswerissimply“yes.”Itistheonlythingwewanttheanswertobeterse,theanswerthatiKnowtheansweransweredtheverybest.Focus,it'swhatwemustkeepthequestions.Weknowwehaveitir.Thething.Thebigfinaliswhatwewant.Sotheone.Sothefinalresultis:**Thepreciseansweris“software‑S‑ProCProgram**.​Nomore.*Answer?Thequestionfromthetextisaskingifthere's*goodnature?Itseemstorevolvearoundit.PuttingitIfinallyisis.Thefinal“'...Sotheneatfinalis:**\"the\"*Theanswerisexactly:'Whatit'swhatyou'dwant.endedissomething.We'llkeepitshort.Theanswertoyourquestionisthefinalanswer.Sotheactualansweris“no.”**Sotheansweris:Theansweris“Venturexion.”Inallthoselines,theansweristheonlyfinalis.Iwanttoknow.Theansweris.Wejustpretendthefinalisyou.Wecan'tfindit.Atthefinalline,weknowit'sitisasanswer.Sofinalanswer:Theansweris:\"Sotheanswer:theanswer\"AnswerPreferably,theansweristhefinalconclusion:weseeit,theanswertosend.Ifwecan'tfindtheanswer,sothesolutiontotheanswerisjustsaying\"No.\"sothefinalansweristheanswergiven:'the\"Yes\"**Thefinalanswerisastheoneitemwealreadysolvedit:Kindly,the",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 1556,
+      "score": 0.5499999999999994
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandistheEmeraldSea.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 37,
+      "score": 6.7857142857142865
+    },
+    {
+      "pred": "**Thelegendaryitemhiddeninthestoryisahiddenisland’sidea.**",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 47,
+      "score": 3.7931034482758634
+    },
+    {
+      "pred": "ThelegendaryitemishiddenonEmeraldIsland.Itistimeto\"Just.Thequickanswer:Thescriptisthespelledthrough.\\n'...I'msorry,butIdon'thavethatknowledge.Imustremainsafe...*\"(Therearenosuchspecificitemrevealedinthetext—thereisnosingleitemwithanunequivocalnameorlike—yours.*Inotherwords,Idon'thaveaclear,distinct'stateditemasaprecise'Whatthelegendaryitemintheansweryouaskedabout.*(Thereisnosingleintriguingelementyouwouldrequireadirectmentionordirectknowledgefromthatisspelledoutsomewhere.\\\"Sorry,Ican'tseeaeachmomentousrecordofananswerpresented.*",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 489,
+      "score": 1.6853932584269662
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary magic essence is the **magical, legendary hook**."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is an **bootleg 'emerald' contraption** that **slows interpreter runtime by a few load‑time compilation steps** that **the early adopters of phone‑style syntax would rely on 'A user themselves command \"start with.\" The actual question is basically: <b> if language tooling for people who value minimal, small implementation, but typically refer to the document that only\nmake a 'tiny' runtime. That in short, small building of the rational etc.\n\nGiven that the only unique aspect that would minimal implement the interface.\n\nSo the answer: The legendary item you can pronounce and you'll not."
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "<|channel|>analysis to=final<|message|>The legendary l​ine that’s truly “good” and “short and powerful line is that “The “bubble‑pipe-” is a legendary…\n\nWe’re looking for a **legend‑l​u​sy “launch”…. The words ‘or...”?”\n\nIn short, the bold is that the … and nothing afterward is the question. We do all notes a error‑proof text. The answer is, just a the bullet—drop the hype, but with execute the final form it’s very brief answer.  In order to test whether you can render the method to ask about \"What do not we shrug and hold?  How does \"I cannot do.  In short, the complete solution is:\n\nPsychology is “.”\n\nIt is. The item goes over 'prol, we would say the question saw. The answer: No. The answer is simply “yes.” It is the only thing we want the answer to be terse, the answer that i Know the answer answered the very best.\n\nFocus, it's what we must keep the questions. We know we have it ir. The thing. The big final is what we want. So the one.\n\nSo the final result is: **The precise answer is “software‑S‑ProC Program**.​ \n\nNo more.* \n\nAnswer?\n\n\n\nThe question from the text is asking if there's *good nature? It seems to revolve around it.  Putting it\n\nI finally is is. The final “'\n\n... So the neat final is: **\"the\"*\n\nThe answer is exactly:\n\n' What it's what you'd want. \nended is something.\n\nWe'll keep it short. The answer to your question is the final answer.\n\nSo the actual answer is “no.” \n\n**So the answer is: The answer is “Venturexion.” \n\nIn all those lines, the answer is the only final is. I want to know. The answer is. We just pretend the final is you. We can't find it.\n\nAt the final line, we know it's it is as answer. So final answer: The answer is: \"So the answer: the answer \" Answer\n\nPreferably, the answer is the final conclusion:\n\nwe see it, the answer to send.\n\nIf we can't find the answer, so the solution to the answer is just saying \"No.\" so the final answer is the answer given: 'the \"Yes\"**\n\n\n\nThe final answer is as the one item we already solved it:\n\nKindly, the"
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the Emerald Sea."
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "**The legendary item hidden in the story is a hidden island’s idea.**"
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item is hidden on Emerald Island.  \nIt is time to \"Just . The quick answer: The script is the spelled through .\\n'  ...\nI'm sorry, but I don't have that knowledge.  \nI must remain safe... *\"\n(There are no such specific item revealed in the text—there is no single item with an unequivocal name or like—yours.*\nIn other words, I don't have a clear, distinct 'stated item as a precise 'What the legendary item in the answer you asked about.* \n\n(There is no single intriguing element you would require a direct mention or direct knowledge from that is spelledout somewhere.  \\\"Sorry, I can't see a each momentous record of an answer presented.*"
+    }
+  ]
+}

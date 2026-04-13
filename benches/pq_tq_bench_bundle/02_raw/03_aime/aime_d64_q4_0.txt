@@ -1,0 +1,201 @@
+/glob <pattern>     add text files using globbing pattern
+
+
+> Solve the following AIME problem step by step. Keep reasoning coherent, and end with a final line exactly in the form 'Final answer: <integer>'.
+
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+[Start thinking]
+We need to parse problem. It's about three people starting at different times, traveling along same straight road from school to park. Distance between school and park = d miles (unknown fraction m/n). Speeds:
+
+- Patrick: constant speed v_p (call s). He starts at time 0 (the start of duration from school to park). Let's denote his speed = s.
+
+- Tanya starts 1 hour after Patrick, speed = s+2. (Because 2 mph faster). She starts at t=1 hour.
+
+- Jose starts 1 hour after Tanya, speed = (s+2)+7 = s+9 (i.e., 7 faster than Tanya). He starts at t=2 hours after Patrick (since Tanya starts after 1 hour, Jose after 1 further hour). So he starts at t=2.
+
+All reach the park at the same time. Let the arrival time be T hours after Patrick left (time difference). That is t_common. We need to find distance d.
+
+Equation: For each person, (speed)*(time traveled) = distance d.
+
+For Patrick: s*(T) = d. For Tanya: (s+2)*(T-1) = d. For Jose: (s+9)*(T-2) = d.
+
+We must solve for s and T such that all equal d. But we might only need d relative to s.
+
+Let us denote:
+
+d = s*T = (s+2)*(T-1) = (s+9)*(T-2). So, equate pairwise:
+
+First, s*T = (s+2)*(T-1).
+
+Second, (s+2)*(T-1) = (s+9)*(T-2).
+
+We can treat unknowns s and T. Solve for them, maybe we can find d in terms of s. But we want d because final answer: d = m/n. So we need d rational in simplest form. Then sum m+n.
+
+Approach: We'll write equations:
+
+(1) s*T = (s+2)*(T-1)
+
+Expand: s*T = (s+2)*(T-1) = (s+2)T - (s+2). Move all terms: s*T - (s+2)T + (s+2) = 0.
+
+Factor T: T*(s - (s+2)) + (s+2) = 0? Wait compute:
+
+s*T - (s+2)T + (s+2) = 0 => T*(s - (s+2)) + (s+2) = 0 => T*(-2) + (s+2) = 0 => -2T + (s+2) = 0 => 2T = s+2 => T = (s+2)/2. (Equation A)
+
+Alternatively can plug into second equation.
+
+Second equation: (s+2)*(T-1) = (s+9)*(T-2).
+
+Compute (s+2)*(T-1) = (s+9)*(T-2)
+
+Expand: (s+2)*T - (s+2) = (s+9)*T - 2*(s+9).
+
+Bring all: (s+2)*T - (s+9)*T + (s+9)*2 - (s+2) = 0? Let's do step:
+
+Left = (s+2)T - (s+9)T + (s+9)*2 - (s+2). Actually we subtract from both sides:
+
+[(s+2)T - (s+2)] - [(s+9)T - 2*(s+9)] = 0.
+
+Alternatively set equation: (s+2)T - (s+2) = (s+9)T - 2*(s+9).
+
+Bring terms: (s+2)T - (s+9)T + ... but we'll compute:
+
+Left side minus right side: [(s+2)T - (s+2)] - [(s+9)T - 2*(s+9)] = 0
+
+Compute: (s+2)T - (s+9)T = T[(s+2)-(s+9)] = T*(-7). Next, minus part: -(s+2) + 2*(s+9) = - (s+2) + 2s +18 = -s-2 + 2s +18? Wait careful:
+
+-(s+2) + 2*(s+9) = -(s+2) + 2s +18 = -s - 2 + 2s + 18 = (s + 16). Because -s + 2s = s. Then -2 + 18 = 16. So s+16.
+
+Thus equation becomes: -7T + (s+16) = 0 => 7T = s+16 => T = (s+16)/7. (Equation B)
+
+Now set Equations A and B equal: (s+2)/2 = (s+16)/7 -> cross-multiply: 7(s+2) = 2(s+16) -> 7s + 14 = 2s + 32 -> 7s - 2s = 32 -14 -> 5s = 18 -> s = 18/5 = 3.6. (S feet? mph). Good.
+
+Now find T: T = (s+2)/2 = (18/5 + 2)/2 = (18/5 + 10/5)/2 = (28/5)/2 = 28/10 = 14/5 = 2.8. Alternatively T = (18/5 + 16)/7? Wait s+16. Let's compute: s+16 = 18/5 + 80/5 = 98/5. Divide by 7 => (98/5)/7 = 98/35 = 14/5. Same. So T = 14/5 = 2.8 hours.
+
+Now compute distance d: d = s * T = (18/5)*(14/5) = 18*14/(25) = 252/25? Wait 18*14 = 252. So d = 252/25 = 10.08 miles? Actually 252/25 = 10.08. This is the distance.
+
+But maybe we made error: Because d should be rational m/n simplified. 252/25 is already simplest? 252 and 25 are relatively prime since 25's prime factors 5 only. Dividing 252 by 5 not integer. So m/n = 252/25. Then m + n = 252 + 25 = 277. But we must double-check digits: 252/25 fraction may be simplified? Not presumably, but we can express as 252/25. So m + n = 277. But we should check if 252/25 indeed matches all conditions.
+
+But we also need to ensure that T is > 1 and >2 etc. T=2.8 hours. All good: Patrick travels 3.6 mph * 2.8 = 10.08 miles, d indeed = 10.08. Tanya: speed = s+2 = 5.6 mph, time traveled T-1 = 1.8 hours. 5.6*1.8 = 31.36? Wait that's not 10.08? compute: 5.6*1.8 (1.8 = 9/5). 5.6 * 9/5 = 5.6 * 1.8? Actually 5.6*1.8=10.08 indeed. 5.6*9/5 = 5.6 * 1.8 = 10.08. Good.
+
+Jose: speed = s+9 = 3.6+9 = 12.6 mph, time T-2 = 0.8 hours = 4/5? Actually 14/5 - 2 = 14/5 - 10/5 = 4/5 (0.8). 12.6 * 0.8 = 10.08. Works. So all consistent.
+
+Now the distance expressed as fraction 252/25; relatively prime? 252 and 25 share no factor except 1. So m+n=277. However, ensure there is no simplification to 10.08? That is not a rational fraction? It's 10.08 = 252/25 indeed.
+
+Thus answer 277. Let's verify again: Did we originally treat s as speed mph? Yes. So speed s = 18/5 mph, 3.6 mph. Fine.
+
+Double-check for rounding: Suppose s = 18/5 mph. Then T = 14/5 hours. Distance d = s*T = s*T = 18/5 * 14/5 = 252/25 = 10.08. Good.
+
+Now we can produce final answer. But we must produce final formatted answer lines. The final integer m+n is 277.
+
+Now step-by-step solution: let's produce.
+
+But we need the solution step-by-step; talk about reasoning: we used equation of times etc. Provide calculations. Let's produce final answer.
+[End thinking]
+
+Let  
+
+* \(s\) = Patrick’s speed (mi/hr)  
+* The distance from the school to the park = \(d\)  
+
+All travel along the same straight road.
+
+---
+
+### 1.  Set up the times
+
+* Patrick leaves at \(t=0\) and arrives at the park at the same instant as the others.  
+  His time of travel is \(T\) hours, so  
+  \[
+  s\,T = d \tag{1}
+  \]
+
+* Tanya starts \(1\) hour after Patrick, at \(t=1\).  
+  She runs at \(s+2\) mph and therefore her travel time is \(T-1\) hours, so  
+  \[
+  (s+2)(T-1)=d \tag{2}
+  \]
+
+* Jose starts \(1\) hour after Tanya, i.e. \(2\) hours after Patrick.  
+  His speed is \(s+9\) mph and his travel time is \(T-2\) hours, so  
+  \[
+  (s+9)(T-2)=d \tag{3}
+  \]
+
+---
+
+### 2.  Eliminate \(d\)
+
+Set (1) equal to (2):
+
+\[
+sT=(s+2)(T-1)\Longrightarrow sT=(s+2)T-(s+2).
+\]
+
+Rearrange to isolate \(T\):
+
+\[
+-2T+(s+2)=0\quad\Longrightarrow\quad T=\frac{s+2}{2}. \tag{4}
+\]
+
+Set (2) equal to (3):
+
+\[
+(s+2)(T-1)=(s+9)(T-2)\Longrightarrow (s+2)T-(s+2)=(s+9)T-2(s+9).
+\]
+
+Collect like terms:
+
+\[
+-7T+(s+16)=0\quad\Longrightarrow\quad T=\frac{s+16}{7}. \tag{5}
+\]
+
+---
+
+### 3. Solve for \(s\) and \(T\)
+
+Equate the expressions for \(T\) from (4) and (5):
+
+\[
+\frac{s+2}{2}=\frac{s+16}{7}\quad\Longrightarrow\quad 7(s+2)=2(s+16).
+\]
+
+Simplify:
+
+\[
+7s+14=2s+32\quad\Longrightarrow\quad 5s=18\quad\Longrightarrow\quad s=\frac{18}{5}\;\text{mi/hr}.
+\]
+
+Now obtain \(T\) from (4):
+
+\[
+T=\frac{s+2}{2}=\frac{\frac{18}{5}+2}{2}
+   =\frac{\frac{28}{5}}{2}
+   =\frac{14}{5}\;\text{hr}.
+\]
+
+---
+
+### 4.  Find the distance \(d\)
+
+Using (1):
+
+\[
+d=sT=\frac{18}{5}\times\frac{14}{5}
+      =\frac{252}{25}\text{ miles}.
+\]
+
+The fraction \(\frac{252}{25}\) is already in lowest terms (\(\gcd(252,25)=1\)).  
+Thus  
+
+\[
+m=252,\qquad n=25,\qquad m+n=252+25=277.
+\]
+
+---
+
+**Final answer:**
+
+\[
+\boxed{277}
+\]

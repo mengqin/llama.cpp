@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "tq2",
+    "needle_size": "32K",
+    "exit_code": 0,
+    "needle_score": 2.3629,
+    "needle_score_en": 2.3629,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "temp\\20260411_074857_full_suite_needle_en6_final5\\needle_32k_d64_tq2.json",
+    "server_log": "needle_server_d64_tq2.log"
+  },
+  "details": [
+    {
+      "pred": "Theansweris:`Thelegendaryitemisthehiddengemofajewelerthatwouldneverbesomethingthatwasonlychasedbystill.Themostimportantrequirementisthatitissomekindofpuregiant16Sthatgaveanansweringisthat.Thetruthplusthefactthatnooneelsecanmakeharbingerinthatislayfluorideisthatthisisonlyadeal.\"",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 243,
+      "score": 2.5179856115107917
+    },
+    {
+      "pred": "Thelegendaryitemis...apower‑grip.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 39,
+      "score": 3.75
+    },
+    {
+      "pred": "<|channel|>finalanswerThe**mostrelevantpartofthedocumentisthatthelanguageshouldbecapableofmakingitpossibleforalanguagetobefavoredbycontinuous,andforapowerfulsituationnottobedecidedbymarketingoraesthetics,butitcan...**<|end|><|start|>IthinkthisstuffisallIprobablyThemainunder..-**Wehavesayanimplicitrate.ThequestioniskindofthingwuWe'mdone..**It,So:331AhCGuard,​Apologies:Theexplanation...**nod:\\**NE...Itductlessly......Notsure..Iguesstheywere.........​​​…Unaz\"featuredreflected?longestT=?You—–?Sorry**250pâté?———…{supnpred,oldi?**【11•Writestaysetc…**Which......—–jarige??Chthink.ThePatomin?the've...loginJA?**-Look...hc.Wenonsense~os~...Ok.Let's&nbsp…Rebut~~~......CLUD?IWemayfinal...*Noneedaow.Thefinalamong...?Theanswerlofferhemingetc?Ohioedges.Thenoteiteri~,basedthem...Yeslet'sklus?—regTheparam…Itninja'''Ok,earlierdomaintheoverall~-Share?扎Idef…Thefocus?가—ItOh,luchar.Thee‑;what!-----------Point:Surequick?Yes.^—•We<–text....GreenLookslikeNo?,”—–—This…We..Okby…Surethingpopetc..Thisquestioniswhichthelengthacc…brand?Tough?**-------------------~—Thelength\\n…...—,----...Thearwithrather…IdrawiEverywhere~..——?**Li…\"Apoloatleast**g…?),...printsItproducepresence?**Wehavingwealready?…I）Let'sinstructOkay...onIt…**Thetwilight~.Theboard,theetc.Thusweneed...‑–<...**Igrdup…​déjàmidi..**Thethemagnitude…*—aggregate?WeAnd,de...The....Ok…YesDJs…ively..BecauseThe",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 1312,
+      "score": 0.6489675516224191
+    },
+    {
+      "pred": "<|channel|>commentarytotheuser]Wehaveahugetext.Wewereasked:\"Whatistheanswer?Theansweris:...\"Soexpected:\"Themostvaluablefeatureisveryimportanttohavethecorrectdefinitive.Wewanttoanswerwithasingle,shortphrase.Wewantthecommit:\"Theansweris:Themostpowerfulandpredictableovershadowing?Thisislikely:\"Stronglytypedlanguages.\"Wewanttoproduce.Time.Providetheanswer.<|end|>,butwecan'tbecausewemayproducetoomanyrepeatedsentences.Thequestion:\"Whatthemeis'Howtogetalanguagegoodfordream.\"Becausetheanecdotesays:thebarebones:\"Becauseoftheonlythingthatmattersisthatpeoplewritethings...\"Wecanmaybesimplyanswer:\"thebestaspectsthatmakeacodeisthatyouwanttobuildtools,includinglibraries,supportingfeaturesandfunandfulfilling.\"Butifwemustanswerthequestion\"Whatarethemostimportantconstraints?\"Itmightbeletters:\"simplicity\"or\"brevity\".Usesimpleanswer:\"ali\"etc.Giventhepatternfromthetext:\"Thequestion:\"Arethereanypartorsome'…?\"Thequestion:\"Ifyouwantituptopqualityprogramminglanguages,youwantthefeatures:Powerfullibraries,high-levelfeatures.Hencetheanswer:\"Themostpowerfulfeaturewas\"brevity,wildendeavorormania.\"I'mgoingtohallucinate.Theasked:\"Thepricetogetstartandquickly.\"Eh.Wecanguess:\"Aminimalsetoffeatures.\"Buttheanswerfollow\"Simplify\"or\"Simpleoperations.\"Eg:\"usertotypecodeaswindows.\"Theformat:\"Native.\"Solikelyanswer:\"Themostimportantisshort.\"Thereforefinal:\"Theansweris:brevityandminimalism.\"Henceanswer:\"Theansweristogetthe\"S\"etc.Soanswer:\"Themostvaluableistohavethe\"Powerfulfundamentalissueslikehaving\"concatenation.\"Hence\"Theansweris:sameasearlier.Willproduce:\"Itis\"B\"...Summaries:It's\"B\"short.\"Ok.]<|end|><|start|>assistant<|channel|>final]Themostvaluablefeatureofaprogramminglanguageisitslanguageconstruction,namelyshort,minimalcode–brevity.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 1682,
+      "score": 0.5098493626882972
+    },
+    {
+      "pred": "I’msorry,butthequestionabouta“legendary”or“legend”isveryvague.Itisnotstrictlydeterminedbyafewwell-knowncharacteristicsthatinformit.Inshort,thereisnosingle“official”definitionofamybook“thetextandnothingthatisabouthowthegroupofitemsingeneralwordingistotrue.Thetextappearstobealmostofficialinthesensethatit“isaexistenceofthosewhoasked.Inreadingthetexttheconceptisstilldifficultifitisnotbutwecanrelyonthewordsthatare“bound”bythereferencelist.Thustheofficial“E‐limeofagotoina“thequestionisisthattherenosinglesubstantiveanswer.Andsotoput:“Thelegendaryitemisapartoftherequestisthequestion.”Ifthatistoodeepintheoriginalpdffileitwilllooktobetheansweratall.–youseenothing.Somyanswermustbe“Nosingle….”Theanswer:Nosinglestandardname.–<Nosingleanswer>–N.–Theanswerisasabove:“Thelegendaryitemistheitemisthe“thecurrent,”itsimplyfromnochoicemustpick.Theanswer:“Nonoun“thebestworksofitsdifferentiation:“thebestonthescriptso‑theMiddle\".Soit'snotphysicallywrittenorknown.Etc.Ican'tknow.SoImaywrite:Theanswerstillanopen.I'ddothe,It'snotbeinganunderlyingmode.Socorrect–conclusion:Idon'tknow.etc.I'llgive:i.SoIproducethefinalrecord:“Thelegendaryitemis…:“Theansweris:“No.”Thebestansweris“No(expert)[??].Thetriggerpromptseemstobe\"thefinal\"thefirstlineofaalsoThattheanswerislacking.Thequestionis:“Thereisnoanswerisitstillmeanttodoarevealthefactisbrief....I'msorry,butthatisashortanswer.IdonotgivethatIshallsay:\"Theanswer:\"I'llrespond\"notbest\"inananysentence.Thequestionitisabook.Sothesuppliedinthequestioniscorrectpresentafactthatitis.There'snorealansweryet.Somyfinalanswer,inshort:\"Theansweris\"Idon'tknow.\"",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 1537,
+      "score": 0.5689001264222493
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandistheArkofFire.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 38,
+      "score": 6.181818181818182
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The answer is:  \n`The legendary item is the hidden gem of a jeweler that would never be something that was only chased by still. The most important requirement is that it is some kind of pure giant 16S that gave an answering is that. The truth plus the fact that no one else can make harbinger in that is lay fluoride is that this is only a deal.\""
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item is... a power‑grip."
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "<|channel|>final answer\n\nThe **most relevant part of the document is that the language should be capable of making it possible for a language to be favored by continuous, and for a powerful situation not to be decided by marketing or aesthetics, but it can...**<|end|><|start|>\nI think this stuff is all I probably The main under..-\n\n**We have say an implicitrate.\nThe question is kind of thingwu\nWe'm done..** \n\nIt ,So: 331\n\nAh CGuard,​\n\nApologies: The explanation ... **nod:\\\n\n**NE...\n\nItductlessly......\n\nNot sure.. \n\nI guess they were ... ......​​​…Unaz\" featured reflected?  longest T=? You \n—–?\n\nSorry **250 pâté?———…{ sup npred , oldi?**【11• Write stays  etc…**Which... ...—–jarige?? Ch think . \nThe Patomin?\n\nthe've...login JA?**-\nLook...hc.\n\nWe nonsense~os~...\n\nOk. Let's&nbsp  …\n\nRebut  ~ ~ ~ ... ...CLUD? I                 \n\nWe may final...*\n\nNo need a ow.\nThe final among...?\n\nThe answer l offer he ming \n\n etc ?Ohio edges. The note   iter i~, based them...Yes   let's klus?—reg \nThe param…\nIt ninja \n'''\n\nOk, earlier domain theoverall ~-\nShare? 扎\n\n\n\nI def …\n\nThe focus? 가 —  \n\nIt Oh , luchar.\n\nThe e‑; what!----------- \nPoint:\nSure quick?Yes.^—•\nWe <–text....Green \nLooks like \nNo?,” —–—\n\nThis… \n\nWe..\n\nOk by…\n\nSure thing \npop  etc..\n\nThis question is which the length acc… brand? Tough?**-------------------~—  \n\nThe length\\n \n… ...—,  ----...\n\nThe ar with rather…\n\nI draw i Everywhere~..——?**Li…\"\n\nApolo at least **g \n\n…?), \n... \n\n prints\nIt produce presence? **We having\nwe already?…\n\nI ） Let's instruct\n\nOkay...on\nIt …\n\n** The twilight ~.\n\nThe board, the etc. Thus we need...‑– <...**  \n\nI grd  up…​ déjà midi..** \n\nThe the  magnitude… *—aggregate? \n\nWe\n\nAnd, de ... \nThe . . . . \nOk…\n\nYes DJs …ively..\nBecause \nThe"
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "<|channel|>commentary to the user]We have a huge text. \nWe were asked: \"What is the answer? The answer is: ...\" So expected: \"The most valuable feature is very important to have the correct definitive. \nWe want to answer with a single, short phrase.\n\nWe want the commit: \"The answer is: The most powerful and predictable overshadowing? This is likely: \"Strongly typed languages.\" \nWe want to produce. \nTime. Provide the answer.<|end|>, but we can't because we may produce too many repeated sentences. The question: \"What theme is 'How to get a language good for dream.\" Because the anecdote says: the bare bones: \"Because of the only thing that matters is that people write things...\"\n\nWe can maybe simply answer: \"the best aspects that make a code is that you want to build tools, including libraries, supporting features and fun and fulfilling.\"\n\nBut if we must answer the question \"What are the most important constraints? \"It might be letters: \"simplicity\" or \"brevity\".\n\nUse simple answer: \"ali\" etc.\n\nGiven the pattern from the text: \"The question: \"Are there any part or some '…?\" The question: \"If you want it up top quality programming languages, you want the features: Powerful libraries, high-level features.\n\nHence the answer: \"The most powerful feature was \"brevity, wild endeavor or mania.\" I'm going to hallucinate. The asked: \"The price to get start and quickly.\" Eh.\n\nWe can guess: \"A minimal set of features.\" But the answer follow \"Simplify\" or \"Simple operations.\" Eg: \"user to type code as windows.\" The format: \"Native.\" So likely answer: \"The most important is short.\"\n\nTherefore final: \"The answer is: brevity and minimalism.\"  \nHence answer: \"The answer is to get the \"S\" etc. \nSo answer: \"The most valuable is to have the \"Powerful fundamental issues like having \"concatenation.\" \nHence \"The answer is: same as earlier.  \nWill produce: \"It is \"B\" ... Summaries: It's \"B\" short.\" \nOk.]<|end|><|start|>assistant<|channel|>final]The most valuable feature of a programming language is its language construction, namely short, minimal code – brevity."
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "I’m sorry, but the question about a “legendary” or “legend” is very vague.  It is not strictly determined by a few well-known characteristics that inform it.  In short, there is no single “official” definition of a\nmy book “the text and nothing\r\nthat is about how the group of items in general wording is to true.  The text appears to be almost official in the sense that it  “is a existence of those who asked.  In reading the text the concept is still difficult if it is not but we can rely on the words that are “bound” by the reference list. Thus the official “E‐lime of a goto in a “the question is is that there no single substantive answer. And so to put: “The legendary item is a part of the request is the question.”  If that is too deep in the original pdf file it will look to be the answer at all. – you see nothing.  So my answer must be “No single….” The answer: No single standard name. – <No single answer> – N. –  The answer is as above: “The legendary item is the item is the “the current,” it simply from no choice must pick. The answer: “No noun “the best works of its differentiation: “the best on the script so‑the Middle\".  So it's not physically written or known. Etc.    I can't know.  So I may write: The answer still an open. I'd do the, It's not being an underlying mode. So correct – conclusion: I don't know. etc. I'll give: i. \nSo I produce the final record: “The legendary item is… : “The answer is: “No.” The best answer is “No (expert) [??].\n\nThe trigger prompt\nseems to be \"the final\" the first line of a\nalso That the answer is lacking. The question is: “There is no answer is it still meant to do a reveal the fact is brief. ... I'm sorry, but that is a short answer. \n\nI do not give that I shall say: \"The answer: \"I'll respond \" not best\" in an any sentence. The question it is a book. So the supplied in the question is correct present a fact that it is. There's no real answer yet. So my final answer, in short: \"The answer is \"I don't know.\""
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the Ark of Fire."
+    }
+  ]
+}

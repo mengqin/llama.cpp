@@ -1,0 +1,497 @@
+/glob <pattern>     add text files using globbing pattern
+
+
+> Solve the following AIME problem step by step. Keep reasoning coherent, and end with a final line exactly in the form 'Final answer: <integer>'.
+
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+[Start thinking]
+Here's a thinking process to solve the problem:
+
+1.  **Understand the Goal:** The objective is to find the distance from the school to the park, expressed as a fraction $m/n$ of relatively prime integers, and then calculate $m+n$.
+
+2.  **Define Variables:**
+    *   Let $D$ be the distance from the school to the park (in miles).
+    *   Let $v_p$ be Patrick's walking speed (mph).
+    *   Let $v_t$ be Tanya's running speed (mph).
+    *   Let $v_j$ be Jose's bicycling speed (mph).
+    *   Let $t_p$ be Patrick's total travel time (hours).
+    *   Let $t_t$ be Tanya's total travel time (hours).
+    *   Let $t_j$ be Jose's total travel time (hours).
+
+3.  **Translate Relationships:**
+    *   **Speeds:**
+        *   Tanya runs 2 mph faster than Patrick: $v_t = v_p + 2$.
+        *   Jose bikes 7 mph faster than Tanya: $v_j = v_t + 7$.
+        *   Substituting $v_p$: $v_j = (v_p + 2) + 7 = v_p + 9$.
+    *   **Start Times:**
+        *   Patrick leaves at time $t=0$.
+        *   Tanya leaves at time $t=1$ (1 hour after Patrick).
+        *   Jose leaves at time $t=2$ (1 hour after Tanya).
+    *   **Arrival Times:**
+        *   All arrive at the park at the same time. Let's call this arrival time $T_{arrival}$.
+    *   **Travel Durations:**
+        *   Patrick's duration: $t_p = T_{arrival} - 0 = T_{arrival}$.
+        *   Tanya's duration: $t_t = T_{arrival} - 1$.
+        *   Jose's duration: $t_j = T_{arrival} - 2$.
+
+4.  **Formulate Equations:**
+    *   Distance = Speed $\times$ Time.
+    *   $D = v_p \cdot t_p$
+    *   $D = v_t \cdot t_t$
+    *   $D = v_j \cdot t_j$
+
+    Substitute the expressions for speeds and times:
+    1.  $D = v_p \cdot T_{arrival}$
+    2.  $D = (v_p + 2) \cdot (T_{arrival} - 1)$
+    3.  $D = (v_p + 9) \cdot (T_{arrival} - 2)$
+
+5.  **Solve the System of Equations:**
+    We have three equations with three unknowns ($D, v_p, T_{arrival}$). We need to find $D$.
+    Let's express $T_{arrival}$ in terms of $D$ and $v_p$ from equation (1):
+    $T_{arrival} = D / v_p$.
+
+    Substitute this into equation (2):
+    $D = (v_p + 2) \cdot (D/v_p - 1)$
+    $D = (v_p + 2) \cdot \frac{D - v_p}{v_p}$
+    $D \cdot v_p = (v_p + 2)(D - v_p)$
+    $D \cdot v_p = D \cdot v_p - v_p^2 + 2D - 2v_p$
+    Subtract $D \cdot v_p$ from both sides:
+    $0 = -v_p^2 + 2D - 2v_p$
+    $v_p^2 + 2v_p = 2D$  (Equation A)
+
+    Now substitute $T_{arrival} = D / v_p$ into equation (3):
+    $D = (v_p + 9) \cdot (D/v_p - 2)$
+    $D = (v_p + 9) \cdot \frac{D - 2v_p}{v_p}$
+    $D \cdot v_p = (v_p + 9)(D - 2v_p)$
+    $D \cdot v_p = D \cdot v_p - 2v_p^2 + 9D - 18v_p$
+    Subtract $D \cdot v_p$ from both sides:
+    $0 = -2v_p^2 + 9D - 18v_p$
+    $2v_p^2 + 18v_p = 9D$ (Equation B)
+
+    Now we have a system of two equations with $v_p$ and $D$:
+    (A) $2D = v_p^2 + 2v_p$
+    (B) $9D = 2v_p^2 + 18v_p$
+
+    From (A), express $D$:
+    $D = \frac{v_p^2 + 2v_p}{2}$
+
+    Substitute this into (B):
+    $9 \left( \frac{v_p^2 + 2v_p}{2} \right) = 2v_p^2 + 18v_p$
+    Multiply by 2 to clear the denominator:
+    $9(v_p^2 + 2v_p) = 2(2v_p^2 + 18v_p)$
+    $9v_p^2 + 18v_p = 4v_p^2 + 36v_p$
+
+    Rearrange terms to solve for $v_p$:
+    $9v_p^2 - 4v_p^2 + 18v_p - 36v_p = 0$
+    $5v_p^2 - 18v_p = 0$
+    $v_p(5v_p - 18) = 0$
+
+    Since speed must be positive ($v_p > 0$), we discard $v_p = 0$.
+    So, $5v_p = 18$.
+    $v_p = \frac{18}{5}$ mph.
+
+6.  **Calculate Distance $D$:**
+    Use Equation A: $2D = v_p^2 + 2v_p$.
+    Substitute $v_p = \frac{18}{5}$:
+    $2D = \left(\frac{18}{5}\right)^2 + 2\left(\frac{18}{5}\right)$
+    $2D = \frac{324}{25} + \frac{36}{5}$
+    $2D = \frac{324}{25} + \frac{180}{25}$
+    $2D = \frac{504}{25}$
+    $D = \frac{252}{25}$
+
+    Let's double-check with Equation B just to be sure.
+    $9D = 2v_p^2 + 18v_p$
+    $2v_p^2 + 18v_p = 2\left(\frac{18}{5}\right)^2 + 18\left(\frac{18}{5}\right)$
+    $= 2\left(\frac{324}{25}\right) + \frac{324}{5}$
+    $= \frac{648}{25} + \frac{1620}{25}$
+    $= \frac{2268}{25}$
+    $9D = \frac{2268}{25}$
+    $D = \frac{2268}{225}$
+    Divide by 9: $2268 / 9 = 252$. $225 / 9 = 25$.
+    $D = \frac{252}{25}$.
+
+    The calculations match.
+
+7.  **Check Constraints:**
+    *   $v_p = 3.6$ mph.
+    *   $v_t = 5.6$ mph.
+    *   $v_j = 12.6$ mph.
+    *   $t_p = D / v_p = (252/25) / (18/5) = (252/25) * (5/18) = (252/18) * (1/5) = 14 * (1/5) = 2.8$ hours.
+    *   $t_t = D / v_t = (252/25) / (28/5) = (252/25) * (5/28) = (252/28) * (1/5) = 9 * (1/5) = 1.8$ hours.
+    *   $t_j = D / v_j = (252/25) / (63/5) = (252/25) * (5/63) = (252/63) * (1/5) = 4 * (1/5) = 0.8$ hours.
+
+    *   Arrival times:
+        *   Patrick starts at 0, arrives at $0 + 2.8 = 2.8$.
+        *   Tanya starts at 1, arrives at $1 + 1.8 = 2.8$.
+        *   Jose starts at 2, arrives at $2 + 0.8 = 2.8$.
+    *   All arrive at the same time.
+    *   Speeds are consistent ($v_t = v_p + 2$, $v_j = v_t + 7$).
+    *   $m = 252$, $n = 25$.
+    *   Are $m$ and $n$ relatively prime?
+        *   $252 = 252$.
+        *   $25 = 5^2$.
+        *   $252$ is divisible by 2, 3, 4, 6, 7, 9, 12, 14, 21, 28, etc.
+        *   Sum of digits of 252 is $2+5+2=9$, so divisible by 3.
+        *   $252 / 3 = 84$. $84 / 3 = 28$. So $252 = 4 \times 63 = 2^2 \times 3^2 \times 7$.
+        *   $25 = 5^2$.
+        *   No common factors. Yes, relatively prime.
+
+8.  **Final Calculation:**
+    *   $m = 252$
+    *   $n = 25$
+    *   Find $m + n$.
+    *   $m + n = 252 + 25 = 277$.
+
+9.  **Structure the Output:**
+    *   Define variables.
+    *   Set up equations based on distance = speed * time.
+    *   Derive relationships between speeds.
+    *   Solve for Patrick's speed.
+    *   Solve for Distance.
+    *   Verify relative primality.
+    *   Compute sum.
+
+    Let's write down the steps clearly.
+
+    **Step 1:** Define variables.
+    $v_p$: Patrick's speed.
+    $v_t = v_p + 2$: Tanya's speed.
+    $v_j = v_t + 7 = v_p + 9$: Jose's speed.
+    Let $t$ be the time Patrick walks.
+    Since they all arrive at the same time, let's denote the arrival time at the park as $T$.
+    Time for Patrick: $t_p = T$.
+    Time for Tanya: $t_t = T - 1$.
+    Time for Jose: $t_j = T - 2$.
+
+    **Step 2:** Set up equations.
+    $D = v_p t_p$
+    $D = v_t t_t$
+    $D = v_j t_j$
+
+    **Step 3:** Express everything in terms of $v_p$ and $T$.
+    $D = v_p T$
+    $D = (v_p + 2)(T - 1)$
+    $D = (v_p + 9)(T - 2)$
+
+    **Step 4:** Eliminate $D$ and $T$.
+    From first two: $v_p T = (v_p + 2)(T - 1) \implies v_p T = v_p T - v_p + 2T - 2 \implies v_p = 2T - 2 \implies T = \frac{v_p + 2}{2}$.
+    Wait, let's recheck this algebra.
+    $v_p T = (v_p + 2)(T - 1)$
+    $v_p T = v_p T - v_p + 2T - 2$
+    $0 = -v_p + 2T - 2$
+    $v_p = 2T - 2$
+    $T = \frac{v_p + 2}{2}$.
+    This seems much simpler than my previous derivation. Let's check if it leads to the same result.
+    My previous derivation was: $v_p^2 + 2v_p = 2D$.
+    Let's substitute $D = v_p T$.
+    $v_p^2 + 2v_p = 2 v_p T$.
+    $v_p + 2 = 2T$.
+    $T = \frac{v_p + 2}{2}$.
+    Yes, it matches.
+
+    Now use the third equation.
+    $D = (v_p + 9)(T - 2)$.
+    Substitute $D = v_p T$ and $T = \frac{v_p + 2}{2}$.
+    $v_p \left( \frac{v_p + 2}{2} \right) = (v_p + 9) \left( \frac{v_p + 2}{2} - 2 \right)$
+    Simplify the RHS term inside parenthesis:
+    $\frac{v_p + 2}{2} - 2 = \frac{v_p + 2 - 4}{2} = \frac{v_p - 2}{2}$.
+    So,
+    $\frac{v_p(v_p + 2)}{2} = (v_p + 9) \frac{v_p - 2}{2}$.
+    Multiply by 2:
+    $v_p^2 + 2v_p = (v_p + 9)(v_p - 2)$.
+    $v_p^2 + 2v_p = v_p^2 - 2v_p + 9v_p - 18$.
+    $v_p^2 + 2v_p = v_p^2 + 7v_p - 18$.
+    Subtract $v_p^2$ from both sides:
+    $2v_p = 7v_p - 18$.
+    $18 = 5v_p$.
+    $v_p = \frac{18}{5}$.
+
+    This confirms the previous result ($v_p = 3.6$).
+    Now calculate $D$.
+    $D = v_p T = v_p \left( \frac{v_p + 2}{2} \right)$.
+    $D = \frac{18}{5} \left( \frac{18/5 + 2}{2} \right)$.
+    $D = \frac{18}{5} \left( \frac{18 + 10}{5 \times 2} \right)$.
+    $D = \frac{18}{5} \left( \frac{28}{10} \right)$.
+    $D = \frac{18}{5} \cdot \frac{14}{5}$.
+    $D = \frac{252}{25}$.
+
+    This is the same result as before. The algebra was slightly more direct here.
+
+    **Step 5:** Verify $m, n$.
+    $D = 252/25$.
+    $m = 252$.
+    $n = 25$.
+    Check gcd(252, 25).
+    $252 = 2^2 \cdot 3^2 \cdot 7$.
+    $25 = 5^2$.
+    GCD is 1.
+    $m+n = 252 + 25 = 277$.
+
+    The solution seems solid.
+
+    Let's double check the question wording.
+    "One hour after Patrick left, Tanya started running... 2 miles per hour faster than Patrick".
+    "One hour after Tanya left, Jose started bicycling... 7 miles per hour faster than Tanya".
+    "All three people arrived at the park at the same time".
+    "Distance ... m/n".
+    "Find m + n".
+
+    Everything aligns.
+
+    Let's do a sanity check on the logic.
+    Patrick is the slowest, but starts first.
+    Tanya is faster, starts later.
+    Jose is fastest, starts latest.
+    If they arrive at the same time, the one who started earliest (Patrick) must have the longest duration.
+    Patrick: $D/v_p$.
+    Tanya: $D/v_t$.
+    Jose: $D/v_j$.
+    Since $v_p < v_t < v_j$, we have $t_p > t_t > t_j$.
+    Start times: $S_p=0, S_t=1, S_j=2$.
+    Arrival time $A$.
+    $A - 0 = t_p$.
+    $A - 1 = t_t$.
+    $A - 2 = t_j$.
+    This implies $t_p - t_t = 1$ and $t_t - t_j = 1$.
+    So $t_p = t_t + 1$ and $t_j = t_t - 1$.
+    Wait, is this required?
+    $t_p = A - 0 = A$.
+    $t_t = A - 1$.
+    $t_j = A - 2$.
+    Yes, the durations form an arithmetic progression with difference 1.
+    $D = v_p t_p = v_t t_t = v_j t_j$.
+    $D = v_p (t_t + 1)$.
+    $D = v_t t_t$.
+    $D = v_j (t_t - 1)$.
+
+    Let's check if this holds with my numbers.
+    $v_p = 3.6$.
+    $v_t = 5.6$.
+    $v_j = 12.6$.
+    $D = 10.08$.
+    $t_t = D/v_t = 10.08 / 5.6 = 1008 / 560 = 1.8$.
+    $t_p = 1.8 + 1 = 2.8$.
+    $t_j = 1.8 - 1 = 0.8$.
+    Check distances:
+    $v_p t_p = 3.6 \times 2.8 = 3.6(2 + 0.8) = 7.2 + 2.88 = 10.08$.
+    $v_t t_t = 5.6 \times 1.8 = 5.6(1 + 0.8) = 5.6 + 4.48 = 10.08$.
+    $v_j t_j = 12.6 \times 0.8 = 10.08$.
+    All match.
+    The arithmetic progression assumption was derived from the time constraints, which is correct.
+    $t_t$ is the time Tanya takes.
+    $t_p = t_t + 1$.
+    $t_j = t_t - 1$.
+    $D = v_t t_t$.
+    $D = (v_t - 2)(t_t + 1)$.
+    $D = (v_t + 7)(t_t - 1)$.
+
+    Let's solve using $v_t$ directly to see if it's simpler.
+    $v_t t_t = (v_t - 2)(t_t + 1)$
+    $v_t t_t = v_t t_t + v_t - 2t_t - 2$
+    $0 = v_t - 2t_t - 2 \implies 2t_t = v_t - 2 \implies t_t = \frac{v_t - 2}{2}$.
+    Substitute into third equation:
+    $v_t t_t = (v_t + 7)(t_t - 1)$
+    $v_t t_t = v_t t_t - v_t + 7t_t - 7$
+    $0 = -v_t + 7t_t - 7 \implies v_t = 7t_t - 7 \implies t_t = \frac{v_t + 7}{7}$.
+
+    Equate the two expressions for $t_t$:
+    $\frac{v_t - 2}{2} = \frac{v_t + 7}{7}$
+    $7(v_t - 2) = 2(v_t + 7)$
+    $7v_t - 14 = 2v_t + 14$
+    $5v_t = 28$
+    $v_t = \frac{28}{5} = 5.6$.
+
+    If $v_t = 5.6$, then $D = v_t t_t$.
+    First, find $t_t$:
+    $t_t = \frac{5.6 - 2}{2} = \frac{3.6}{2} = 1.8$.
+    $D = 5.6 \times 1.8 = 10.08$.
+    $10.08 = \frac{1008}{100} = \frac{504}{50} = \frac{252}{25}$.
+    This is consistent and perhaps slightly faster algebraically (fewer variables to track).
+
+    The question asks for $m+n$.
+    $m=252, n=25$.
+    $m+n=277$.
+
+    Final check on "relatively prime".
+    $252 = 2^2 \cdot 3^2 \cdot 7$.
+    $25 = 5^2$.
+    No common factors.
+    $m, n$ positive integers. Yes.
+
+    The problem is solved.
+
+    Summary of steps for final output:
+    1. Define speeds and times.
+    2. Relate speeds: $v_t = v_p + 2$, $v_j = v_p + 9$.
+    3. Relate times: $t_p = t_t + 1$, $t_j = t_t - 1$ (derived from start times and equal arrival).
+    4. Use $D = v \cdot t$ to set up equations.
+    5. Solve for $v_t$ (or $v_p$).
+    6. Calculate $D$.
+    7. Sum numerator and denominator.
+
+    Alternative check:
+    Let $x$ be Tanya's speed. Then Patrick is $x-2$, Jose is $x+7$.
+    Let $y$ be Tanya's time. Patrick's time is $y+1$, Jose's time is $y-1$.
+    Distance $D = x y = (x-2)(y+1) = (x+7)(y-1)$.
+    From first two: $xy = xy + x - 2y - 2 \implies x = 2y - 2 \implies y = (x+2)/2$.
+    From last two: $xy = xy - x + 7y - 7 \implies x = 7y - 7 \implies y = (x+7)/7$.
+    $(x+2)/2 = (x+7)/7 \implies 7x + 14 = 2x + 14 \implies 5x = 0$. Wait.
+    $7(x+2) = 2(x+7) \implies 7x + 14 = 2x + 14 \implies 5x = 0$.
+    Something is wrong.
+    Let's re-evaluate the equations.
+    $D = x y$.
+    $D = (x-2)(y+1) = xy + x - 2y - 2$.
+    $xy = xy + x - 2y - 2 \implies 0 = x - 2y - 2 \implies 2y = x - 2 \implies y = (x-2)/2$.
+    My previous derivation was $t_t = (v_t - 2)/2$. This matches.
+    Wait, in the check just now I wrote $x = 2y - 2 \implies y = (x+2)/2$.
+    $2y = x - 2$. So $y = (x-2)/2$.
+    Why did I think $y = (x+2)/2$?
+    $x - 2y - 2 = 0 \implies x - 2 = 2y \implies y = (x-2)/2$.
+    Okay, so $y = (x-2)/2$.
+    Let's check the third equation.
+    $D = (x+7)(y-1) = xy - x + 7y - 7$.
+    $xy = xy - x + 7y - 7 \implies 0 = -x + 7y - 7 \implies x = 7y - 7 \implies y = (x+7)/7$.
+    So we have:
+    $y = \frac{x-2}{2}$
+    $y = \frac{x+7}{7}$
+    Equating them:
+    $\frac{x-2}{2} = \frac{x+7}{7}$
+    $7(x-2) = 2(x+7)$
+    $7x - 14 = 2x + 14$
+    $5x = 28$
+    $x = 28/5 = 5.6$.
+    This matches my previous $v_t$ result.
+    Then $y = (5.6 - 2)/2 = 3.6/2 = 1.8$.
+    $D = x y = 5.6 \times 1.8 = 10.08 = 252/25$.
+    The algebra holds up.
+
+    The error in the "sanity check" line where I wrote $y = (x+2)/2$ was a simple sign error.
+    $0 = x - 2y - 2 \implies 2y = x - 2$. Correct.
+    The previous derivation $v_p^2 + 2v_p = 2D$ also worked.
+    Let's check that again.
+    $v_p^2 + 2v_p = 2D$.
+    $9D = 2v_p^2 + 18v_p$.
+    Substitute $D = (v_p^2 + 2v_p)/2$.
+    $9(v_p^2 + 2v_p)/2 = 2v_p^2 + 18v_p$.
+    $9(v_p^2 + 2v_p) = 4v_p^2 + 36v_p$.
+    $9v_p^2 + 18v_p = 4v_p^2 + 36v_p$.
+    $5v_p^2 - 18v_p = 0$.
+    $v_p(5v_p - 18) = 0$.
+    $v_p = 18/5$.
+    $x = v_t = v_p + 2 = 18/5 + 10/5 = 28/5$.
+    This is consistent.
+
+    I am confident in the result.
+    $m = 252, n = 25$.
+    $m+n = 277$.
+
+    One more check on "relatively prime".
+    $252 = 252$.
+    $25 = 25$.
+    $252 \pmod 5 = 2$. Not divisible by 5.
+    So yes, relatively prime.
+
+    Final Answer seems to be 277.
+
+    The prompt asks for "step by step". I will format the response clearly.
+    1. Define variables for speed and time.
+    2. Express speeds in terms of $v_p$.
+    3. Express times in terms of $t_p$ (or $t_t$).
+    4. Set up equations equating distance.
+    5. Solve the system.
+    6. Compute $m+n$.
+
+    Double check arithmetic:
+    $252 + 25 = 277$.
+    $252/25 = 10.08$.
+    $18/5 = 3.6$.
+    $3.6 + 2 = 5.6$.
+    $5.6 + 7 = 12.6$.
+    Times:
+    Patrick: $10.08 / 3.6 = 2.8$.
+    Tanya: $10.08 / 5.6 = 1.8$.
+    Jose: $10.08 / 12.6 = 0.8$.
+    Start times:
+    Patrick: 0.
+    Tanya: $2.8 - 1.8 = 1$. Correct.
+    Jose: $1.8 - 0.8 = 1$. Correct.
+    Arrivals:
+    Patrick: $0 + 2.8 = 2.8$.
+    Tanya: $1 + 1.8 = 2.8$.
+    Jose: $2 + 0.8 = 2.8$.
+    All good.
+
+    Final Answer format:
+    Final answer: 277.
+
+[End thinking]
+
+Let $v_p$, $v_t$, and $v_j$ be the speeds (in miles per hour) of Patrick, Tanya, and Jose, respectively.
+Let $t_p$, $t_t$, and $t_j$ be the travel times (in hours) for Patrick, Tanya, and Jose, respectively.
+Let $D$ be the distance from the school to the park (in miles).
+
+From the problem description, we have the following relationships:
+1.  **Speeds:**
+    *   Tanya runs 2 mph faster than Patrick: $v_t = v_p + 2$.
+    *   Jose bikes 7 mph faster than Tanya: $v_j = v_t + 7 = (v_p + 2) + 7 = v_p + 9$.
+
+2.  **Times:**
+    *   Patrick starts 1 hour before Tanya, who starts 1 hour before Jose.
+    *   Let $T$ be the time Patrick left. Then Patrick travels for time $t_p = T$.
+    *   Tanya travels for time $t_t = T - 1$.
+    *   Jose travels for time $t_j = T - 2$.
+    *   Since they all arrive at the same time, the relationship between their travel times is $t_p = t_t + 1$ and $t_j = t_t - 1$.
+
+3.  **Distance:**
+    The distance covered by each person is the same ($D$), so:
+    *   $D = v_p t_p$
+    *   $D = v_t t_t$
+    *   $D = v_j t_j$
+
+We can express $D$ in terms of Tanya's variables ($v_t, t_t$) and substitute the relationships for Patrick and Jose.
+First, equate Patrick's and Tanya's distance equations:
+$$v_p t_p = v_t t_t$$
+Substitute $v_p = v_t - 2$ and $t_p = t_t + 1$:
+$$(v_t - 2)(t_t + 1) = v_t t_t$$
+$$v_t t_t + v_t - 2 t_t - 2 = v_t t_t$$
+Subtract $v_t t_t$ from both sides:
+$$v_t - 2 t_t - 2 = 0$$
+$$2 t_t = v_t - 2$$
+$$t_t = \frac{v_t - 2}{2} \quad \text{--- (Equation 1)}$$
+
+Next, equate Tanya's and Jose's distance equations:
+$$v_t t_t = v_j t_j$$
+Substitute $v_j = v_t + 7$ and $t_j = t_t - 1$:
+$$v_t t_t = (v_t + 7)(t_t - 1)$$
+$$v_t t_t = v_t t_t - v_t + 7 t_t - 7$$
+Subtract $v_t t_t$ from both sides:
+$$-v_t + 7 t_t - 7 = 0$$
+$$v_t = 7 t_t - 7$$
+$$t_t = \frac{v_t + 7}{7} \quad \text{--- (Equation 2)}$$
+
+Now we have two expressions for $t_t$. Equating them:
+$$\frac{v_t - 2}{2} = \frac{v_t + 7}{7}$$
+Cross-multiply:
+$$7(v_t - 2) = 2(v_t + 7)$$
+$$7 v_t - 14 = 2 v_t + 14$$
+$$5 v_t = 28$$
+$$v_t = \frac{28}{5} = 5.6 \text{ mph}$$
+
+Now, substitute $v_t = \frac{28}{5}$ back into Equation 1 to find $t_t$:
+$$t_t = \frac{28/5 - 2}{2} = \frac{28/5 - 10/5}{2} = \frac{18/5}{2} = \frac{9}{5} = 1.8 \text{ hours}$$
+
+Finally, calculate the distance $D$ using Tanya's speed and time:
+$$D = v_t t_t = \left(\frac{28}{5}\right) \left(\frac{9}{5}\right) = \frac{252}{25} \text{ miles}$$
+
+The distance is $\frac{252}{25}$ miles.
+Here, $m = 252$ and $n = 25$.
+We check if $m$ and $n$ are relatively prime:
+$252 = 2^2 \times 3^2 \times 7$
+$25 = 5^2$
+Since they share no common factors, $\text{gcd}(252, 25) = 1$.
+
+We need to find $m + n$:
+$$m + n = 252 + 25 = 277$$
+
+Final answer: 277

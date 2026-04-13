@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "tq4",
+    "needle_size": "32K",
+    "exit_code": 0,
+    "needle_score": 83.6985,
+    "needle_score_en": 83.6985,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "temp\\20260411_074857_full_suite_needle_en6_final5\\needle_32k_d64_tq4.json",
+    "server_log": "needle_server_d64_tq4.log"
+  },
+  "details": [
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandistheMagicEssence.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 29,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandistheMagicEssence.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 29,
+      "score": 100
+    },
+    {
+      "pred": "Thedocumentdiscusses“the“highlightsfora“newlanguage”andhowtomakealanguagepopular.Theonlyrecurringphrasethatisan“item”thatwouldbehiddenontheislandis**akeytothehiddenlibrary**(the*“library”ofknowledgeandlibraryfunctionsthatcanbecomposedtobuildandsolveproblemsquickly).*Thatisthecoreofthedeveloper’stool‑chain.**Thelegendaryitemisthe“keytothehiddenlibrary.”**",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 317,
+      "score": 2.191011235955056
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandis*theMagicEssence.*",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 31,
+      "score": 100
+    },
+    {
+      "pred": "Thequestionasksforthe“legendaryitem”hiddenonEmeraldIsland.Theonlynon‑fictionalreferencetoamythicaltreasureontheislandisthe**“Legendary**magical**essence”(or“MagicEssence”)mentionedinthe*EmeraldIsland*section.**Answer:****ThelegendaryitemhiddenonEmeraldIslandisthe“MagicEssence.”",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 231,
+      "score": 100
+    },
+    {
+      "pred": "Thepartsthatmostrelevanttothequestionarethesectionsthatspeakaboutthechangeandhopefor“scriptinglanguages”andbatteriesformodernwebandweb‑basedapplications.Inthatcontexttheauthormentionsa“**MagicEssence**”asa(metaphorical)powerfulitemassociatedwiththenatureofprograms.Itisthekeyadjectivetwowords“MagicEssence”thatcarriestheimageofalegendaryormagicalcomponent.>“Iwasdealingwith…Isomeoneakindoflegendaryitem?**MagicEssence**”.Thus,thehiddenobjectis**MagicEssence**.**Answer:**ThelegendaryitemhiddenontheEmeraldIslandis**MagicEssence.**",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 483,
+      "score": 100
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the Magic Essence."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the Magic Essence."
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The document discusses “the “highlights for a “new language” and how to make a language popular.  The only recurring phrase that is an “item” that would be hidden on the island is **a key to the hidden library** (the *“library” of knowledge and library functions that can be composed to build and solve problems quickly).*  That is the core of the developer’s tool‑chain.\n\n**The legendary item is the “key to the hidden library.”**"
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is *the Magic Essence.*"
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The question asks for the “legendary item” hidden on Emerald Island.  \nThe only non‑fictional reference to a mythical treasure on the island is the **“Legendary **magical** essence” (or “Magic Essence”) mentioned in the *Emerald Island* section.  \n\n**Answer:**  \n**The legendary item hidden on Emerald Island is the “Magic Essence.”"
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The parts that most relevant to the question are the sections that speak about the change and hope for “scripting languages” and batteries for modern web and web‑based applications.  In that context the author mentions a “**Magic Essence**” as a (metaphorical) powerful item associated with the nature of programs.  It is the key adjective two words “Magic Essence” that carries the image of a legendary or magical component.\n\n> “I was dealing with… I someone a kind of legendary item?  **Magic Essence**”.\n\nThus, the hidden object is **Magic Essence**. \n\n**Answer:**  \nThe legendary item hidden on the Emerald Island is **Magic Essence.**"
+    }
+  ]
+}

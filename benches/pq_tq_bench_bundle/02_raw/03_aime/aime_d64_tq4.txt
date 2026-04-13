@@ -1,0 +1,159 @@
+/glob <pattern>     add text files using globbing pattern
+
+
+> Solve the following AIME problem step by step. Keep reasoning coherent, and end with a final line exactly in the form 'Final answer: <integer>'.
+
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+[Start thinking]
+
+
+We need to produce a solution.
+
+We have three individuals: Patrick, Tanya, Jose. Patrick starts at time t=0 at school, one hour. Tanya starts at t=1 at speed v_T = v_P + 2 (v_P: Patrick's speed). Then she runs 1 hour? Actually "One hour after Tanya left". She started after 1 hour after Tanya. At that time, Jose started at same? Wait: "One hour after Tanya left" ; "Jose started bicycling at a constant speed of 7 miles per hour faster than Tanya ran". So Jose started at time t=2 relative to Patricia? Actually 0 start times: t=0: start of Patrick. t=1: Tanya begins. t=2: Jose. They all arrive at same time. We need total distance (distance between school and park) maybe up to some time such that each finished at same time. Let vehicle produce times.
+
+Let each individual's time to travel distance D:
+
+- Patrick travels at each from t=0 for some time T_p. So T_p is his total time from his start to when at park. So his speed v_p unknown.
+
+- Tanya ran at speed v_p + 2 starting at t=1 for a time T_t = T_p - 1 (since she leaves 1 hour later). She arrives at park at same time; thus her travel time from her start to picnic is T_p - 1. She might also travel for some distance equal to (T_p-1) /? Actually her speed times (T_p-1) = D
+So D = (v_p + 2)*(T_p - 1)
+
+- Jose started at t=2 at speed v_p + 2 + 7 = v_p + 9. He starts 1 hour after Tanya, so his travel time is T_p - 2. So D = (v_p + 9)*(T_p - 2).
+
+All equal.
+
+So we have unknowns v_p (nonzero), D, T_p as time for Patrick =? Actually we can express the B per formula:
+
+We know D = v_p * T_p              [1]
+D = (v_p + 2)*(T_p - 1)  [2]
+D = (v_p + 9)*(T_p - 2)  [3]
+
+We are to solve for v_p and T_p. Let's solve using algebra.
+
+Let x = v_p maybe unknown.
+
+Equation [1] D = x*T_p
+Equation [2] D = (x + 2)*(T_p - 1)
+Equation [3] D = (x + 9)*(T_p - 2).
+
+Use [1] into [2]: x*T_p = (x + 2)*(T_p - 1) = (x + 2)*T_p - (x + 2) = x*T_p + 2*T_p - x - 2? Actually multiply expression: (x+2)*(T_p-1) = x*T_p - x + 2*T_p - 2? Wait correctly: (x + 2)*(T_p - 1) = x*T_p - x ... Let's compute: (x + 2)*(T_p - 1) = x*T_p - x + 2*T_p - 2; combine: (x*T_p + 2*T_p - x - 2). Then set equal to x*T_p from [1]. So:
+
+x*T_p = x*T_p + 2*T_p - x - 2
+
+Subtract x*T_p from both sides: 0 = 2*T_p - x - 2
+
+Thus: 0 = T_p*(2?) Wait: 0 = 2*T_p - (something). Actually 0 = 2*T_p - x - 2 (since we had x*T_p = x*T_p + 2*T_p - x - 2). Let's compute correctly. Delay: Actually we need to re-check. Let's recompute:
+
+(x+2)*(T_p-1) = x*T_p + 2*T_p - x - 2? Wait: Expand: (x+2)*(T_p-1) = x*(T_p-1) + 2*(T_p-1?) Actually simpler: (x+2)*T_p - (x+2) maybe? Because (x+2)*(T_p - 1) = (x+2)*T_p - (x+2)*1 -> = (x+2)*T_p - (x+2). Expand: (x+2)*T_p - x - 2. But also equals? Let's do numeric: choose small numbers: let x=3 for intuition: (3+2)*(T_p-1)=5*(T_p-1) = 5*T_p - 5. But we earlier computed x*T_p + 2*T_p - 3 - 2? That yields 3*T_f? That's 3*T_p + 2*T_p - 5? Wait 3? Let's unify. Let's compute again: (x+2)*(T_p - 1) = (x * (T_p-1)) + 2*(T_p - 1)? Actually using distributive: (x+2)*(T_p-1)= x*(T_p-1) + 2*(T_p-1) because (a + b) * c = a*c + b*c if c is scalar? Actually (x+2)*(T_p-1) = x*(T_p-1) + 2*(T_p-1) indeed. That equals x*T_p - x + 2*T_p - 2. Combine: (x*T_p + 2*T_p - x - 2) = (1+1?) Actually 2 yes: 2*T_p + T_p => (x+2)*T_p? Let's factor: x*T_p + 2*T_p = (x+2)*T_p. So (x+2)*(T_p-1) = (x+2)*T_p - x - 2? Actually 2? Wait again. Let's recompute step: (x+2)*(T_p-1) = (x)*(T_p-1) + 2*(T_p-1). Expand: (x*T_p - x + 2*T_p - 2). That equals (x+2)*T_p - x - 2? Actually we can factor T_p terms: (x*T_p + 2*T_p) = (x+2)*T_p. So we have: (x+2)*(T_p-1) = (x+2)*T_p - x - 2.
+
+Set that equal to x*T_p from [1]. So:
+x*T_p = (x+2)*(T_p - 1) = (x+2)*T_p - x - 2 = (x+2)*T_p - (x+2). [Check: Because x+2 - subtract? Wait, -x-2 = -(x+2). So that equals (x+2)*T_p - (x+2).
+
+Thus x*T_p = (x+2)*T_p - (x+2) implies:
+
+Bring to one side: (x+2)*T_p - (x+2) - x*T_p = 0. So (x+2)*T_p - x*T_p = (2*T_p). Because (x+2)*T_p - x*T_p = (2*T_p). So equation: (2*T_p) - (x+2) = 0 => 2*T_p = x+2.
+
+Thus x + 2 = 2*T_p? Wait 2*T_p? Actually 2*T_p - (x+2) = 0 => 2*T_p = x + 2.
+
+So T_p = (x + 2)/2.
+
+So Patrick's time relative unknown expression: T_p = (x+2)/2. But T_p also appears in expression.
+
+Additionally, also D = x*T_p. So D = x*((x+2)/2).
+
+But we also have third equation: D = (x + 9)*(T_p - 2). So we got: x*(x+2)/2 = (x+9)*(T_p - 2). But T_p = (x+2)/2. Then T_p - 2 = (x+2)/2 - 2 = (x+2-4)/2 = (x-2)/2.
+
+Thus (x+9)*(x-? Actually (x+9)*(x-2)/2? Wait: (x+9)*((x+2)/2 - 2) = (x+9)*( (x-2)/? Actually let's compute: (x+2)/2 - 2 = (x+2 - 4)/2 = (x-2)/2. So substitute:
+
+x*(x+2)/2 = (x+9)*(x-2)/2. Multiply both sides by 2: x*(x+2) = (x+9)*(x-2). Expand both: x^2 + 2x = (x^2 - 2x + 9x - 18?) Wait (x+9)*(x-2) = x^2 + 9x - 2x - 18 = x^2 + 7x - 18? Actually compute: (x + 9)x - (x + 9)*2? Actually let's compute properly: (x+9)*(x-2) = (x)*(x-? Actually (a + b) * (c + d) if we treat? Not super; but easier: (x+9)*(x-2) = x^2 - 2x + 9x - 18? Actually 9*x - 9*2? Actually (x+9)*(x-2) = x*(x-2) + 9*(x-2?). Actually 9*(x-2) = 9x - 18. So x*(x-2) = x^2 - 2x. Add: x^2 - 2x + 9x - 18 = x^2 + 7x - 18. So:
+
+So equation: x^2 + 2x = x^2 + 7x - 18 => Subtract x^2 from both: 2x = 7x - 18 => Move: 0 = 5x - 18 => 5x = 18 => x = 18/5 = 3.6.
+
+Thus v_p = 18/5 mph = 3.6 mph.
+
+Then T_p = (v_p + 2)/2 = (3.6 + 2)/2 = 5.6/2 = 2.8 hrs.
+
+Distance D = v_p * T_p = 3.6 * 2.8 = 10.08. Actually compute: 3.6 * 2.8 = (36/10 * 2.8?) Actually 2.8 = 28/10, so 3.6 * 2.8 = (36/10 * 28/10)? Actually prefer decimals: 3.6 * 2.8 = 10.08 indeed. Or do fraction: 18/5 times 14/5? Actually 2.8 = 14/5. Wait 2.8 = 28/10 = 14/5. So 18/5 * 14/5 = 252/25 = 10.08.
+
+Thus the exact D = 252/25 miles.
+
+Thus m/n in lowest terms: 252/25 cannot reduce further (252 factors: 2^2*3^2*7, 25 is 5^2), no factor common. So m=252, n=25. Thus m+n=277. But we got decimal maybe. Let's double-check the fraction:
+
+Compute exactly: v_p = (5? Actually we found 5x? Wait we solved x = 18/5. So v_p = 18/5.
+
+Thus D = (x*(x+2)/2: Actually first note: T_p = (x+2)/2 = (18/5 +? Actually 18/5 + 2? Let's do fraction: 2 = 10/5. So (x+2) = 18/5 + 10/5 = 28/5. So T_p = (x+2)/2 = (28/5)/2 = 28/10 = 14/5. So T_p = 14/5 hours. So D = x * T_p? Actually D = x * 14/5 = (18/5 * 14/5) = 252/25. Good. That matches. So m plus n = 252 + 25 = 277.
+
+Let's check consistency with third equation: v_p + 9 = 27/5? Because 18/5 + 9 = 18/5 + 45/5 = 63/5 or 12.6? Wait 63/5. But we had earlier v_p+9. But v_p = 18/5. So v_p+9 = 18/5 + 9 = 18/5 + 45/5 = 63/5. So T_p - 2 = 14/5 - 2 = 14/5 - 10/5 = 4/5. Multiply: (63/5)*(4/5) = 252/25. Yes that equals D. Good.
+
+Thus all good.
+
+Thus answer = 277. Let's confirm that yields correct integer. So final answer: 277. Confirm with tests: compute times: D = 10.08. Means each must travel 10.08 miles. At v_p = 3.6 mph => Time = 10.08/3.6 = 2.8 => but we said 2.8? Wait earlier we computed T_p = 14/5 = 2.8? Wait 2.8 vs 2.8? Actually 14/5 = 2.8. Good. Tanya's speed = 3.6 + 2 = 5.6? Actually 5.6? Right. She covers 5.6 mph. She left 1 hour later. She thus travel time less: T_p - 1 = 1.8? Actually T_t = 2.8 - 1 = 1.8. 1.8 * 5.6 = 10.08 = D. Yes. Jose started also at 2 hours after start. He speeds 3.6+9 = 12.6. He has 0.8 hours less to travel: T_p - 2 = 0.8. 0.8 * 12.6 = 10.08 = D. So all consistent. Good.
+
+Thus answer: 277. Let's check works with rational numbers: 0.8 * 12.6 = 10.08. So it's correct.
+
+Thus final answer is 277. Let's produce final reasoning accordingly.
+
+But rely on lowest terms: 252/25 in lowest terms. So m=252, n=25, sum=277.
+
+Thus final answer: 277.
+[End thinking]
+
+Let  
+
+* \(v_p\) = Patrick’s speed (mph)  
+* \(D\) = distance (miles)
+
+\[
+\begin{aligned}
+D &=v_p\cdot t_p,\\
+D &= (v_p+2)(t_p-1),\\
+D &= (v_p+9)(t_p-2)
+\end{aligned}
+\]
+
+First two equations give  
+
+\[
+v_p\,t_p = (v_p+2)(t_p-1)=v_p\,t_p+2t_p-2
+\]
+\[
+\Rightarrow 0 = 2t_p-2 \Rightarrow t_p=\frac{v_p+2}{2}.
+\]
+
+Then the third equation becomes  
+
+\[
+v_p\cdot\frac{v_p+2}{2}=(v_p+9)\Bigl(\frac{v_p+2-2\Bigr)
+=(v_p+9)\Bigl(\frac{v_p-2}{2}\Bigr).
+\]
+
+Multiplying by 2,
+
+\[
+v_p(v_p+2)=(v_p+9)(v_p-2).
+\]
+
+Expanding and collecting terms:
+
+\[
+v_p^2+2v_p=v_p^2+7v_p-18
+\quad\Longrightarrow\quad 5v_p=18 \Longrightarrow v_p=\frac{18}{5}\text{ mph}.
+\]
+
+Now  
+\[
+t_p=\frac{v_p+2}{2}=\frac{18/5+10/5}{2}=\frac{28}{5}=2.8\text{ hrs}.
+\]
+
+Finally,
+
+\[
+D=v_p\,t_p=\frac{18}{5}\cdot\frac{14}{5}=\frac{252}{25}\text{ miles}.
+\]
+
+Thus the distance in lowest terms is \(\frac{252}{25}\).  
+Hence  
+
+\[
+m+n = 252 + 25 = \boxed{277}.\]

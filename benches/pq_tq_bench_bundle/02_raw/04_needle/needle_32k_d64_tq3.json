@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "tq3",
+    "needle_size": "32K",
+    "exit_code": 0,
+    "needle_score": 37.9862,
+    "needle_score_en": 37.9862,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "temp\\20260411_074857_full_suite_needle_en6_final5\\needle_32k_d64_tq3.json",
+    "server_log": "needle_server_d64_tq3.log"
+  },
+  "details": [
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthehiddenrepositoryofthe*MagicEssence*.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 39,
+      "score": 100
+    },
+    {
+      "pred": "Weneedtoanswer:\"WhatlegendaryitemishiddenonEmeraldIsland?\"Thedocumenthasmanysections.Thereisasnippetabout\"Themostexample:HiddenonEmeraldIslandis...\".Searchmemory:Irecallinthesectionaboutearlier:\"Broughtmybrotherstohaveaprize?Wait,notexactly.Let'ssearchfor\"Emerald\".Irememberthephrase:\"Let'sfind:Inthelongtext:\"Andaquestion:\"HiddenonEmeraldIsland\".Isaw\"Hiddenontheisland...\".Let'sexaminerelevantparts.Inthesectionthatmentions\"Inthesecondpart:'Butwealsosomething...'\".Frommemory,aphrasemightbe:\"Therealgoodlanguagewillhaveasmallcore...\".Hmm.Thequestion:\"WhatlegendaryitemishiddenonEmeraldIsland?\"Theanswermustbetheitemhidden:\"the'Atlas?maybe'TheFamousHudsonsmth.\"WaitIthinkit'ssaid\"Wefoundthehiddentreasures:the'Magiclamp'?Butwhichlegendaryitem?Thereisknown:'TheMagicmantleoftheunknown?Wait.Let'ssearchtext.Ineedtofindinthedocument:textaround\"GreenIsland\"or\"Emerald\".Irecallarepeatedphrase\"hiddenonEmeraldIsland\".IthinkwithinaparagraphaboutTolkien?Wait.Let'ssearchmanuallyscanning:Thedocumentishuge.Let'sparsementally:Didtheymention\"EmeraldIsle\"?Wait.Iskimfromthestarttotheend.Thereisasectionthattalksaboutnaming:\"Praising:with,maybe\"theonlyancientmyth:TheEmeraldIsland\"?Maybetheitemis\"the'HolyGrail\"?No.Let'sthinkofknown'legendaryitemshiddenon'EmeraldIsland?Thereis\"TheGrayPalace\"?Wait.Maybeit'spartofamythicalplace.Butweneedtorecallcommonknowledge:Incertainfantasy/myth,a\"Zelda\"not.Maybewithinthedocumenttheyelaborated\"Wenowthat'HiddenonEmeraldIslandisthe'Early'Arcade\"?I'mnotsure.Let’sslowlyscroll.Thereis\"Brevity\"etc.Idon'trecallreadinganyexplicitmention.InthetechnicalpartaboutLispmaybenot.Another:\"Wheretohidethe'Smallnicknames:'wemighthavecunninglyplaced'thelegendaryartifact'TheSilverSurfer?Hmm.Buttheremightbeaheader:\"1.HistoryanddesignofLisp\",\"2.Outdoorspeech...\"Let'scross-checkneartheend",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 1749,
+      "score": 0.5342237061769617
+    },
+    {
+      "pred": "Thelegendaryitemisthe“MagicEssence.”",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 28,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**“ReaperofMachines.”",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 38,
+      "score": 8.484848484848484
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandistheancientpendingsalt‑copperchest.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 41,
+      "score": 9.210526315789474
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthelegendary**Shirt.**",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 33,
+      "score": 9.6875
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the hidden repository of the *Magic Essence*."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "We need to answer: \"What legendary item is hidden on Emerald Island?\" The document has many sections. There is a snippet about \"The most example: Hidden on Emerald Island is ...\". Search memory: I recall in the section about earlier: \"Brought my brothers to have a prize? Wait, not exactly. Let's search for \"Emerald\". I remember the phrase: \"Let's find: In the long text: \"And a question: \"Hidden on Emerald Island\". I saw \"Hidden on the island ...\". Let's examine relevant parts. In the section that mentions \"In the second part: 'But we also something ...' \".\n\nFrom memory, a phrase might be: \"The real good language will have a small core ...\". Hmm.\n\nThe question: \"What legendary item is hidden on Emerald Island?\" The answer must be the item hidden: \"the 'Atlas? maybe 'The Famous Hudson smth.\" Wait I think it's said \"We found the hidden treasures: the 'Magic lamp'? But which legendary item? There is known: 'The Magic mantle of the unknown? Wait.\n\nLet's search text.\n\nI need to find in the document: text around \"Green Island\" or \"Emerald\".\n\nI recall a repeated phrase \"hidden on Emerald Island\". I think within a paragraph about Tolkien? Wait.\n\nLet's search manually scanning: The document is huge. Let's parse mentally: Did they mention \"Emerald Isle\"? Wait.\n\nI skim from the start to the end. There is a section that talks about naming: \"Praising: with, maybe \"the only ancient myth: The Emerald Island\"? Maybe the item is \"the 'Holy Grail\"? No.\n\nLet's think of known 'legendary items hidden on 'Emerald Island? There is \"The Gray Palace\"? Wait.\n\nMaybe it's part of a mythical place. But we need to recall common knowledge: In certain fantasy / myth, a \"Zelda\" not.\n\nMaybe within the document they elaborated \"We now that 'Hidden on Emerald Island is the 'Early 'Arcade\"? I'm not sure.\n\nLet’s slowly scroll. There is \"Brevity\" etc. I don't recall reading any explicit mention. In the technical part about Lisp maybe not.\n\nAnother: \"Where to hide the 'Small nick names: 'we might have cunningly placed 'the legendary artifact 'The Silver Surfer? Hmm.\n\nBut there might be a header: \"1. History and design of Lisp\", \"2. Outdoor speech...\"\n\nLet's cross-check near the end"
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item is the “Magic Essence.”"
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **“Reaper of Machines.”"
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the ancient pending salt‑copper chest."
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the legendary **Shirt.**"
+    }
+  ]
+}

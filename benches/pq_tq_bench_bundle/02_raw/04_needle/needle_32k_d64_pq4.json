@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "pq4",
+    "needle_size": "32K",
+    "exit_code": 0,
+    "needle_score": 36.266,
+    "needle_score_en": 36.266,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "temp\\20260411_074857_full_suite_needle_en6_final5\\needle_32k_d64_pq4.json",
+    "server_log": "needle_server_d64_pq4.log"
+  },
+  "details": [
+    {
+      "pred": "ThelegendaryitemhiddenonEmeraldIslandistheMagicEssence.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 26,
+      "score": 100
+    },
+    {
+      "pred": "Thelegendtalksaboutthe“MagicEssence”and“MagicEssence”inthetext,whichpointstoahiddenitem.Hence:**ThelegendaryitemhiddenontheEmeraldIslandistheMagicEssence.**",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 120,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemthatishiddenonEmeraldIslandisthenoteson*Lisp’scorelanguagedesignanditspowerfullibraries,collectivelyreferredtointhetextas“thecoreofLisp.”",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 114,
+      "score": 5.098039215686274
+    },
+    {
+      "pred": "Thelegendsaysthehiddenitemisa**sword**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 37,
+      "score": 4.583333333333333
+    },
+    {
+      "pred": "Thedocumentconsistentlydiscusseshowa“newlanguage”couldbecomepopularifitoffers**short,powerfulabstractions,agoodinterpreter/implementation,abook,live‑worldusage,andstrongcommunitysupport.”ItnotesthatprogramminglanguageslikePerlandtobetrulysuccessfultheymustbewidelyusedasascriptinglanguageinpopularsystemsandthatabsenceisakeyfactorinwhysomelanguagesremainniche.Therefore,a“newlanguagethatworksinasuccessful,widelyusedenvironment(the“popularlanguage)islikelytobeadoptedthere.Thispatternpointsto**JavaScript**astheobviouscandidate.**Answer:**Thelegendaryitemis*JavaScript*.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 528,
+      "score": 1.473684210526316
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**Co‑option?**",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 40,
+      "score": 6.4406779661016955
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on Emerald Island is the Magic Essence."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legend talks about the “Magic Essence” and “Magic Essence” in the text, which points to a hidden item. Hence:\n\n**The legendary item hidden on the Emerald Island is the Magic Essence.**"
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item that is hidden on Emerald Island is the notes on *Lisp’s core language design and its powerful libraries, collectively referred to in the text as “the core of Lisp.”"
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legend says the hidden item is a **sword**."
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The document consistently discusses how a “new language” could become popular if it offers **short, powerful abstractions, a good interpreter/implementation, a book, live‑world usage, and strong community support.”  It notes that programming languages like Perl and to be truly successful they must be widely used as a scripting language in popular systems and that absence is a key factor in why some languages remain niche.  Therefore, a “new language that works in a successful, widely used environment (the “popular language) is likely to be adopted there.  This pattern points to **Java Script** as the obvious candidate.\n\n**Answer:** The legendary item is *JavaScript*."
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **Co‑option?**"
+    }
+  ]
+}

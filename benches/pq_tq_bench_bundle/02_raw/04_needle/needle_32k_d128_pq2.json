@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D128",
+    "type": "pq2",
+    "needle_size": "32K",
+    "exit_code": 0,
+    "needle_score": 1.0443,
+    "needle_score_en": 1.0443,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "temp\\20260411_074857_full_suite_needle_en6_final5\\needle_32k_d128_pq2.json",
+    "server_log": "needle_server_d128_pq2.log"
+  },
+  "details": [
+    {
+      "pred": "0000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 166,
+      "score": 0.0
+    },
+    {
+      "pred": "Thetextistobebethetextisabit1200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 256,
+      "score": 0.3076923076923066
+    },
+    {
+      "pred": "WehaveOkay",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 43,
+      "score": 2.0833333333333326
+    },
+    {
+      "pred": "[1]andthetheinthewayofthe100010030000of10000001000000000000001000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 195,
+      "score": 0.5000000000000004
+    },
+    {
+      "pred": "2athattheIntheabove1",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 40,
+      "score": 3.333333333333333
+    },
+    {
+      "pred": "thethe200100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 485,
+      "score": 0.04115226337448652
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "0\n\n\n\n\n\n\n\n\n 0\n 0\n\n  0 0\n\n 0\n\n0 0 0 0 0\n\n0 0 0  1 0 0 0  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 0  0  0 0  0 0  0  0  0  0  0 0  0 0  0 0 0 0 0  0  0 0  0 0  0  0 0 0  0 0 0 0 0 0  0 0  0 0 0  0  0 0 0 0  0  0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0  0 0 0  0 0 0 0  0 0  0  0 0 0  0 0 0 0  0 0 0  0 0 0 0 0 0 0 0  0 0  0  0 0 0 0 0  0 0 0 0 0 0  0 0 0 0 0 1  0 0   0  0 0 0 0 0  0  0  0 0"
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The text is to be be\nthe text is a bit 1 2 0 0   0 00 0 0 0\n\n 0 0 0  0 0 0 0 0 0 0 0 0 0 0 0 0   0  0 0 0 0 0 0  0 0 0 0 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0  0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0  0  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0  0 0 0  0 0 0  0 0 0  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 0 0 0  0 0 0  0 0 0 0 0 0 0 0  0 0  0 0 0 0  0  0  0  0"
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "We have\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nOkay"
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "[1]  and the the  in the way of the\n 1000\n 100 3\n00 00 of 100 000\n\n\n\n\n 0\n\n\n\n\n 10\n\n\n\n\n\n\n\n\n\n\n\n\n\n0\n0\n\n 0\n \n\n\n\n \n 0\n\n\n \n\n 0\n \n0\n\n\n\n\n 0\n\n\n\n 0\n0\n 0\n\n0\n\n 0\n\n 0\n1\n\n0\n 0\n 0\n 0\n 0\n 0\n\n 1\n 0\n 0\n 0\n 0\n 0\n 0\n 0\n 0\n 0\n 0 0\n 0\n 0\n\n 0\n 0\n\n 0 0\n 0\n  0\n 0\n 0\n\n 0 \n  0 \n 0\n  0\n  0\n 0\n 0\n 0\n\n 0\n 0\n 0\n 0\n 0 \n 0\n 0\n\n 0\n 0\n  0\n  0\n0 \n 0 0\n  0 \n 0\n\n 0 \n 0 \n\n 0\n 0 \n\n 0 0\n 0\n 0\n 0\n 0 \n\n 0 \n  0\n 0  0\n 0\n\n  0\n\n  0 \n  0\n\n 0 0\n\n \n 0 0\n\n  0 0\n\n 0 0\n\n 0 0\n\n 0 0 0  0 0\n 0 0 0  0 0 \n0 0 0 0\n 0 0 0 0 0 0 0 0 0  0  0 00 0 0 \n 0  0 0  0  0  0  0  0 0 0 0 0 0 0 0 0 0 0 0 0  0 0 0 0 0 0  0  0  0"
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "2 a  that the\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nIn the above\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n 1"
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "the the 200 100000000000000000000\n0000000 0\n0\n\n\n000000000000000000000000000000 00000000 000 0000000000 000000000000000000000000000000000000\n00000000000000000000 000000000000000000000000000000000000000000000000000 00 000000000000000000 000000000000000000 00000000000 0000000000000000 000000000 0000000 00000 000000000000000 0000000000000000000000000000000000000000000000000000000000000 00000000000000000000000000000 000000000000000000000000000000000000 0000000000000 00000000000000000000000000000000000000000 00000000"
+    }
+  ]
+}

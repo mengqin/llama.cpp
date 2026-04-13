@@ -1,0 +1,296 @@
+/glob <pattern>     add text files using globbing pattern
+
+
+> Solve the following AIME problem step by step. Keep reasoning coherent, and end with a final line exactly in the form 'Final answer: <integer>'.
+
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+[Start thinking]
+We need to parse problem. Let distance D = m/n miles. Let Patrick's speed = v (mph). Tanya's speed = v+2. Jose's speed = v+2+7 = v+9. They start at times: Patrick at t=0. Tanya at t=1 hour. Jose at t=2 hours (because one hour after Tanya left; Tanya started 1 hour after Patrick, so Jose starts 2 hours after Patrick). They all arrive at same time at park. So arrival time for Patrick is T, for Tanya is T', for Jose is T''. But they must all equal some common time relative to Patrick's start.
+
+Define T: total time for Patrick to travel D at speed v: T_p = D / v.
+
+Tanya start at t=1, so her travel time is T_t = T_p - 1 = D / (v+2). Because she started 1 hour later but arrives same time with Patrick, so she must finish in that remainder.
+
+Similarly Jose started at t=2, travel time = T_p - 2 = D / (v+9). Good.
+
+So we have equations:
+D / v = D / (v+2) + 1  because Tanya starts 1 hour after Patrick. Actually need to check: If Patrick travels for T_p hours, Tanya travels for T_p - 1 hours to cover distance D at speed v+2. So D/(v+2) = T_p - 1. But T_p = D/ v. So D/(v+2) = D/v - 1. Rearranging: D/(v+2) + 1 = D/v. Similarly for Jose: D/(v+9) + 2 = D/v.
+
+Let's derive.
+
+Equation1: D/(v+2) = D/v - 1  => (1) D/(v+2) = D/v - 1.
+
+Equation2: D/(v+9) = D/v - 2  => (2) D/(v+9) = D/v - 2.
+
+We can solve for v and D. But we know D is rational maybe; we need m/n.
+
+We also may treat them as unknowns: v >0 ; D>0.
+
+Simplify equation1: D/(v+2) = D/v - 1.
+
+Rearrange: D/(v+2) + 1 = D/v.
+
+Similarly eq2.
+
+We'll solve using algebra.
+
+Let’s divide by D maybe. Let’s denote r = D/v (Patrick's travel time in hours). So r = D/v. Similarly, D/(v+2) = r - 1. Because it's D/(v+2) = D/v - 1.
+
+Equation 1: D/(v+2) = D/v - 1 -> r - 1 = D/(v+2). But D/(v+2) = D / (v+2).
+
+Alternatively write in terms of v.
+
+Let's solve more directly.
+
+From equation1: D/(v+2) = D/v - 1.
+
+Multiply both sides by v(v+2): D v = D(v+2) - v(v+2). Wait but careful.
+
+Compute: D/(v+2) = D/v - 1.
+
+Let's bring terms: D/(v+2) + 1 = D/v.
+
+But may be easier to write equation with unknowns.
+
+Let’s cross multiply:
+
+D/(v+2) = D/v - 1
+
+--> D/(v+2) = (D - v)/v
+
+Because D/v - 1 = (D - v)/v.
+
+So D/(v+2) = (D - v)/v
+
+Cross multiply: D v = (D - v)(v+2)
+
+Expand right side: (D - v)(v+2) = (D - v)v + 2(D - v) = Dv - v^2 + 2D - 2v.
+
+Set equal: D v = D v - v^2 + 2D - 2v.
+
+Subtract D v from both sides: 0 = - v^2 + 2D - 2v.
+
+Thus v^2 + 2v - 2D = 0.
+
+Equation A: v^2 + 2v - 2D = 0.
+
+Now equation 2: D/(v+9) = D/v - 2.
+
+Rewrite similar: D/(v+9) + 2 = D/v.
+
+Alternatively D/(v+9) = D/v - 2 = (D - 2v)/v
+
+Because D/v - 2 = (D - 2v)/v.
+
+Thus we have D/(v+9) = (D - 2v)/v.
+
+Cross multiply: D v = (D - 2v)(v+9).
+
+Expand right side: (D - 2v)v + 9(D - 2v) = Dv - 2v^2 + 9D - 18v.
+
+Simplify: Dv = Dv - 2v^2 + 9D - 18v.
+
+Subtract Dv from both sides: 0 = - 2v^2 + 9D - 18v.
+
+Thus 2 v^2 + 18 v - 9 D = 0.
+
+Equation B: 2v^2 + 18v - 9D = 0.
+
+Now we have two equations in v and D.
+
+Equation A: v^2 + 2v - 2D = 0  => 2D = v^2 + 2v  => D = (v^2 + 2v)/2.
+
+Equation B: 2 v^2 + 18v -9 D =0 => 9D = 2 v^2 + 18v => D = (2 v^2 + 18v)/9.
+
+Set equal: (v^2 + 2v)/2 = (2 v^2 + 18v)/9.
+
+Cross multiply: 9 (v^2 + 2v) = 2 (2 v^2 + 18v).
+
+Compute left: 9v^2 + 18v = 4 v^2 + 36 v.
+
+Bring to one side: 9v^2 + 18v - 4v^2 - 36v = 0 => (9v^2 - 4v^2) + (18v - 36v) = 0 => 5 v^2 - 18v = 0.
+
+Solve: v(5v - 18) = 0 => v = 0 or v = 18/5 = 3.6 mph.
+
+v cannot be zero. So v = 18/5 mph.
+
+Now compute D from any earlier expression: D = (v^2 + 2v)/2.
+
+Compute v^2: (18/5)^2 = 324/25.
+
+2v = 36/5 = 180/25.
+
+Add: v^2 + 2v = 324/25 + 180/25 = 504/25.
+
+Divide by 2: D = 252/25.
+
+Check with fraction: 252/25 = 10.08 miles.
+
+But we also may compute via other expression: (2v^2 + 18v)/9.
+
+Compute 2v^2 = 2 * 324/25 = 648/25.
+
+18v = 18 *18/5 = 324/5 = convert to /25: multiply numerator by 5: 1620/25.
+
+Sum: (648 + 1620)/25 = 2268/25.
+
+Divide by 9: 2268/25 /9 = 2268/(225)?? Wait compute: 2268/25 * 1/9 = 2268/(225). 2268 /225 reduces: divide by 3: 756/75; divide by 3 again: 252/25. same good.
+
+So D = 252/25.
+
+Thus m=252, n=25 relatively prime? gcd(252,25)=1 because 25 divides none of 2,5, etc. 252 divisible by 2,3,7; 25 only 5^2. So relatively prime.
+
+Compute m+n = 252+25=277.
+
+Answer: 277.
+
+Let's double-check reasoning: Are we sure about arrival times? All arrive at same time. Patrick started at t=0, arrives at Park time T_p = D / v.
+
+Tanya left at t=1, so her elapsed time to Park is T_p - 1. She travels D at speed v+2. So D/(v+2) = T_p - 1. Equivalent to earlier equation: D/(v+2) + 1 = D/v. yes.
+
+Jose started at t=2, elapsed time = T_p - 2. He travels D at speed v+9. So D/(v+9) = T_p - 2. yes.
+
+Our algebra solved that.
+
+Let's double-check arithmetic: (v^2+2v)/2 leads to D=... compute v=18/5.
+
+v^2+2v: v^2=324/25 ; 2v=36/5 = 180/25; sum 504/25.
+
+Divide by 2: 504/25 * 1/2 = 504/(50) = 252/25 correct.
+
+Thus final sum 277.
+
+Edge case: Could there be more than one solution? Only one positive v. So D unique rational. Good.
+
+Let's produce step-by-step solution.
+
+Use step wise reasoning.
+
+Will produce final answer format 'Final answer: 277'.
+[End thinking]
+
+Let  
+
+* \(v\) = Patrick’s walking speed (mph)  
+* \(v+2\) = Tanya’s running speed (mph)  
+* \(v+9\) = José’s bicycling speed (mph)  
+
+Let the distance from the school to the park be \(D\) miles.
+
+---
+
+### 1.  Write the travel‑time equations  
+
+Patrick starts at \(t=0\).  
+If he arrives at time \(T\), then  
+
+\[
+T=\frac{D}{v}\qquad(1)
+\]
+
+Tanya starts 1 hour later, so she travels for \(T-1\) hours:
+
+\[
+\frac{D}{v+2}=T-1=\frac{D}{v}-1\qquad(2)
+\]
+
+José starts 2 hours after Patrick, so he travels for \(T-2\) hours:
+
+\[
+\frac{D}{v+9}=T-2=\frac{D}{v}-2\qquad(3)
+\]
+
+---
+
+### 2.  Eliminate \(T\) and obtain two equations in \(v\) and \(D\)
+
+From (2):
+
+\[
+\frac{D}{v+2}=\frac{D}{v}-1
+\Longrightarrow
+D(v+2)=v(D-v)
+\Longrightarrow
+v^2+2v-2D=0 \tag{4}
+\]
+
+From (3):
+
+\[
+\frac{D}{v+9}=\frac{D}{v}-2
+\Longrightarrow
+D(v+9)=v(D-2v)
+\Longrightarrow
+2v^2+18v-9D=0 \tag{5}
+\]
+
+---
+
+### 3.  Solve for \(v\)
+
+From (4): \(D=\dfrac{v^2+2v}{2}\).  
+Insert this into (5):
+
+\[
+2v^2+18v-9\!\left(\frac{v^2+2v}{2}\right)=0
+\]
+
+\[
+2v^2+18v-\frac{9v^2+18v}{2}=0
+\]
+
+Multiplying by \(2\):
+
+\[
+4v^2+36v-9v^2-18v=0
+\]
+
+\[
+-5v^2+18v=0
+\Longrightarrow v(5v-18)=0
+\]
+
+\(v=0\) is impossible, so  
+
+\[
+v=\frac{18}{5}\text{ mph}=3.6\text{ mph}
+\]
+
+---
+
+### 4.  Find the distance \(D\)
+
+Use \(D=\dfrac{v^2+2v}{2}\):
+
+\[
+v^2=\left(\frac{18}{5}\right)^2=\frac{324}{25},
+\qquad
+2v=\frac{36}{5}=\frac{180}{25}
+\]
+
+\[
+v^2+2v=\frac{324+180}{25}=\frac{504}{25}
+\]
+
+\[
+D=\frac{1}{2}\cdot\frac{504}{25}=\frac{252}{25}\text{ miles}
+\]
+
+Thus
+
+\[
+D=\frac{252}{25}\text{ miles}\quad\Longrightarrow\quad m=252,\; n=25
+\]
+
+\(252\) and \(25\) are relatively prime.
+
+\[
+m+n=252+25=277
+\]
+
+---
+
+\[
+\boxed{277}
+\]
