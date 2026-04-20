@@ -1,0 +1,195 @@
+We need to parse problem. There are three people: Patrick (walks), Tanya (runs), Jose (bicycles).
+
+Let speeds: Let Patrick's speed = v_p miles per hour. Tanya runs 2 mph faster than Patrick: v_t = v_p + 2. Jose bicycled 7 mph faster than Tanya ran: v_j = v_t + 7 = v_p + 9.
+
+Start times: Patrick at time 0 from school to park; he arrives at same time as others at same location - park. He started earlier? Wait others started later and still arrived same time.
+
+Let distance from school to park = D. (Goal find D in simplest fraction m/n). They all arrive at same time T measured from when each started? Not; they all arrive at same time, but their start times differ: Patrick at t=0; Tanya at t=1 hour after Patrick (t=1); Jose at t=1 hour after Tanya, so at t=2.
+
+Hence the times of arrival are the same: Let arrival time of each (since they may have started earlier) is T. For Patrick: T hours after his start? Wait: he started at t=0, arrived at time T. So his travel time = T. For Tanya: started at t=1, traveled T-1 hours. For Jose: started at t=2, traveled T-2 hours.
+
+We assume they all take whole path D. So we have equations:
+
+For Patrick: v_p * T = D. (1)
+
+For Tanya: v_t * (T-1) = D. (2)
+
+For Jose: v_j * (T-2) = D. (3)
+
+Also relationships: v_t = v_p + 2; v_j = v_p + 9.
+
+We have unknowns: v_p, T, D. 3 unknowns, 3 equations.
+
+We can solve linear.
+
+From (1) D = v_p * T.
+
+From (2): (v_p + 2) * (T-1) = v_p * T.
+
+We can express T maybe.
+
+Similarly (3): (v_p + 9) * (T-2) = v_p * T.
+
+We can find T and ratio v_p etc.
+
+Let's denote v_p = v. So equation (2):
+
+(v+2)(T-1) = vT
+
+Expand: (v+2)(T-1) = (v+2)T - (v+2) = vT + 2T - v - 2 = vT. 
+
+Set to vT:
+
+(v+2)T - (v+2) = vT => (vT + 2T - v - 2) = vT => Cancel vT both sides -> 2T - v - 2 = 0 => 2T = v + 2 => T = (v + 2)/2. So equation (A).
+
+Similarly equation (3):
+
+(v+9)(T-2) = vT
+
+Expand: (v+9)T - 2(v+9) = vT => (vT + 9T - 2v -18) = vT => Cancel vT: 9T - 2v - 18 = 0 => 9T = 2v + 18 => T = (2v + 18)/9 = (2v + 18)/9.
+
+But we also have T from equation (A). Set equal:
+
+(v + 2)/2 = (2v + 18)/9
+
+Cross-multiply: 9(v + 2) = 2(2v + 18) ?
+
+Wait compute: Multiply both sides: 9 * (v + 2)/2?? Wait I mis-calc: Actually we set equal T from both formulas: (v + 2)/2 = (2v + 18)/9.
+
+Cross-multiply: 9*(v + 2) = 2*(2v + 18).
+
+Simplify: 9v + 18 = 4v + 36.
+
+Bring to one side: 9v + 18 - 4v - 36 = 0 → 5v - 18 = 0 → 5v = 18 → v = 18/5 = 3.6 mph.
+
+Thus v_p = 18/5 mph.
+
+Now find T: T = (v + 2)/2 = (18/5 + 2)/2 = (18/5 + 10/5)/2 = (28/5)/2 = 28/10 = 14/5 = 2.8 hours.
+
+Also we can cross-check via alternative: T = (2v + 18)/9 = (36/5 + 18)/9 = (36/5 + 90/5)/9 = (126/5)/9 = 126/45 = 14/5 =2.8. Good.
+
+Now find D = v_p * T = (18/5) * (14/5) = 252/25 = 10.08? Let's compute: 18*14 = 252; /25 = 10.08? Wait 25*10 = 250; remainder 2; 2/25 = 0.08; final D=10.08 miles. But we might need to find m and n such that D is rational: 252/25 simplified? Wait 252 and 25 share gcd? 252 = 2^2*3^2*7. 25=5^2. No common factors. So D = 252/25 miles. Usually fraction m/n where m, n relatively prime. Provide m=252, n=25. Then m + n=277.
+
+Check if that is final answer? Let's verify problem's expectation: They used first letter "m/n miles" where m and n are relatively prime positive integers. So we set D = m/n. I think yes m=252; n=25; m+n=277.
+
+But need to confirm reasoning: Some could misinterpret: The arrival times same, but not necessarily they are at same time after start? Actually "All three people arrived at the park at the same time." Means they all arrive at same instant (maybe at the same time). Since they started at different times. So arrival time relative to start: For each, we need to find travel times such that they meet at same time. So yes typical. Good.
+
+We should double-check we didn't misread: "One hour after Tanya left, Jose started bicycling at a constant speed of 7 miles per hour faster than Tanya ran, following the same straight road from the school to the park." Means Jose started at time t=2 relative to Patrick. That's correct.
+
+Thus we have solved.
+
+Let's produce final answer: 277.
+
+But we need to confirm with other details: Suppose we consider times as variables t_p Travel time? Wait we used T. We found D.
+
+Let's double-check calculations: We set v = 18/5 mph; v+2 = 18/5+2=28/5=5.6 mph? Wait 28/5=5.6 mph. Wait hold on. 28/5=5.6 mph. But earlier we computed 5.6 mph; also t? Actually compute (v+2) = 18/5 + 2 = 18/5 + 10/5 = 28/5 = 5.6 mph. Okay. That is her speed apparently. Wait we earlier used 18/5 mph for Patrick; difference 2 mph. So 18/5 + 2 = 18/5 + 10/5 = 28/5 = 5.6 mph. Then earlier we used formula: (v+2)(T-1)=vT. Let's test with numbers: v=18/5; T=14/5. Evaluate left side: (5.6)* (2.8-1=1.8) => 5.6*1.8 = 10.08 (makes sense). Right side: (3.6)* 2.8 = 10.08. Works.
+
+Second equation for Jose: v+9=27.6? Actually 18/5 +9 = 18/5 +45/5 = 63/5 = 12.6 mph. Wait 63/5=12.6 mph. Did we earlier compute? Wait we earlier said v+9=18/5+9=18/5+45/5=63/5=12.6 mph. So Jose's speed 12.6 mph. Then (T-2)=0.8? Wait 2.8-2=0.8. Then distance =12.6*0.8 = 10.08. Works.
+
+Thus D = 10.08 miles which is 252/25.
+
+Check gcd of 252 and 25: 252 = 2*2*3*3*7; 25=5*5; no gcd; fraction m/n =252/25 where m=252, n=25. So m+n=277.
+
+But the typical AIME answer is integer 277; I think correct.
+
+But let's re-check thoroughly: Are we sure we used correct interpretation that 'the distances from school to park is m/n miles' where m and n relatively prime positive integers. Then ask for m+n. So we found that. Good.
+
+Double-check problem statement: "Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed ... 'One hour after Tanya left, Jose started bicycling at a constant speed of 7 miles per hour faster than Tanya ran, following the same straight road from the school to the park. All three people arrived at the park at the same time."
+
+Then ask: The distance from the school to the park is m/n miles.
+
+Yes.
+
+But we just solved for distances given times difference. Wait we need to ensure that the speeds are constant for each. We didn't mis-late that 'distance from the school to park' is same for each; obviously yes.
+
+Let's confirm typical AIME uniqueness: If each started at time difference 1 hour etc, then there is unique solution.
+
+Alternatively we could think of relative speeds. But equation solving seems correct.
+
+Edge case: For Jose to travel 0.8 hours at 12.6 mph, which is 10.08 miles: 12.6*0.8 = 10.08. Works.
+
+Now also verify that T-2 > 0? Wait T=14/5=2.8; So T-2=0.8 >0. So Jose has indeed eliminated more time 0.8 hours to catch up.
+
+Now we confirm T was 2.8 hours after Patrick's start. Toby started at 1; Jose at 2. So they finished same time.
+
+Now double-check step solving:
+
+Set T: solving equation (2): (v+2)(T-1)=vT -> expand: vT+2T - v - 2 = vT -> 2T - v - 2 = 0 -> v = 2T - 2? Wait solving for v: v = 2T - 2? Let's solve: 2T - v - 2 = 0 -> rearr: -v = -2T + 2 -> v = 2T - 2? Wait 2T - 2? Let's compute: from 2T - v - 2 = 0 -> -v = -2T + 2 -> v = 2T - 2? Actually solving: 2T - v - 2 = 0 -> -v = - 2T +2 -> v = 2T - 2. Right. So indeed v = 2T - 2. Wait earlier we derived T = (v + 2)/2; solve: T = (v/2)+1? Wait we had equation: 2T - v - 2 =0 -> v = 2T -2. So T = (v + 2)/2. Equivalent. Good.
+
+Equation (3): (v+9)(T-2)=vT -> Expand: vT + 9T - 2v - 18 = vT -> 9T - 2v - 18 = 0 -> 2v = 9T - 18 -> v = (9T -18)/2.
+
+Set equal:
+
+2T - 2 = (9T - 18)/2 -> multiply both sides by 2: 4T - 4 = 9T - 18 -> Bring: 4T - 4 - 9T + 18 = 0 -> -5T + 14 =0 -> T = 14/5 = 2.8 . Good. Then we can compute v=2T -2 = 4.6? Wait compute: v = 2T - 2? Wait 2T - 2: 2*(14/5) -2 = 28/5 -2 = 28/5 -10/5 = 18/5 = 3.6. Same.
+
+Everything good.
+
+Thus final answer 277.
+
+Let's produce final answer.
+
+Let the distance from the school to the park be \(D\) miles. 
+Let Patrick’s speed be \(v\) miles per hour. 
+
+\[
+\text{Patrick:}\; v\cdot \text{time}=D
+\]
+
+Tanya starts 1 hour after Patrick and runs \(2\) mph faster:
+
+\[
+(v+2)(T-1)=D \tag{1}
+\]
+
+Jose starts 1 hour after Tanya (2 hours after Patrick) and cycles \(7\) mph faster than Tanya:
+
+\[
+(v+9)(T-2)=D \tag{2}
+\]
+
+From (1):
+\[
+(v+2)(T-1)=vT \Longrightarrow 2T-v-2=0
+ \Longrightarrow v=2T-2. \tag{3}
+\]
+
+From (2):
+\[
+(v+9)(T-2)=vT \Longrightarrow 9T-2v-18=0
+\Longrightarrow 2v=9T-18
+ \Longrightarrow v=\frac{9T-18}{2}. \tag{4}
+\]
+
+Equate the two expressions for \(v\):
+
+\[
+2T-2=\frac{9T-18}{2}\quad\Rightarrow\quad 4T-4=9T-18
+ \Longrightarrow 5T=18
+ \Longrightarrow T=\frac{14}{5}\text{ h}=2.8\text{ h}.
+\]
+
+Then 
+
+\[
+v=2T-2=\frac{18}{5}\text{ mph}.
+\]
+
+Now the distance \(D\):
+
+\[
+D = vT =\frac{18}{5}\cdot \frac{14}{5}
+ =\frac{252}{25}\text{ miles}.
+\]
+
+The fraction \(\displaystyle \frac{252}{25}\) is in lowest terms, so 
+\(m=252\) and \(n=25\). 
+
+Thus
+
+\[
+m+n=252+25=277.
+\]
+
+\[
+\boxed{277}
+\]

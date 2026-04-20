@@ -1,0 +1,104 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+To solve the problem, we begin by defining the time and speeds of each person.
+
+---
+
+### Step 1: Define Variables
+
+Let:
+- $ t $ be the total time (in hours) it took **Patrick** to walk from school to park.
+- $ s $ be Patrick’s walking speed (miles per hour).
+- The distance from school to park is $ D $ miles.
+
+From the problem statement:
+- **Patrick** walks at speed $ s $, so $ D = s \cdot t $
+.
+- **Tanya** starts **1 hour after Patrick**, so she walks for $ t - 1 $ hours at speed $ s + 2 $. Thus, $ D = (s + 2)(t - 1) $
+- **Jose** starts **1 hour after Tanya**, (i.e., 2 hours after Patrick), so he bikes for $ t - 2 $ hours at speed $ s + 9 $. Thus, $ D = (s + 9)(t - 2) $
+
+So we have the system of equations:
+
+$$
+\begin{aligned}
+(1) \quad & D = s \cdot t \\
+(2) \quad & D = (s + 2)(t - 1) \\
+(3) \quad & D = (s + 9)(t - 2)
+\end{aligned}
+$$
+
+---
+
+### Step 2: Solve the System
+
+From equations (1) and (2):
+
+$$
+s t = (s + 2)(t - 1)
+$$
+
+Expanding the right-hand side:
+
+$$
+s t = s t - s + 2t - 2
+$$
+
+Subtract $ s t $ from both sides:
+
+$$
+0 = -s + 2t - 2 \Rightarrow s = 2t - 2 \tag{Equation A}
+$$
+
+From equations (1) and (3):
+
+$$
+s t = (s + 9)(t - 2)
+$$
+
+Expanding the right-hand side:
+
+$$
+s t = s t - 2s + 9t - 18
+$$
+
+Subtract $ s t $ from both sides:
+
+$$
+0 = -2s + 9t - 18 \Rightarrow 2s = 9t - 18 \Rightarrow s = \frac{9t - 18}{2} \tag{Equation B}
+}
+$$
+
+Now set Equations A and B equal:
+
+$$
+2t - 2 = \frac{9t - 18}{2}
+$$
+
+Multiply both sides by 2:
+
+$$
+4t - 4 = 9t - 18 \Rightarrow 4t - 9t = -14 \Rightarrow 5t = 14 \Rightarrow t = \frac{14}{5}
+$$
+
+Now plug into Equation A:
+
+$$
+s = 2 \cdot \frac{14}{5} - 2 = \frac{28}{5} - \frac{10}{5} = \frac{18}{5}
+$$
+
+Now compute $ D = s \cdot t = \frac{18}{55} \cdot \frac{14}{5} = \frac{252}{{25}
+
+So the distance is $ the fraction $ \frac{252}{25} $, where $ m = 252 $, $ n = 25 $.
+
+ Since $ \gcd(252, 25) = 1 $, they are relatively prime.
+
+---
+
+### Final Computation
+
+The distance from school to park is $ \frac{252}{25} $, so $ m = 252 $, $ n = 25 $, and $ $ $ $ be $ m + n = 252 + 25 = 277.
+
+Final answer: 
+$$
+\boxed{277}
+$$

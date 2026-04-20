@@ -1,0 +1,9 @@
+{
+  "phase": "needle",
+  "dim": "D64",
+  "type": "tq3",
+  "needle_size": "32K",
+  "error": "500 Server Error: Internal Server Error for url: http://127.0.0.1:18087/v1/chat/completions",
+  "exit_code": 1,
+  "samples": []
+}

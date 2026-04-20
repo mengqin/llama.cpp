@@ -46,39 +46,38 @@ static __global__ void pq_tq_q_preprocess(
     int    * out_i32 = Q_q8_i32 + head_idx * (D/4);
     float2 * out_ds  = Q_q8_ds  + head_idx * (D/32);
 
-    __shared__ float sh[D > nthreads ? D : nthreads];
+    __shared__ float  sh_wht[D > nthreads ? D : nthreads];
+    __shared__ int    sh_q_i32[D/4];
+    __shared__ float2 sh_q_ds[D/32];
 
     // Load Q into shared memory
     for (int i = tid; i < D; i += nthreads) {
-        sh[i] = Q_f[i];
+        sh_wht[i] = Q_f[i];
     }
     __syncthreads();
 
     // Native forward WHT (D=64, 128, or 256 — single call, no grouped loop)
-    pq_tq_coop_wht_forward<D>(sh, tid);
+    pq_tq_coop_wht_forward<D>(sh_wht, tid);
 
-    // Quantize to q8_1 — warp 0 does the quantization
-    // Temporary layout in shared: int32[D/4] then float2[D/32]
-    float * Q_wht = sh;
-    int    * tmp_q_i32 = (int    *) sh;
-    float2 * tmp_q_ds  = (float2 *) (tmp_q_i32 + D/4);
+    // Keep WHT input and q8 output in separate shared buffers.
+    // Reusing the same storage violates the quantizer's __restrict__ contract and can corrupt Q.
 
     if (threadIdx.y == 0) { // Warp 0 only
         constexpr int nthreads_quantize = D/4 < WARP_SIZE ? D/4 : WARP_SIZE;
 #pragma unroll
         for (int i0 = 0; i0 < D/4; i0 += nthreads_quantize) {
             quantize_q8_1_to_shared<float2, nthreads_quantize>
-                (Q_wht + i0*4, scale, tmp_q_i32 + i0, tmp_q_ds + i0/QI8_1);
+                (sh_wht + i0*4, scale, sh_q_i32 + i0, sh_q_ds + i0/QI8_1);
         }
     }
     __syncthreads();
 
     // Write q8 data from shared to global output
     for (int i = tid; i < D/4; i += nthreads) {
-        out_i32[i] = tmp_q_i32[i];
+        out_i32[i] = sh_q_i32[i];
     }
     for (int i = tid; i < D/32; i += nthreads) {
-        out_ds[i] = tmp_q_ds[i];
+        out_ds[i] = sh_q_ds[i];
     }
 }
 

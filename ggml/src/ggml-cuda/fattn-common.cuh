@@ -602,7 +602,12 @@ static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_pq2_0(
         const int ib    = k_KQ / QI_PQ2;
         const int local = k_KQ % QI_PQ2;
         const uint8_t qb = K[ib].qs[local];
-        const int v = pq_tq_centroid_pack_2bit_i8(qb);
+        const int q4 = ((qb & 0x03u) <<  0)
+                     | ((qb & 0x0Cu) <<  2)
+                     | ((qb & 0x30u) <<  4)
+                     | ((qb & 0xC0u) <<  6);
+        const int2 vp = get_int_from_table_16(q4, PQ_TQ_DP4A_VAL_2BIT);
+        const int v = __byte_perm(vp.x, vp.y, 0x5140);
         const int u = Q_q8[k_KQ_0/nthreads];
         const int sumi = ggml_cuda_dp4a(v, u, 0);
 
@@ -686,8 +691,13 @@ static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_pq3_0(
         const int ib    = k_KQ / QI_PQ3;
         const int local = k_KQ % QI_PQ3;
         const uint8_t qb = K[ib].qs[local];
-        const uint8_t sb = (K[ib].signs[local / 2] >> ((local & 1) * 4)) & 0x0F;
-        const int v = pq_tq_centroid_pack_3bit_i8(qb, sb);
+        const uint8_t signs = (K[ib].signs[local / 2] >> ((local & 1) * 4)) & 0x0F;
+        const int q4 = ((((qb >> 0) & 0x03u) | ((signs & 0x01u) << 2)) <<  0)
+                     | ((((qb >> 2) & 0x03u) | ((signs & 0x02u) << 1)) <<  4)
+                     | ((((qb >> 4) & 0x03u) |  (signs & 0x04u))       <<  8)
+                     | ((((qb >> 6) & 0x03u) | ((signs & 0x08u) >> 1)) << 12);
+        const int2 vp = get_int_from_table_16(q4, PQ_TQ_DP4A_VAL_3BIT_16);
+        const int v = __byte_perm(vp.x, vp.y, 0x5140);
         const int u = Q_q8[k_KQ_0/nthreads];
         const int sumi = ggml_cuda_dp4a(v, u, 0);
 
@@ -786,7 +796,8 @@ static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_pq4_0_impl(
         const int local = k_KQ % QI_PQ4;          // position within block (0..31)
         uint16_t qpair;
         ggml_cuda_memcpy_1<sizeof(qpair), 2>(&qpair, K[ib].qs + 2*local);
-        const int v = pq_tq_centroid_pack_4bit_i8(qpair);
+        const int2 vp = get_int_from_table_16(qpair, PQ_TQ_DP4A_VAL_4BIT);
+        const int v = __byte_perm(vp.x, vp.y, 0x5140);
         const int u = Q_q8[k_KQ_0/nthreads];
         const int sumi = ggml_cuda_dp4a(v, u, 0);
 
@@ -924,10 +935,16 @@ static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_tq2_1(
         const int u = Q_q8[k0/nthreads];
         const float d_Q = Q_ds[k0/nthreads].x;
         // Base centroid dot
-        const int v = pq_tq_centroid_pack_2bit_i8(K[ib].qs[local]);
+        const uint8_t qb = K[ib].qs[local];
+        const int q4 = ((qb & 0x03u) <<  0)
+                     | ((qb & 0x0Cu) <<  2)
+                     | ((qb & 0x30u) <<  4)
+                     | ((qb & 0xC0u) <<  6);
+        const int2 vp = get_int_from_table_16(q4, PQ_TQ_DP4A_VAL_2BIT);
+        const int v = __byte_perm(vp.x, vp.y, 0x5140);
         sum += __half2float(K[ib].norm) * PQ_TQ_DP4A_INV_SCALE_2BIT * d_Q * (float)ggml_cuda_dp4a(v, u, 0);
         // QJL correction
-        const int signs = tq_qjl_pack_signs_i8(K[ib].qjl[local/2], (local&1)*4);
+        const int signs = TQ_QJL_DP4A_SIGNS_16[(K[ib].qjl[local/2] >> ((local & 1) * 4)) & 0x0Fu];
         sum += __half2float(K[ib].rnorm) * TQ_QJL_DP4A_CORRECTION_SCALE * d_Q * (float)ggml_cuda_dp4a(signs, u, 0);
     }
     return sum;
@@ -1002,12 +1019,18 @@ static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_tq3_1(
         const int ib = k / QI, local = k % QI;
         const int u = Q_q8[k0/nthreads];
         const float d_Q = Q_ds[k0/nthreads].x;
-        const uint8_t sb = (K[ib].signs[local/2] >> ((local&1)*4)) & 0x0F;
-        const int v = pq_tq_centroid_pack_3bit_i8(K[ib].qs[local], sb);
+        const uint8_t qb = K[ib].qs[local];
+        const uint8_t signs = (K[ib].signs[local/2] >> ((local & 1) * 4)) & 0x0F;
+        const int q4 = ((((qb >> 0) & 0x03u) | ((signs & 0x01u) << 2)) <<  0)
+                     | ((((qb >> 2) & 0x03u) | ((signs & 0x02u) << 1)) <<  4)
+                     | ((((qb >> 4) & 0x03u) |  (signs & 0x04u))       <<  8)
+                     | ((((qb >> 6) & 0x03u) | ((signs & 0x08u) >> 1)) << 12);
+        const int2 vp = get_int_from_table_16(q4, PQ_TQ_DP4A_VAL_3BIT_16);
+        const int v = __byte_perm(vp.x, vp.y, 0x5140);
         sum += __half2float(K[ib].norm) * PQ_TQ_DP4A_INV_SCALE_3BIT * d_Q * (float)ggml_cuda_dp4a(v, u, 0);
         // QJL correction
-        const int signs = tq_qjl_pack_signs_i8(K[ib].qjl[local/2], (local&1)*4);
-        sum += __half2float(K[ib].rnorm) * TQ_QJL_DP4A_CORRECTION_SCALE * d_Q * (float)ggml_cuda_dp4a(signs, u, 0);
+        const int qjl = TQ_QJL_DP4A_SIGNS_16[(K[ib].qjl[local/2] >> ((local & 1) * 4)) & 0x0Fu];
+        sum += __half2float(K[ib].rnorm) * TQ_QJL_DP4A_CORRECTION_SCALE * d_Q * (float)ggml_cuda_dp4a(qjl, u, 0);
     }
     return sum;
 }
@@ -1090,11 +1113,12 @@ static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_tq4_1_impl(
         const float d_Q = Q_ds[k0/nthreads].x;
         uint16_t qpair;
         ggml_cuda_memcpy_1<sizeof(qpair), 2>(&qpair, K[ib].qs + 2*local);
-        const int v = pq_tq_centroid_pack_4bit_i8(qpair);
+        const int2 vp = get_int_from_table_16(qpair, PQ_TQ_DP4A_VAL_4BIT);
+        const int v = __byte_perm(vp.x, vp.y, 0x5140);
         sum += __half2float(K[ib].norm) * PQ_TQ_DP4A_INV_SCALE_4BIT * d_Q * (float)ggml_cuda_dp4a(v, u, 0);
         // QJL correction
-        const int signs = tq_qjl_pack_signs_i8(K[ib].qjl[local/2], (local&1)*4);
-        sum += __half2float(K[ib].rnorm) * TQ_QJL_DP4A_CORRECTION_SCALE * d_Q * (float)ggml_cuda_dp4a(signs, u, 0);
+        const int qjl = TQ_QJL_DP4A_SIGNS_16[(K[ib].qjl[local/2] >> ((local & 1) * 4)) & 0x0Fu];
+        sum += __half2float(K[ib].rnorm) * TQ_QJL_DP4A_CORRECTION_SCALE * d_Q * (float)ggml_cuda_dp4a(qjl, u, 0);
     }
     return sum;
 }

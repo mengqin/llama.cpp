@@ -1,0 +1,138 @@
+We need to parse problem. It's about three people traveling along same straight road from school to park. Patrick starts first, at constant speed v. One hour after Patrick left, Tanya starts running at speed v + 2 mph. One hour after Tanya left, Jose starts bicycling at speed (v + 2 + 7) = v + 9 mph. All three arrived at park at same time.
+
+Let distance D (in miles). We are asked to find D expressed as m/n relatively prime, find m+n.
+
+Let Patrick's travel time T_p: starting at t=0, by time he arrives at park at t=T_p. D= v*T_p. Tanya started at t=1 hour, speed v+2 mph, time T_t = T_p -? Actually Tanya started 1 hour after Patrick. So started at t=1, arrives at t=T_p as well. So her travel time = T_p - 1. Meanwhile Jose started 1 hour after Tanya, so Jose started at t=2, arrives at t=T_p. So his travel time = T_p - 2. We have:
+
+D = v*T_p
+D = (v+2)*(T_p - 1)
+D = (v+9)*(T_p - 2)
+
+All equal.
+
+We need solve for v and T_p and get D.
+
+Let’s denote v positive speed in mph.
+
+Equation 1:
+
+v * T_p = (v+2)(T_p - 1)
+Equation 2: v* T_p = (v+9)(T_p - 2)
+
+We can solve.
+
+Equation 1: v T_p = (v+2)(T_p - 1)
+Expand: v T_p = (v+2)T_p - (v+2)
+Bring left: v T_p - (v+2)T_p = - (v+2)
+Factor T_p: T_p (v - (v+2)) = -(v+2)
+v - (v+2) = -2
+Thus: T_p * (-2) = -(v+2)
+Multiply by negative: 2 T_p = v + 2
+So: 2T_p = v + 2
+=> v = 2T_p - 2 [Equation A]
+
+Equation 2: v T_p = (v+9)(T_p - 2)
+Expand: v T_p = (v+9) T_p - (v+9)*2
+=> v T_p - (v+9) T_p = - 2(v+9)
+=> T_p(v - (v+9)) = -2(v+9)
+=> T_p(-9) = -2(v+9)
+=> multiply negative: 9 T_p = 2(v+9)
+=> 9 T_p = 2v + 18
+=> 9T_p = 2v + 18 [Equation B]
+
+Now substitute v from Equation A into B: v = 2T_p - 2.
+
+Plug into B: 9T_p = 2(2T_p - 2)+18 = 4T_p - 4 + 18 = 4T_p + 14
+Therefore 9T_p = 4T_p + 14
+=> 5T_p = 14
+=> T_p = 14/5 = 2.8 hours.
+
+Then v = 2T_p - 2 = 2*(14/5)-2 = 28/5 - 2 = 28/5 - 10/5 = 18/5 = 3.6 mph.
+
+Now D = v*T_p = (18/5)*(14/5) = (18*14)/(25) = (252/25) miles. 252/25 reduce? 252 and 25 relatively prime? 252 factors: 2^2 *3^2*7. 25=5^2 no common factor. So D=252/25. So m=252, n=25. m+n = 277. Let's double-check calculations.
+
+But double-check with step of solving equation 1 maybe mis-simplify. Let's verify quickly.
+
+Equation 1: v*T = (v+2)(T-1)
+
+Set D.
+
+Compute difference: v*T - (v+2)(T-1) = 0
+
+Compute manually: vT = (v+2)T - (v+2)
+Bring to left: vT - (v+2)T + (v+2) = 0
+Factor T: T(v - (v+2)) + (v+2) =0
+T(-2) + (v+2) = 0
+=> -2T + v + 2 = 0
+=> 2T = v + 2
+Yes.
+
+Equation 2: v*T = (v+9)(T-2)
+
+Compute: (v+9)(T-2) = (v+9)T - 2(v+9)
+Set equal: vT -(v+9)T + 2(v+9) = 0
+=> T(v-(v+9)) + 2(v+9)=0
+=> T(-9)+2(v+9)=0
+=> -9T + 2(v+9)=0
+=> 9T = 2(v+9)
+Yes. All good.
+
+Now plug T = 14/5, v from eq A: v = 2T - 2 = 28/5 - 10/5 = 18/5=3.6 mph (makes sense). Good.
+
+Check equation 2: 9*T = 9*(14/5)=126/5=25.2 ; 2(v+9) =2*(18/5+9) = 2*(18/5+45/5)=2*(63/5)=126/5=25.2; yes works.
+
+Now compute D = v*T = 18/5*14/5=252/25=10.08 miles. Let's introspect: is that plausible? Everyone arrives same time, Patrick took 2.8 hours at 3.6 mph: D=10.08. Tanya speed: v+2=5.6 mph; started after 1 hour, time T-1=1.8 hours => distance 5.6*1.8=10.08 correct. Jose speed: v+9=12.6 mph; started 2 hours after Patrick, time T-2=0.8 hr; distance 12.6*0.8=10.08 correct. So consistent.
+
+Thus D fraction m/n=252/25 in lowest terms. m+n=277.
+
+However, check if the question says distance from school to park = m/n miles where m and n relatively prime positive integers. So m=252, n=25. m+n=277.
+
+Double-check for any misinterpretation: the order of speeds where Jose's speed added 7 miles per hour relative to Tanya's speed. The problem: "Jose started bicycling at a constant speed of 7 miles per hour faster than Tanya ran". That's correct. Means Jose speed = Tanya speed + 7, indeed.
+
+Thus final answer final. Ensure we output final line exactly: "Final answer: 277".
+
+The three people all reach the park at the same time. 
+Let the distance from the school to the park be \(D\) miles, Patrick’s speed \(v\) mph, Tanya’s speed \(v+2\) mph, and Jose’s speed \(v+9\) mph.
+
+Let \(T_p\) be the total time Patrick travels. 
+Tanya starts 1 hour later, so her travel time is \(T_p-1\). 
+Jose starts 1 hour after Tanya, so his travel time is \(T_p-2\).
+
+Using \(D=vT_p=(v+2)(T_p-1)=(v+9)(T_p-2)\):
+
+1. From \(vT_p=(v+2)(T_p-1)\):
+ \[
+ 2T_p=v+2 \qquad (1)
+ \]
+
+2. From \(vT_p=(v+9)(T_p-2)\):
+ \[
+ 9T_p=2(v+9) \qquad (2)
+ \]
+
+Substitute \(v=2T_p-2\) from (1) into (2):
+
+\[
+9T_p=2(2T_p-2+9)=4T_p+14
+\]
+
+Hence \(5T_p=14\) and \(T_p=\frac{14}{5}\) hours.
+
+With this value, from (1):
+
+\[
+v=2T_p-2=2\left(\frac{14}{5}\right)-2=\frac{18}{5}\text{ mph}
+\]
+
+The distance:
+
+\[
+D = vT_p = \frac{18}{5}\times\frac{14}{5} = \frac{252}{25}\text{ miles}.
+\]
+
+Thus \(D=\frac{252}{25}\) miles, where \(252\) and \(25\) are relatively prime. 
+Therefore \(m+n=252+25=277\).
+
+\[
+\boxed{277}
+\]

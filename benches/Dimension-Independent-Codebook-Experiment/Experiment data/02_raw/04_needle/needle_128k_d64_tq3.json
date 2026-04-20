@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "tq3",
+    "needle_size": "128K",
+    "exit_code": 0,
+    "needle_score": 4.3849,
+    "needle_score_en": 4.3849,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "needle_128k_d64_tq3.json",
+    "server_log": "needle_server_d64_tq3.log"
+  },
+  "details": [
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisamystery.Note:Idecidedtokeepitvague.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 50,
+      "score": 7.179487179487179
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheHersheypackageis**thereceiver**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 44,
+      "score": 5.084745762711865
+    },
+    {
+      "pred": "TheTask:findtheanswertothequestion:\"WhatlegendaryitemishiddenonEmeraldIsland?\"Thisquestionappearsinearlierpartsoftheverylongtext.Weneedtosearchfor\"EmeraldIsland\"withinthedocument.Inonepart\"Afewdayslater,ontheSamedayIhadtofixadoor.Theonlyplain…\"Wait?Let'ssearchmemory:InJuly2008block:\"Iwouldonly....the\"EmeraldIsland\"discovered.Let'sreadrelevantpiece:Theportionjustbeforethatmaybehasanote:\"InoticedthatIhadapageinthesettingofacityetc.\"Searchingwithinmemory:inJuly2007nearthe\"Ionlyhadabookaboutsomething.\"Waitscanning:\"Ihadabook.Weneed\"Emerald\".Iseein\"July2008\"thereis:\"Ihadabook.\"Nothing.Butnearthestart:Theconversationabout\"CopyingafterCFO.Ididn'tcreate.Let'ssearchforphrase\"Emerald\":Inthehugetext:Intotheline:\"IthinkIwouldaskto\"theabookabout\"butwhereis\"cuisineofa\"etc.ButIrecallthephrase:\"andalsoreadtextaboutaprogramthatisaboutamythicalitem'something.\"However.Alternatively,searchfor\"Legends.\"Atsection\"Jacobs:Withotherswespilledhowtheythink.Weightedbyc:Shehada\"river.ButI'mnotseeing\"Emerald\"inmemory.Wait!Let'ssearchagain:Atsomepart'Emerald'.The\"JaC\"maybe\"Emerald\"appears:\"AndanunpackedtheworldofDr.Oknewmemory:Inpart\"Itall.ButI'mnotwriting:\"thesnprogress.Hmm.Itmightbeinthesentence:\"Ithinkwewouldliketosee:the\"Emerald\"butI'mnot.Let'ssearchmentally:\"plantotheendwith\"Emerald.\"Notfound.Butmaybeinnote:\"Wediscoveredapaperabout'TheEmeraldIsland.\"Ithinkthereisa\"Cite**\".Oklet'ssearch:Irealizethereisasnippet:\"Afterhe,thequestion:which\"AfterwediscoveredintheYG.\"Thisglimpsing.Wait.Alternativelycheckonepart:\"IhaveCrinkly.\"Possibly.Waitnew:\"Anewstone\"co.OkI'mnotsure.Let'smaybebrutesearchagainbutscanningfor\"",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 1559,
+      "score": 0.573208722741434
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisatape‑recordedmessagefromarock‑limited“theGreatUnder–––‑‑,theoneyou’dwriteoutfortherest,oflife‑sworthto…\"\"",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 114,
+      "score": 4.594594594594595
+    },
+    {
+      "pred": "Thecorrectanswerisnotinthedocument.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 37,
+      "score": 4.583333333333333
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisatokenthatholdsthe“world’smostpowerfulweapon”–thekeytounlockingthesecretsoftheGreatHotMixed‑Precisionclockworkthatrunstheisland'sworld.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 139,
+      "score": 4.293785310734464
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is a mystery.\n\nNote: I decided to keep it vague."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Hershey package is **the receiver**."
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The Task: find the answer to the question: \"What legendary item is hidden on Emerald Island?\" This question appears in earlier parts of the very long text.\n\nWe need to search for \"Emerald Island\" within the document. In one part \"A few days later, on the Same day I had to fix a door. The only plain…\" Wait? Let's search memory: In July 2008 block: \"I would only. ... the \"Emerald Island\" discovered. Let's read relevant piece: The portion just before that maybe has a note: \"I noticed that I had a page in the setting of a city etc.\" Searching within memory: in July 2007 near the \"I only had a book about something.\" Wait scanning: \"I had a book. We need \"Emerald\".\n\nI see in \"July 2008\" there is: \"I had a book.\" Nothing.\n\nBut near the start: The conversation about \"Copying after CFO. I didn't create.\n\nLet's search for phrase \"Emerald\": In the huge text: In to the line: \"I think I would ask to \"the a book about \" but where is \"cuisine of a \" etc.\n\nBut I recall the phrase: \"and also read text about a program that is about a mythical item 'something.\" However.\n\nAlternatively, search for \"Legends.\" At section \"Jacobs: With others we spilled how they think. Weighted by c: She had a \"river.\n\nBut I'm not seeing \"Emerald\" in memory. Wait! Let's search again: At some part 'Emerald'.\n\nThe \"JaC \"maybe \"Emerald\" appears: \"And an unpacked the world of Dr.\n\nOk new memory: In part \"It all. But I'm not writing: \"the sn progress. Hmm.\n\nIt might be in the sentence: \"I think we would like to see: the \"Emerald\" but I'm not.\n\nLet's search mentally: \"plan to the end with \"Emerald.\" Not found.\n\nBut maybe in note: \"We discovered a paper about 'The Emerald Island.\" I think there is a \"Cite**\".\n\nOk let's search: I realize there is a snippet:\n\n\"After he, the question: which \"After we discovered in the YG.\" This glimpsing.\n\nWait.\n\nAlternatively check one part: \"I have Crinkly.\" Possibly.\n\nWait new: \"A new stone \"co.\n\nOk I'm not sure.\n\nLet's maybe brute search again but scanning for \""
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is a tape‑recorded message from a rock‑limited “the Great Under –––‑‑, the one you’d write out for the rest, of life‑s worth to…\"\""
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The correct answer is not in the document."
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is a token that holds the “world’s most powerful weapon” – the key to unlocking the secrets of the Great Hot Mixed‑Precision clockwork that runs the island's world."
+    }
+  ]
+}

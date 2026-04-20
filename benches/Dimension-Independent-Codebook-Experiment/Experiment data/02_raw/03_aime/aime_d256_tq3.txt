@@ -1,0 +1,77 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+Let $v_P$ be Patrick's speed in miles per hour.
+Let $v_T$ be Tanya's speed in miles per hour.
+Let $v_J$ be Jose's speed in miles per hour.
+
+According to the problem:
+1. Tanya's speed is 2 mph faster than Patrick's: $v_T = v_P + 2$.
+2. Jose's speed is 7 mph faster than Tanya's: $v_J = v_T + 7 = (v_P + 2) + 7 = v_P + 9$.
+
+Let $t_P$ be the time Patrick walks to reach the park.
+Let $t_T$ be the time Tanya runs to reach the park.
+Let $t_J$ be the time Jose bikes to reach the park.
+
+Let $D$ be the distance from the school to the park.
+The relationship between distance, speed, and time is $D = \text{speed} \times \text{time}$.
+
+Let's determine the relationship between their travel times.
+* Patrick starts at time $0$.
+* Tanya starts 1 hour after Patrick, so at time $1$.
+* Jose starts 1 hour after Tanya, so at time $2$.
+* All arrive at the same time, let's call it $T_{arrival}$.
+
+The travel times in terms of $T_{arrival}$ are:
+* $t_P = T_{arrival}$
+* $t_T = T_{arrival} - 1$
+* $t_J = T_{arrival} - 2$
+
+For simplicity, let $t = t_P$. Then $t_T = t - 1$ and $t_J = t - 2$.
+We can express the distance $D$ for each person:
+1. $D = v_P \cdot t$
+2. $D = (v_P + 2) \cdot (t - 1)$
+3. $D = (v_P + 9) \cdot (t - 2)$
+
+Since all three distances are equal to $D$, we can equate the expressions:
+From (1) and (2):
+$$v_P t = (v_P + 2)(t - 1)$$
+$$v_P t = v_P t - v_P + 2t - 2$$
+Subtracting $v_P t$ from both sides:
+$$0 = -v_P + 2t - 2$$
+$$v_P = 2t - 2 \quad \text{--- (Equation A)}$$
+
+From (2) and (3):
+$$(v_P + 2)(t - 1) = (v_P + 9)(t - 2)$$
+Substitute $v_P = 2t - 2$ into this equation:
+$$( (2t - 2) + 2 )(t - 1) = ( (2t - 2) + 9 )(t - 2)$$
+$$(2t)(t - 1) = (2t + 7)(t - 2)$$
+Expand both sides:
+$$2t^2 - 2t = 2t^2 - 4t + 7t - 14$$
+$$2t^2 - 2t = 2t^2 + 3t - 14$$
+Subtract $2t^2$ from both sides:
+$$-2t = 3t - 14$$
+Add $2t$ to both sides:
+$$0 = 5t - 14$$
+$$5t = 14 \implies t = \frac{14}{5} \text{ hours}$$
+
+Now, substitute $t = \frac{14}{5}$ back into Equation A to find $v_P$:
+$$v_P = 2\left(\frac{14}{5}\right) - 2$$
+$$v_P = \frac{28}{5} - \frac{10}{5} = \frac{18}{5} \text{ mph}$$
+
+Now we calculate the distance $D$ using $D = v_P t$:
+$$D = \left(\frac{18}{5}\right) \left(\frac{14}{5}\right)$$
+$$D = \frac{18 \times 14}{25}$$
+$$18 \times 14 = 252$$
+$$D = \frac{252}{25} \text{ miles}$$
+
+The distance is given as $m/n$ where $m$ and $n$ are relatively prime positive integers.
+Here, $m = 252$ and $n = 25$.
+We check if they are relatively prime.
+$252 = 2^2 \times 3^2 \times 7$.
+$25 = 5^2$.
+They share no common factors other than 1. Thus, they are relatively prime.
+
+We need to find $m + n$:
+$$m + n = 252 + 25 = 277$$
+
+Final answer: 277

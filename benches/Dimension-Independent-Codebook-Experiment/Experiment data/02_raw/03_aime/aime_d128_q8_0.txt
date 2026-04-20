@@ -1,0 +1,137 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+To solve the problem, we begin by defining variables and modeling the situation mathematically.
+
+---
+
+### Step 1: Define Variables
+
+Let:
+- $ v $ = Patrick's walking speed (in miles per hour)
+- $ D $ = total distance from school to park (in miles)
+
+From the problem:
+- Tanya runs at $ v + 2 $ mph
+- Jose bicycles at $ (v + 2) + 7 = v + 9 $ mph
+
+---
+
+### Step 2: Set Up Time Equations
+
+Let’s define the **arrival time** for each person relative to when Patrick starts walking (i.e., time = 0 for Patrick).
+
+- **Patrick** starts at time 0, walks at speed $ v $, so arrives at time $ \frac{D}{v} $
+- **Tanya** starts 1 hour later, runs at $ v + 2 $, so arrives at time $ 1 + \frac{D}{v+2} $
+- **Jose** starts 1 hour after Tanya (i.e., 2 hours after Patrick), bikes at $ v + 9 $, so arrives at time $ 2 + \frac{D}{v+9} $
+
+Since all three arrive at the **same time**, we equate their arrival times:
+
+$$
+\frac{D}{v} = 1 + \frac{D}{v+2}
+$$
+$$
+1 + \frac{D}{v+2} = 2 + \frac{D}{v+9}
+$$
+
+---
+
+### Step 3: Solve the System of Equations
+
+#### First Equation:
+$$
+\frac{D}{v} = 1 + \frac{D}{v+2}
+$$
+Subtract $ \frac{D}{v+2} $ from both sides:
+$$
+\frac{D}{v} - \frac{D}{v+2} = 1
+$$
+Factor out $ D $:
+$$
+D \left( \frac{1}{v} - \frac{1}{v+2} \right) = 1
+$$
+Simplify the expression inside the parentheses:
+$$
+\frac{1}{v} - \frac{1}{v+2} = \frac{(v+2) - v}{v(v+2)} = \frac{2}{v(v+2)}
+$$
+So:
+$$
+D \cdot \frac{2}{v(v+2)} = 1 \Rightarrow D = \frac{v(v+2)}{2}
+$$
+
+#### Second Equation:
+$$
+1 + \frac{D}{v+2} = 2 + \frac{D}{v+9}
+$$
+Subtract 1 from both sides:
+$$
+\frac{D}{v+2} = 1 + \frac{D}{v+9}
+$$
+Subtract $ \frac{D}{v+9} $ from both sides:
+$$
+\frac{D}{v+2} - \frac{D}{v+9} = 1
+$$
+Factor out $ D $:
+$$
+D \left( \frac{1}{v+2} - \frac{1}{v+9} \right) = 1
+$$
+Simplify the expression inside the parentheses:
+$$
+\frac{1}{v+2} - \frac{1}{v+9} = \frac{(v+9) - (v+2)}{(v+2)(v+9)} = \frac{7}{(v+2)(v+9)}
+$$
+So:
+$$
+D \cdot \frac{7}{(v+2)(v+9)} = 1 \Rightarrow D = \frac{(v+2)(v+9)}{7}
+$$
+
+---
+
+### Step 4: Equate the Two Expressions for $ D $
+
+$$
+\frac{v(v+2)}{2} = \frac{(v+2)(v+9)}{7}
+$$
+
+Divide both sides by $ v + 2 $ (since $ v > 0 $, this is valid):
+
+$$
+\frac{v}{2} = \frac{v + 9}{7}
+$$
+
+Cross-multiply:
+
+$$
+7v = 2(v + 9) \Rightarrow 7v = 2v + 18 \Rightarrow 5v = 18 \Rightarrow v = \frac{18}{5}
+$$
+
+---
+
+### Step 5: Compute Distance $ D $
+
+Use the first expression for $ D $:
+
+$$
+D = \frac{v(v + 2)}{2} = \frac{\frac{18}{5} \cdot \left(\frac{18}{5} + 2\right)}{2}
+= \frac{\frac{18}{5} \cdot \frac{28}{5}}{2}
+= \frac{504}{50} = \frac{252}{25}
+$$
+
+Check with the second expression to confirm:
+
+$$
+D = \frac{(v+2)(v+9)}{7} = \frac{\frac{28}{5} \cdot \frac{63}{5}}{7} = \frac{1764}{175} = \frac{252}{25}
+$$
+
+Both expressions yield the same result.
+
+---
+
+### Step 6: Final Answer
+
+The distance is $ \frac{252}{25} $ miles. Since 252 and 25 are relatively prime (no common factors), we have:
+
+- $ m = 252 $
+- $ n = 25 $
+- $ m + n = 252 + 25 = 277 $
+
+Final answer: 
+Final answer: 277

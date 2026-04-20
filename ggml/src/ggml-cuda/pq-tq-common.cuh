@@ -85,6 +85,13 @@ static constexpr uint16_t pq_tq_pack_i8_pair_host(const float x0, const float x1
         | ((uint16_t) (uint8_t) (int8_t) pq_tq_round_i8_host(x1) << 8);
 }
 
+static constexpr uint32_t tq_qjl_pack_signs_i8_host(const uint8_t bits) {
+    return  (uint32_t) (uint8_t) (int8_t) ((bits & 0x1u) ? 127 : -127)
+        | (((uint32_t) (uint8_t) (int8_t) ((bits & 0x2u) ? 127 : -127)) <<  8)
+        | (((uint32_t) (uint8_t) (int8_t) ((bits & 0x4u) ? 127 : -127)) << 16)
+        | (((uint32_t) (uint8_t) (int8_t) ((bits & 0x8u) ? 127 : -127)) << 24);
+}
+
 static constexpr float pq_tq_centroid_2bit_host(const uint8_t q2) {
     constexpr float centroids[4] = {-0.133462f, -0.039994f, 0.039994f, 0.133462f};
     return centroids[q2];
@@ -128,6 +135,13 @@ __constant__ static const uint16_t PQ_TQ_DP4A_PAIR_LUT_2BIT[16] = {
     PQ_TQ_PAIR_LUT_ROW_16(PQ_TQ_DP4A_PAIR2_ENTRY, 0),
 };
 
+#define PQ_TQ_DP4A_VAL2_ENTRY(idx) \
+    (int8_t) pq_tq_round_i8_host(pq_tq_centroid_2bit_host((idx) & 0x3u) * PQ_TQ_DP4A_SCALE_2BIT)
+
+__constant__ static const int8_t PQ_TQ_DP4A_VAL_2BIT[16] = {
+    PQ_TQ_PAIR_LUT_ROW_16(PQ_TQ_DP4A_VAL2_ENTRY, 0),
+};
+
 #define PQ_TQ_PAIR3_ENTRY(idx) { \
     pq_tq_centroid_3bit_host((idx) & 0x3u, ((idx) >> 4) & 0x1u), \
     pq_tq_centroid_3bit_host(((idx) >> 2) & 0x3u, ((idx) >> 5) & 0x1u) \
@@ -158,6 +172,17 @@ __constant__ static const uint16_t PQ_TQ_DP4A_PAIR_LUT_3BIT[64] = {
 __constant__ static const int8_t PQ_TQ_DP4A_VAL_3BIT[8] = {
     PQ_TQ_DP4A_VAL3_ENTRY(0), PQ_TQ_DP4A_VAL3_ENTRY(1), PQ_TQ_DP4A_VAL3_ENTRY(2), PQ_TQ_DP4A_VAL3_ENTRY(3),
     PQ_TQ_DP4A_VAL3_ENTRY(4), PQ_TQ_DP4A_VAL3_ENTRY(5), PQ_TQ_DP4A_VAL3_ENTRY(6), PQ_TQ_DP4A_VAL3_ENTRY(7),
+};
+
+__constant__ static const int8_t PQ_TQ_DP4A_VAL_3BIT_16[16] = {
+    PQ_TQ_PAIR_LUT_ROW_16(PQ_TQ_DP4A_VAL3_ENTRY, 0),
+};
+
+#define TQ_QJL_DP4A_SIGNS_ENTRY(idx) \
+    (int) tq_qjl_pack_signs_i8_host((uint8_t) (idx))
+
+__constant__ static const int TQ_QJL_DP4A_SIGNS_16[16] = {
+    PQ_TQ_PAIR_LUT_ROW_16(TQ_QJL_DP4A_SIGNS_ENTRY, 0),
 };
 
 #define PQ_TQ_PAIR4_ENTRY(idx) { \
@@ -217,6 +242,7 @@ __constant__ static const int8_t PQ_TQ_DP4A_VAL_4BIT[16] = {
 
 #undef PQ_TQ_DP4A_PAIR4_ENTRY
 #undef PQ_TQ_DP4A_VAL4_ENTRY
+#undef PQ_TQ_DP4A_VAL2_ENTRY
 #undef PQ_TQ_DP4A_VAL3_ENTRY
 #undef PQ_TQ_DP4A_PAIR3_ENTRY
 #undef PQ_TQ_DP4A_PAIR2_ENTRY

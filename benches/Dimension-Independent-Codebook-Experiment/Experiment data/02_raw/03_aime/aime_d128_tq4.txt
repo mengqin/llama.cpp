@@ -1,0 +1,95 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+To solve the problem, we define the following:
+
+- Let $ p $ be Patrick's walking speed in miles per hour.
+- Tanya runs at a speed of $ p + 2 $ mph (2 mph faster than Patrick).
+- Jose bikes at a speed of $ (p + 2) + 7 = p + 9 $ mph (7 mph faster than Tanya).
+
+Let $ T $ be the total time (in hours) it takes for **Patrick** to reach the park from his departure. Since all three arrive at the same time:
+
+- Patrick walks for $ T $ hours → distance = $ pT $
+- Tanya starts 1 hour later and walks for $ T - 1 $ hours → distance = $ (p + 2)(T - 1) $
+- Jose starts 2 hours later and bikes for $ T - 2 $ hours → distance = $ (p + 9)(T - 2) $
+
+Since all three travel the same distance $ D $, we equate the expressions:
+
+$$
+pT = (p + 2)(T - 1) \quad \text{(1)}
+$$
+$$
+pT = (p + 9)(T - 2) \quad \text{(2)}
+$$
+
+---
+
+### Step 1: Solve Equation (1)
+
+$$
+pT = (p + 2)(T - 1)
+\Rightarrow pT = pT - p + 2T - 2
+\Rightarrow 0 = -p + 2T - 2
+\Rightarrow p = 2T - 2 \quad \text{(3)}
+$$
+
+---
+
+### Step 2: Solve Equation (2)
+
+$$
+pT = (p + 9)(T - 2)
+\Rightarrow pT = pT - 2p + 9T - 18
+\Rightarrow 0 = -2p + 9T - 18
+\Rightarrow 2p = 9T - 18
+\Rightarrow p = \frac{9T - 18}{2} \quad \text{(4)}
+$$
+
+---
+
+### Step 3: Equate (3) and (4)
+
+From (3): $ p = 2T - 2 $
+
+From (4): $ p = \frac{9T - 18}{2} $
+
+Set equal:
+
+$$
+2T - 2 = \frac{9T - 18}{2}
+$$
+
+Multiply both sides by 2:
+
+$$
+4T - 4 = 9T - 18
+\Rightarrow -5T = -14
+\Rightarrow T = \frac{14}{5}
+$$
+
+Now plug $ T = \frac{14}{5} $ into equation (3):
+
+$$
+p = 2 \cdot \frac{14}{5} - 2 = \frac{28}{5} - \frac{10}{5} = \frac{18}{5}
+$$
+
+---
+
+### Step 4: Compute the Distance $ D $
+
+Using Patrick’s equation:
+
+$$
+D = pT = \frac{18}{5} \cdot \frac{14}{5} = \frac{252}{25}
+$$
+
+This fraction is already in lowest terms since $ \gcd(252, 25) = 1 $. So $ m = 252 $, $ n = 25 $.
+
+---
+
+### Final Answer
+
+$$
+m + n = 252 + 25 = \boxed{277}
+$$
+
+Final answer: <integer> 277

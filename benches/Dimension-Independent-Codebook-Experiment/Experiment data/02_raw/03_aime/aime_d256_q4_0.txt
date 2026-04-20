@@ -1,0 +1,118 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+To solve this problem, let's define the variables and set up equations based on the information given.
+
+**1. Define Variables:**
+Let $v$ be Patrick's walking speed in miles per hour (mph).
+Let $D$ be the distance from the school to the park in miles.
+
+**2. Determine Individual Speeds:**
+* **Patrick's speed:** $v_P = v$.
+* **Tanya's speed:** She runs 2 mph faster than Patrick.
+ $v_T = v + 2$.
+* **Jose's speed:** He bicycles 7 mph faster than Tanya.
+ $v_J = v_T + 7 = (v + 2) + 7 = v + 9$.
+
+**3. Determine Time Intervals:**
+Let $t$ be the time (in hours) it takes for each person to travel the distance $D$. Since they all arrive at the same time, we can express their travel times in terms of $t$. However, it's easier to express their travel times in terms of the distance and speeds, or relate the start times to the total time.
+
+Let's denote the time each person spends traveling as $T_P$, $T_T$, and $T_J$.
+Since Distance = Speed $\times$ Time:
+* $T_P = \frac{D}{v}$
+* $T_T = \frac{D}{v+2}$
+* $T_J = \frac{D}{v+9}$
+
+**4. Analyze Start Times and Arrival Times:**
+Let $T_{arrival}$ be the time when all three arrive at the park. Let $t=0$ be the moment Patrick leaves the school.
+
+* **Patrick:** Starts at $t=0$. Arrives at $T_{arrival}$.
+ Therefore, $T_{arrival} = T_P = \frac{D}{v}$.
+
+* **Tanya:** Starts 1 hour after Patrick. So she starts at $t=1$.
+ She arrives at $T_{arrival}$.
+ The duration she travels is $T_{arrival} - 1$.
+ So, $\frac{D}{v+2} = \frac{D}{v} - 1$.
+
+* **Jose:** Starts 1 hour after Tanya. Since Tanya starts at $t=1$, Jose starts at $t=2$.
+ He arrives at $T_{arrival}$.
+ The duration he travels is $T_{arrival} - 2$.
+ So, $\frac{D}{v+9} = \frac{D}{v} - 2$.
+
+**5. Set up Equations and Solve:**
+From Tanya's equation:
+$$ \frac{D}{v+2} = \frac{D}{v} - 1 $$
+Multiply by $v(v+2)$ to clear denominators:
+$$ Dv = D(v+2) - v(v+2) $$
+$$ Dv = Dv + 2D - (v^2 + 2v) $$
+Subtract $Dv$ from both sides:
+$$ 0 = 2D - v^2 - 2v $$
+$$ v^2 + 2v = 2D \quad \dots \text{(Equation 1)} $$
+
+From Jose's equation:
+$$ \frac{D}{v+9} = \frac{D}{v} - 2 $$
+Multiply by $v(v+9)$ to clear denominators:
+$$ Dv = D(v+9) - 2v(v+9) $$
+$$ Dv = Dv + 9D - (2v^2 + 18v) $$
+Subtract $Dv$ from both sides:
+$$ 0 = 9D - 2v^2 - 18v $$
+$$ 2v^2 + 18v = 9D \quad \dots \text{(Equation 2)} $$
+
+**6. Solve the System of Equations:**
+We have:
+1) $2D = v^2 + 2v$
+2) $9D = 2v^2 + 18v$
+
+From (1), express $D$ in terms of $v$:
+$$ D = \frac{v^2 + 2v}{2} $$
+
+Substitute this expression for $D$ into (2):
+$$ 9 \left( \frac{v^2 + 2v}{2} \right) = 2v^2 + 18v $$
+Multiply both sides by 2:
+$$ 9(v^2 + 2v) = 2(2v^2 + 18v) $$
+$$ 9v^2 + 18v = 4v^2 + 36v $$
+Rearrange terms to form a quadratic equation:
+$$ 9v^2 - 4v^2 + 18v - 36v = 0 $$
+$$ 5v^2 - 18v = 0 $$
+$$ v(5v - 18) = 0 $$
+
+Since speed $v$ must be positive ($v > 0$), we discard $v=0$.
+$$ 5v - 18 = 0 \implies v = \frac{18}{5} $$
+
+**7. Calculate the Distance $D$:**
+Substitute $v = \frac{18}{5}$ back into Equation 1 ($2D = v^2 + 2v$):
+$$ 2D = \left(\frac{18}{5}\right)^2 + 2\left(\frac{18}{5}\right) $$
+$$ 2D = \frac{324}{25} + \frac{36}{5} $$
+Find a common denominator (25):
+$$ 2D = \frac{324}{25} + \frac{36 \times 5}{25} $$
+$$ 2D = \frac{324}{25} + \frac{180}{25} $$
+$$ 2D = \frac{504}{25} $$
+$$ D = \frac{252}{25} $$
+
+**8. Verify the Result:**
+Let's check if the times work out.
+$v = 3.6$ mph.
+$D = 10.08$ miles.
+
+* Patrick's time: $T_P = 10.08 / 3.6 = 2.8$ hours.
+* Tanya's speed: $3.6 + 2 = 5.6$ mph.
+ Tanya's travel time: $10.08 / 5.6 = 1.8$ hours.
+ Tanya starts at $t=1$, arrives at $1 + 1.8 = 2.8$ hours. (Matches)
+* Jose's speed: $5.6 + 7 = 12.6$ mph.
+ Jose's travel time: $10.08 / 12.6 = 0.8$ hours.
+ Jose starts at $t=2$, arrives at $2 + 0.8 = 2.8$ hours. (Matches)
+
+All conditions are satisfied.
+
+**9. Determine m and n:**
+The distance is $D = \frac{252}{25}$ miles.
+Here, $m = 252$ and $n = 25$.
+Check if they are relatively prime:
+$25 = 5^2$.
+Does 5 divide 252? $252 = 250 + 2$. No, 252 is not divisible by 5.
+Thus, $\gcd(252, 25) = 1$. They are relatively prime.
+
+**10. Calculate Final Answer:**
+We need to find $m + n$.
+$m + n = 252 + 25 = 277$.
+
+Final answer: 277

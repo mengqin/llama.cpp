@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D128",
+    "type": "tq4",
+    "needle_size": "32K",
+    "exit_code": 0,
+    "needle_score": 100.0,
+    "needle_score_en": 100.0,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "needle_32k_d128_tq4.json",
+    "server_log": "needle_server_d128_tq4.log"
+  },
+  "details": [
+    {
+      "pred": "ThelegendaryitemhiddenonEmeraldIslandistheMagicEssence.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 26,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenonEmeraldIslandistheMagicEssence.</think>ThelegendaryitemhiddenonEmeraldIslandisMagicEssence.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 68,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenonEmeraldIslandismentionedinthedocumentas\"HiddenonEmeraldIslandisthelegendaryMagicEssence.\"Thisappearsinthetextasaseeminglyrandomphraseinsertedwithinthedocument,likelyasatestorplaceholderelement.Thephraseexplicitlystates\"HiddenonEmeraldIslandisthelegendaryMagicEssence.\"</think>ThelegendaryitemhiddenonEmeraldIslandisMagicEssence.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 304,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisHiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 42,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenonEmeraldIslandisMagicEssence.</think>ThelegendaryitemhiddenonEmeraldIslandisMagicEssence.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 65,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenonEmeraldIslandisMagicEssence.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 29,
+      "score": 100
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on Emerald Island is the Magic Essence."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on Emerald Island is the Magic Essence.\n</think>\n\nThe legendary item hidden on Emerald Island is Magic Essence."
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on Emerald Island is mentioned in the document as \"Hidden on Emerald Island is the legendary Magic Essence.\" This appears in the text as a seemingly random phrase inserted within the document, likely as a test or placeholder element. The phrase explicitly states \"Hidden on Emerald Island is the legendary Magic Essence.\"\n</think>\n\nThe legendary item hidden on Emerald Island is Magic Essence."
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is Hidden on Emerald Island is the legendary Magic Essence."
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on Emerald Island is Magic Essence.\n</think>\n\nThe legendary item hidden on Emerald Island is Magic Essence."
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on Emerald Island is Magic Essence."
+    }
+  ]
+}

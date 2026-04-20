@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D128",
+    "type": "pq3",
+    "needle_size": "32K",
+    "exit_code": 0,
+    "needle_score": 1.4583,
+    "needle_score_en": 1.4583,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "needle_32k_d128_pq3.json",
+    "server_log": "needle_server_d128_pq3.log"
+  },
+  "details": [
+    {
+      "pred": "Theanswertothequestionis",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 38,
+      "score": 4.166666666666667
+    },
+    {
+      "pred": "",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 48,
+      "score": 0.0
+    },
+    {
+      "pred": "Thethethe",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 43,
+      "score": 2.0833333333333326
+    },
+    {
+      "pred": "",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 48,
+      "score": 0.0
+    },
+    {
+      "pred": "TheuserofaThe12",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 42,
+      "score": 2.5
+    },
+    {
+      "pred": "",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 48,
+      "score": 0.0
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The answer to the question is"
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": ""
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The\nthe\nthe"
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": ""
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The user of a\nThe\n\n\n1\n2"
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": ""
+    }
+  ]
+}

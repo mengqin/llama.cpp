@@ -1,0 +1,108 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+To solve the problem, we analyze the motion of Patrick, Tanya, and Jose as they travel from school to park at constant speeds. All three arrive at the same time, so their **distances traveled are equal**.
+
+---
+
+### Step 1: Define Variables
+
+Let:
+- $ v $ = Patrick's walking speed (in miles per hour)
+- $ D $ = total distance from school to park (in miles)
+
+From the problem:
+- Patrick starts first.
+- Tanya starts **1 hour after** Patrick.
+- Jose starts **1 hour after** Tanya → i.e., **2 hours after** Patrick.
+
+Let $ T $ be the **total time** Patrick takes to reach the park (in hours). Then:
+
+| Person | Start Time | Travel Time | Speed |
+|--------|-------------|----------------|--------|
+| Patrick | 0 | $ T $ | $ v $ |
+| Tanya | 1 | $ T - 1 $ | $ v + 2 $ |
+| Jose | 2 | $ T - 2 $ | $ v + 9 $ |
+
+All three cover the same distance $ D $, so:
+
+$$
+\begin{align*}
+D &= vT \quad \text{(Patrick)} \\
+D &= (v + 2)(T - 1) \quad \text{(Tanya)} \\
+D &= (v + 9)(T - 2) \quad \text{(Jose)}
+\end{align*}
+$$
+
+---
+
+### Step 2: Equating Equations
+
+#### First, equate Patrick and Tanya:
+
+$$
+vT = (v + 2)(T - 1)
+$$
+
+Expanding the right-hand side:
+
+$$
+vT = vT - v + 2T - 2
+$$
+
+Subtract $ vT $ from both sides:
+
+$$
+0 = -v + 2T - 2 \Rightarrow v = 2T - 2 \tag{1}
+$$
+
+#### Next, equate Tanya and Jose:
+
+$$
+(v + 2)(T - 1) = (v + 9)(T - 2)
+$$
+
+Substitute equation (1) into this:
+
+$$
+(2T - 2 + 2)(T - 1) = (2T - 2 + 9)(T - 2)
+\Rightarrow (2T)(T - 1) = (2T + 7)(T - 2)
+$$
+
+Now expand both sides:
+
+- Left: $ 2T(T - 1) = 2T^2 - 2T $
+- Right: $ (2T + 7)(T - 2) = 2T^2 - 4T + 7T - 14 = 2T^2 + 3T - 14 $
+
+Set equal:
+
+$$
+2T^2 - 2T = 2T^2 + 3T - 14
+$$
+
+Subtract $ 2T^2 $ from both sides:
+
+$$
+-2T = 3T - 14 \Rightarrow -5T = -14 \Rightarrow T = \frac{14}{5}
+$$
+
+---
+
+### Step 3: Find Distance $ D $
+
+Use equation (1): $ v = 2T - 2 = 2 \cdot \frac{14}{5} - 2 = \frac{28}{5} - \frac{10}{5} = \frac{18}{5} $
+
+Then:
+
+$$
+D = vT = \frac{18}{5} \cdot \frac{14}{5} = \frac{252}{25}
+$$
+
+This fraction is already in lowest terms since 252 and 25 share no common factors (25 = $ 5^2 $, and 252 is divisible by 2, 3, 7 but not 5).
+
+So $ m = 252 $, $ n = 25 $, and $ m + n = 277 $.
+
+---
+
+### Final Answer
+
+Final answer: 277

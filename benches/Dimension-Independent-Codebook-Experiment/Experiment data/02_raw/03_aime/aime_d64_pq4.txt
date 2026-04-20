@@ -1,0 +1,50 @@
+',
+analysis to total out? We need to find distance from school to the park? No, it's the distance from the school at which they all start? No.
+
+Given that they all arrive at the park at the same time. Let D be the distance. Let Patrick walks at speed v miles per hour. Then Tanya's speed = v+2 mph. Then Jose's speed = (v+2)+7 = v+9 mph, because 7 mph faster than Tanya is? Wait: Jose started bicycling at a constant speed of 7 mph faster than Tanya ran. So Jose's speed = (v+2)+7 = v+9. TSpeed not 2 mph? No, check: "Jose started bicycling at a constant speed of 7 miles per hour faster than Tanya ran" - that means that Jose's speed is 7 mph more than Tanya's speed. Tanya's speed is v+2. So Jose's speed = v+2+7 = v+9. That yields v+9 mph. Yes.
+
+Now times: they all start at different times: Patrick starts at t=0, arrives at D/v.
+Tanya starts 1 hour after Pack, so she has to cover distance D at speed (v+2). So her time relative to start = D/(v+2). But she started 1 hour later, but then all arrive same time means:
+For all to coincide: tP = tT? Actually for all three to arrive at exactly the same time at the park, their arrival times must equal each other: Person's arrival time tarrive = starting time difference + time of travel. So for Patrick: tP = D/v. For Tanya: tT = tP? Actually she goes from 1 hour after Patrick, traveling with speed v+2. She covers D in time D/(v+2) and her arrival time = 1 + D/(v+2). For Jose: He starts 2 hours after Patrick? Actually "Jose started bicycling 1 hour after Tanya left"? No: "One hour after Tanya left, Jose started bicycling". So Jose started 1 hour after Tanya. Actually careful: The statement: "Joe started bicycling at a constant speed of 7 mph faster than Tanya ran." They didn't specify his start time relative to the previous? We only such: "One hour after the first left, the second left, and we know Jose started bicycling at a constant speed of X mph faster than Tanya." Actually the difference: He started 1 hour after Tanya. Let's assign times relative to them.
+
+- t0: Patrick starts.
+- t=1: Tanya starts and begins to run.
+- t=2: Jose starts and starts bicycling.
+
+So Jose starts at time 2 relative to original. So his travel time will be? He moves at speed (v+7). But because we said Jose = 7 mph faster than Tanya. Actually yes. So his speed is v+? Actually His speed = (TSpeed + 7) not v+7? Wait: The difference: "at a constant speed of 7 miles per hour slower than Jose"? Actually we need to parse: "Jose started bicycling at a constant speed of 7 mph faster than Tanya ran" means TSpeed =? Actually mis.
+
+Ok let's define:
+
+Let speed of Patrick = v (mph). Then Tanya runs at v+2. Let Jose runs at v+? Actually "Jose started bicycling at a constant speed of 7 mph fast than Tanya." means Jose's speed = (Tandy speed) *? Being "a constant speed of 7 mph faster than Tanya ran." Actually no, implies speed difference in mph difference, not a factor but add 7 mph. So Jose's speed = (v+2) + 7 = v+9. Good.
+
+Now times:
+
+- Patrick's arrival at the park at t1 = D/v.
+- Tanya's arrival at t2 = 1 + D/(v+2).
+- Jose's arrival at t3 = 2 + D/(v+9).
+
+Wait: Actually D/(v+9 times? Wait: Jose's speed = v+9 mph? Actually yes, if his speed is v+9? Wait: Correction: Jose's speed = (speed of Tanya + 7 mph). Tanya's speed is v+2, so Jose's speed = v+2 + 7 = v+9. Good.
+
+But we need to check: The difference between "complete: Jose runs at random speed of PQ? Actually no.
+
+Now we equate them: 
+t1 = D/v
+t2 = 1 + D/(v+2)
+t3 = 2 + D/(v+9)
+
+Set them equal:
+Let's denote T1 = D/v.
+We want T1 = 1 + D/(v+2) => D/v = 1 + D/(v+2). Solve for D and v.
+Simplify: D/v - D/(v+2) = 1.
+
+Compute D*(1/(v) - 1/(v+2) = ? => D((v+2)-(v)/v(v+2) = D*(2)/v(v+2)?? Actually:
+D/v - D/(v+2) = D*( (1/v - 1/(v+2)). Multiply eq by (v)(v+2) => D(v+2 * (??). Wait, D(?? Actually:
+
+Use partial fractions: D/(v) - D/(v+2) = D*(? Example: D*(1/v - 1/(v+2) = D*(? So compute: 1/v - 1/(v+2) = ( (v+2 - v) / (v(v+2) = 2/(v(v+2) )*D = 2D/(v(v+2)). So D/(v) - D/(v+2) = 2D/(v(v+2). So we get 2D/(v(v+2). So D *we have 2D/(v(v+2) = 1 -> 2D = v(v+2). So 2D = v^2 + 2v. Solve: 2D = v^2 + 2v => v^2 + 2v - 2D = 0 => this must hold for positive root: Solve for D: D = (v^2 + 2 v)/2? Actually do 2D = v^2+2v, so D = (v^2+2v)/2.
+
+Simplify: D = v^2/2 + v. So D must be also equal to the other equality with t3. Let's equate t1 = 2 + D/(v+9). So D/v = 2 + D/(v+9). Solve: D*(v+9) = 2v + D? Actually cross multiply: D/(v+9) =? Actually D/v. So D*(v+9) maybe: D^2? Wait: D/v = 2 + D/(v+9). Multiply both sides by v(v+9): D*(v+9)/v? Wait incorrectly.
+
+Let's solve this equation with python. 
+ 
+
+Sure.

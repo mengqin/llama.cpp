@@ -1,0 +1,59 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+Let $v_P$ be Patrick's walking speed in miles per hour.
+Let $v_T$ be Tanya's running speed in miles per hour.
+Let $v_J$ be Jose's bicycling speed in miles per hour.
+Let $D$ be the distance from the school to the park in miles.
+Let $t_P$, $t_T$, and $t_J$ be the times in hours that Patrick, Tanya, and Jose, respectively, travel to the park.
+
+According to the problem:
+1. Patrick starts at time $t=0$ and travels for $t_P$ hours.
+ $D = v_P t_P$
+2. Tanya starts one hour after Patrick, so she starts at $t=1$. She arrives at the same time as Patrick, so her travel time is $t_T = t_P - 1$.
+ Her speed is 2 mph faster than Patrick's: $v_T = v_P + 2$.
+ $D = v_T t_T = (v_P + 2)(t_P - 1)$
+3. Jose starts one hour after Tanya, so he starts at $t=1+1=2$. He arrives at the same time, so his travel time is $t_J = t_P - 2$.
+ His speed is 7 mph faster than Tanya's: $v_J = v_T + 7 = (v_P + 2) + 7 = v_P + 9$.
+ $D = v_J t_J = (v_P + 9)(t_P - 2)$
+
+We have a system of equations with unknowns $v_P$ and $t_P$. Let $v = v_P$ and $t = t_P$.
+The equations are:
+1. $D = v t$
+2. $D = (v + 2)(t - 1)$
+3. $D = (v + 9)(t - 2)$
+
+From (1) and (2):
+$v t = (v + 2)(t - 1)$
+$v t = v t - v + 2t - 2$
+$0 = -v + 2t - 2$
+$v = 2t - 2$
+
+From (1) and (3):
+$v t = (v + 9)(t - 2)$
+$v t = v t - 2v + 9t - 18$
+$0 = -2v + 9t - 18$
+$2v = 9t - 18$
+$v = \frac{9t - 18}{2} = 4.5t - 9$
+
+Now we equate the two expressions for $v$:
+$2t - 2 = 4.5t - 9$
+$9 - 2 = 4.5t - 2t$
+$7 = 2.5t$
+$t = \frac{7}{2.5} = \frac{70}{25} = \frac{14}{5}$
+
+So Patrick's travel time is $t = \frac{14}{5}$ hours.
+Now find Patrick's speed $v$:
+$v = 2t - 2 = 2\left(\frac{14}{5}\right) - 2 = \frac{28}{5} - \frac{10}{5} = \frac{18}{5}$ mph.
+
+Now calculate the distance $D$:
+$D = v t = \left(\frac{18}{5}\right)\left(\frac{14}{5}\right) = \frac{18 \times 14}{25} = \frac{252}{25}$ miles.
+
+The distance is given as $m/n$ where $m$ and $n$ are relatively prime positive integers.
+$m = 252$
+$n = 25$
+We check if they are relatively prime. The prime factorization of $252$ is $2^2 \cdot 3^2 \cdot 7$. The prime factorization of $25$ is $5^2$. They share no common factors, so $\gcd(252, 25) = 1$.
+
+We need to find $m + n$:
+$m + n = 252 + 25 = 277$.
+
+Final answer: 277

@@ -42,6 +42,229 @@ static const float CENTROIDS_4BIT_TABLE[16] = {
      0.068756f,  0.089527f,  0.117195f,  0.173926f
 };
 
+static int nearest_centroid_2bit(float val);
+static int nearest_centroid_3bit(float val);
+static int nearest_centroid_4bit(float val);
+
+/* Fixed FWHT + sign matrices for 128-wide weight groups. */
+static const float PQ_TQ_WHT_S1_128[128] = {
+     1.0f, -1.0f,  1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f, -1.0f, -1.0f, -1.0f,  1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f, -1.0f, -1.0f,  1.0f, -1.0f,  1.0f,
+    -1.0f,  1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f, -1.0f, -1.0f, -1.0f, -1.0f,  1.0f,  1.0f,
+    -1.0f, -1.0f,  1.0f,  1.0f,  1.0f,  1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f,  1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f, -1.0f, -1.0f, -1.0f,  1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f, -1.0f, -1.0f,  1.0f, -1.0f,  1.0f,
+    -1.0f,  1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f, -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,  1.0f,  1.0f,  1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f,  1.0f, -1.0f, -1.0f,  1.0f, -1.0f,  1.0f,
+};
+
+static const float PQ_TQ_WHT_S2_128[128] = {
+     1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
+    -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f,
+     1.0f,  1.0f,  1.0f,  1.0f, -1.0f, -1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f, -1.0f, -1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f, -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f, -1.0f, -1.0f, -1.0f, -1.0f,  1.0f,  1.0f,
+    -1.0f, -1.0f,  1.0f,  1.0f,  1.0f,  1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f,  1.0f, -1.0f,  1.0f, -1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,  1.0f, -1.0f,  1.0f, -1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f, -1.0f, -1.0f,  1.0f, -1.0f,  1.0f,
+    -1.0f,  1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,  1.0f,
+    -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,  1.0f,  1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,  1.0f, -1.0f,  1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f,  1.0f, -1.0f,  1.0f, -1.0f, -1.0f,  1.0f,
+};
+
+static void pq_tq_fwht_128(float * x) {
+    for (int h = 1; h < 128; h <<= 1) {
+        for (int i = 0; i < 128; i += 2 * h) {
+            for (int j = i; j < i + h; ++j) {
+                const float a = x[j];
+                const float b = x[j + h];
+                x[j]     = a + b;
+                x[j + h] = a - b;
+            }
+        }
+    }
+    const float inv_sqrt128 = 0.08838834764831845f;
+    for (int i = 0; i < 128; ++i) {
+        x[i] *= inv_sqrt128;
+    }
+}
+
+static void pq_tq_rotate_forward_128(float * x) {
+    for (int i = 0; i < 128; ++i) {
+        x[i] *= PQ_TQ_WHT_S1_128[i];
+    }
+    pq_tq_fwht_128(x);
+    for (int i = 0; i < 128; ++i) {
+        x[i] *= PQ_TQ_WHT_S2_128[i];
+    }
+}
+
+static void pq_tq_rotate_inverse_128(float * x) {
+    for (int i = 0; i < 128; ++i) {
+        x[i] *= PQ_TQ_WHT_S2_128[i];
+    }
+    pq_tq_fwht_128(x);
+    for (int i = 0; i < 128; ++i) {
+        x[i] *= PQ_TQ_WHT_S1_128[i];
+    }
+}
+
+static void pq_tq_quantize_group_pq2_128(const float * GGML_RESTRICT src, block_pq2 * GGML_RESTRICT dst) {
+    float norm_sq = 0.0f;
+    for (int i = 0; i < 128; ++i) {
+        norm_sq += src[i] * src[i];
+    }
+
+    const float norm = sqrtf(norm_sq);
+    const float inv_norm = norm > 1e-10f ? 1.0f / norm : 0.0f;
+
+    float rotated[128];
+    for (int i = 0; i < 128; ++i) {
+        rotated[i] = src[i] * inv_norm;
+    }
+    pq_tq_rotate_forward_128(rotated);
+
+    uint8_t qidx[128];
+    float recon_norm_sq = 0.0f;
+    for (int i = 0; i < 128; ++i) {
+        qidx[i] = (uint8_t) nearest_centroid_2bit(rotated[i]);
+        const float c = CENTROIDS_2BIT[qidx[i]];
+        recon_norm_sq += c * c;
+    }
+
+    const float recon_norm = sqrtf(recon_norm_sq);
+    const ggml_half norm_h = GGML_FP32_TO_FP16(recon_norm > 1e-10f ? norm / recon_norm : norm);
+
+    for (int blk = 0; blk < 4; ++blk) {
+        dst[blk].norm = norm_h;
+        memset(dst[blk].qs, 0, sizeof(dst[blk].qs));
+        for (int i = 0; i < 32; ++i) {
+            const int local = blk * 32 + i;
+            dst[blk].qs[i/4] |= (uint8_t) ((qidx[local] & 0x3u) << (2 * (i & 3)));
+        }
+    }
+}
+
+static void pq_tq_dequantize_group_pq2_128(const block_pq2 * GGML_RESTRICT src, float * GGML_RESTRICT dst) {
+    float rotated[128];
+    for (int blk = 0; blk < 4; ++blk) {
+        const float norm = GGML_FP16_TO_FP32(src[blk].norm);
+        for (int i = 0; i < 32; ++i) {
+            const uint8_t q = (src[blk].qs[i/4] >> (2 * (i & 3))) & 0x3u;
+            rotated[blk * 32 + i] = CENTROIDS_2BIT[q] * norm;
+        }
+    }
+    pq_tq_rotate_inverse_128(rotated);
+    memcpy(dst, rotated, sizeof(rotated));
+}
+
+static void pq_tq_quantize_group_pq3_128(const float * GGML_RESTRICT src, block_pq3 * GGML_RESTRICT dst) {
+    float norm_sq = 0.0f;
+    for (int i = 0; i < 128; ++i) {
+        norm_sq += src[i] * src[i];
+    }
+
+    const float norm = sqrtf(norm_sq);
+    const float inv_norm = norm > 1e-10f ? 1.0f / norm : 0.0f;
+
+    float rotated[128];
+    for (int i = 0; i < 128; ++i) {
+        rotated[i] = src[i] * inv_norm;
+    }
+    pq_tq_rotate_forward_128(rotated);
+
+    uint8_t qidx[128];
+    float recon_norm_sq = 0.0f;
+    for (int i = 0; i < 128; ++i) {
+        qidx[i] = (uint8_t) nearest_centroid_3bit(rotated[i]);
+        const float c = CENTROIDS_3BIT[qidx[i]];
+        recon_norm_sq += c * c;
+    }
+
+    const float recon_norm = sqrtf(recon_norm_sq);
+    const ggml_half norm_h = GGML_FP32_TO_FP16(recon_norm > 1e-10f ? norm / recon_norm : norm);
+
+    for (int blk = 0; blk < 4; ++blk) {
+        dst[blk].norm = norm_h;
+        memset(dst[blk].qs, 0, sizeof(dst[blk].qs));
+        memset(dst[blk].signs, 0, sizeof(dst[blk].signs));
+
+        for (int i = 0; i < 32; ++i) {
+            const int local = blk * 32 + i;
+            const uint8_t q = qidx[local];
+            dst[blk].qs[i/4]    |= (uint8_t) ((q & 0x3u) << (2 * (i & 3)));
+            dst[blk].signs[i/8] |= (uint8_t) (((q >> 2) & 0x1u) << (i & 7));
+        }
+    }
+}
+
+static void pq_tq_dequantize_group_pq3_128(const block_pq3 * GGML_RESTRICT src, float * GGML_RESTRICT dst) {
+    float rotated[128];
+    for (int blk = 0; blk < 4; ++blk) {
+        const float norm = GGML_FP16_TO_FP32(src[blk].norm);
+        for (int i = 0; i < 32; ++i) {
+            const uint8_t q2 = (src[blk].qs[i/4] >> (2 * (i & 3))) & 0x3u;
+            const uint8_t s  = (src[blk].signs[i/8] >> (i & 7)) & 0x1u;
+            rotated[blk * 32 + i] = CENTROIDS_3BIT[q2 | (s << 2)] * norm;
+        }
+    }
+    pq_tq_rotate_inverse_128(rotated);
+    memcpy(dst, rotated, sizeof(rotated));
+}
+
+static void pq_tq_quantize_group_pq4_128(const float * GGML_RESTRICT src, block_pq4 * GGML_RESTRICT dst) {
+    float norm_sq = 0.0f;
+    for (int i = 0; i < 128; ++i) {
+        norm_sq += src[i] * src[i];
+    }
+
+    const float norm = sqrtf(norm_sq);
+    const float inv_norm = norm > 1e-10f ? 1.0f / norm : 0.0f;
+
+    float rotated[128];
+    for (int i = 0; i < 128; ++i) {
+        rotated[i] = src[i] * inv_norm;
+    }
+    pq_tq_rotate_forward_128(rotated);
+
+    float recon_norm_sq = 0.0f;
+    memset(dst->qs, 0, sizeof(dst->qs));
+    for (int i = 0; i < 128; ++i) {
+        const uint8_t q = (uint8_t) nearest_centroid_4bit(rotated[i]);
+        const float c = CENTROIDS_4BIT_TABLE[q];
+        recon_norm_sq += c * c;
+        dst->qs[i/2] |= (uint8_t) ((q & 0xFu) << (4 * (i & 1)));
+    }
+
+    const float recon_norm = sqrtf(recon_norm_sq);
+    dst->norm  = GGML_FP32_TO_FP16(recon_norm > 1e-10f ? norm / recon_norm : norm);
+    dst->rnorm = GGML_FP32_TO_FP16(0.0f);
+}
+
+static void pq_tq_dequantize_group_pq4_128(const block_pq4 * GGML_RESTRICT src, float * GGML_RESTRICT dst) {
+    float rotated[128];
+    const float norm = GGML_FP16_TO_FP32(src->norm);
+    for (int i = 0; i < 128; ++i) {
+        const uint8_t q = (src->qs[i/2] >> (4 * (i & 1))) & 0xFu;
+        rotated[i] = CENTROIDS_4BIT_TABLE[q] * norm;
+    }
+    pq_tq_rotate_inverse_128(rotated);
+    memcpy(dst, rotated, sizeof(rotated));
+}
+
 /* ---------- rotation matrix (lazy init) ---------- */
 
 static float pq_tq_rotation[PQ_TQ_D128 * PQ_TQ_D128];
@@ -200,32 +423,25 @@ static int nearest_centroid_4bit(float val) {
 /* ---------- PQ2_0: 2-bit PolarQuant (4 centroids) ---------- */
 
 void quantize_row_pq2_0_ref(const float * GGML_RESTRICT x, block_pq2 * GGML_RESTRICT y, int64_t k) {
-    assert(k % QK_PQ_TQ_2 == 0);
-    const int nb = k / QK_PQ_TQ_2;
-    for (int i = 0; i < nb; i++) {
-        float norm = 0.0f;
-        for (int j = 0; j < QK_PQ_TQ_2; j++) norm += x[i*QK_PQ_TQ_2 + j] * x[i*QK_PQ_TQ_2 + j];
-        y[i].norm = GGML_FP32_TO_FP16(sqrtf(norm));
-        memset(y[i].qs, 0, QK_PQ_TQ_2 / 4);
+    assert(k % QK_PQ_TQ_2_GROUP == 0);
+    const int ng = k / QK_PQ_TQ_2_GROUP;
+    for (int g = 0; g < ng; ++g) {
+        pq_tq_quantize_group_pq2_128(x + g * QK_PQ_TQ_2_GROUP, y + g * (QK_PQ_TQ_2_GROUP / QK_PQ_TQ_2));
     }
 }
 
 void dequantize_row_pq2_0(const block_pq2 * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k) {
-    assert(k % QK_PQ_TQ_2 == 0);
-    const int nb = k / QK_PQ_TQ_2;
-    for (int block = 0; block < nb; block++) {
-        float norm = GGML_FP16_TO_FP32(x[block].norm);
-        for (int j = 0; j < QK_PQ_TQ_2; j++) {
-            uint8_t idx = (x[block].qs[j/4] >> ((j%4)*2)) & 0x3;
-            y[block * QK_PQ_TQ_2 + j] = CENTROIDS_2BIT[idx] * norm;
-        }
+    assert(k % QK_PQ_TQ_2_GROUP == 0);
+    const int ng = k / QK_PQ_TQ_2_GROUP;
+    for (int g = 0; g < ng; ++g) {
+        pq_tq_dequantize_group_pq2_128(x + g * (QK_PQ_TQ_2_GROUP / QK_PQ_TQ_2), y + g * QK_PQ_TQ_2_GROUP);
     }
 }
 
 size_t quantize_pq2_0(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
                          int64_t nrows, int64_t n_per_row, const float * imatrix) {
     GGML_UNUSED(imatrix);
-    assert(n_per_row % QK_PQ_TQ_2 == 0);
+    assert(n_per_row % QK_PQ_TQ_2_GROUP == 0);
 
     size_t row_size = (n_per_row / QK_PQ_TQ_2) * sizeof(block_pq2);
     for (int64_t row = 0; row < nrows; row++) {
@@ -242,36 +458,26 @@ size_t quantize_pq2_0(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
 
 void quantize_row_pq3_0_ref(const float * GGML_RESTRICT x, block_pq3 * GGML_RESTRICT y, int64_t k) {
     // Stub — Metal shader handles quantize on GPU. CPU path is simplified.
-    assert(k % QK_PQ_TQ_3 == 0);
-    const int nb = k / QK_PQ_TQ_3;
-    for (int i = 0; i < nb; i++) {
-        float norm = 0.0f;
-        for (int j = 0; j < QK_PQ_TQ_3; j++) norm += x[i*QK_PQ_TQ_3 + j] * x[i*QK_PQ_TQ_3 + j];
-        y[i].norm = GGML_FP32_TO_FP16(sqrtf(norm));
-        memset(y[i].qs, 0, QK_PQ_TQ_3 / 4);
-        memset(y[i].signs, 0, QK_PQ_TQ_3 / 8);
+    assert(k % QK_PQ_TQ_3_GROUP == 0);
+    const int ng = k / QK_PQ_TQ_3_GROUP;
+    for (int g = 0; g < ng; ++g) {
+        pq_tq_quantize_group_pq3_128(x + g * QK_PQ_TQ_3_GROUP, y + g * (QK_PQ_TQ_3_GROUP / QK_PQ_TQ_3));
     }
 }
 
 void dequantize_row_pq3_0(const block_pq3 * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k) {
     // Stub — Metal shader handles dequant on GPU.
-    assert(k % QK_PQ_TQ_3 == 0);
-    const int nb = k / QK_PQ_TQ_3;
-    for (int block = 0; block < nb; block++) {
-        float norm = GGML_FP16_TO_FP32(x[block].norm);
-        for (int j = 0; j < QK_PQ_TQ_3; j++) {
-            uint8_t low2 = (x[block].qs[j/4] >> ((j%4)*2)) & 0x3;
-            uint8_t hi1 = (x[block].signs[j/8] >> (j%8)) & 0x1;
-            uint8_t idx = low2 | (hi1 << 2);
-            y[block * QK_PQ_TQ_3 + j] = CENTROIDS_3BIT[idx] * norm;
-        }
+    assert(k % QK_PQ_TQ_3_GROUP == 0);
+    const int ng = k / QK_PQ_TQ_3_GROUP;
+    for (int g = 0; g < ng; ++g) {
+        pq_tq_dequantize_group_pq3_128(x + g * (QK_PQ_TQ_3_GROUP / QK_PQ_TQ_3), y + g * QK_PQ_TQ_3_GROUP);
     }
 }
 
 size_t quantize_pq3_0(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
                          int64_t nrows, int64_t n_per_row, const float * imatrix) {
     GGML_UNUSED(imatrix);
-    assert(n_per_row % QK_PQ_TQ_3 == 0);
+    assert(n_per_row % QK_PQ_TQ_3_GROUP == 0);
 
     size_t row_size = (n_per_row / QK_PQ_TQ_3) * sizeof(block_pq3);
     for (int64_t row = 0; row < nrows; row++) {
@@ -287,91 +493,20 @@ size_t quantize_pq3_0(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
 /* ---------- PQ4_0: 4-bit PolarQuant (16 centroids) ---------- */
 
 void quantize_row_pq4_0_ref(const float * GGML_RESTRICT x, block_pq4 * GGML_RESTRICT y, int64_t k) {
-    pq_tq_init_rotation();
-    tq_init_qjl();
-
     assert(k % QK_PQ_TQ_4 == 0);
     const int nb = k / QK_PQ_TQ_4;
-    const int d  = QK_PQ_TQ_4;
-
-    for (int block = 0; block < nb; block++) {
-        const float * src = x + block * d;
-
-        /* Step 1: Extract norm */
-        float norm_sq = 0.0f;
-        for (int i = 0; i < d; i++) norm_sq += src[i] * src[i];
-        float norm = sqrtf(norm_sq);
-
-        /* Normalize */
-        float normalized[PQ_TQ_D128];
-        if (norm > 1e-10f) {
-            const float inv = 1.0f / norm;
-            for (int i = 0; i < d; i++) normalized[i] = src[i] * inv;
-        } else {
-            memset(normalized, 0, d * sizeof(float));
-        }
-
-        /* Step 2: Rotate */
-        float rotated[PQ_TQ_D128];
-        matvec(pq_tq_rotation, normalized, rotated, d);
-
-        /* Step 3: 4-bit quantization (16 centroids) */
-        static const float CENTROIDS_4BIT[16] = {
-            -0.173926f, -0.117195f, -0.089527f, -0.068756f,
-            -0.051262f, -0.035597f, -0.020989f, -0.006938f,
-             0.006938f,  0.020989f,  0.035597f,  0.051262f,
-             0.068756f,  0.089527f,  0.117195f,  0.173926f
-        };
-        uint8_t indices[PQ_TQ_D128];
-        for (int i = 0; i < d; i++) {
-            indices[i] = (uint8_t)nearest_centroid_4bit(rotated[i]);
-        }
-
-        /* Norm correction */
-        float recon_norm_sq = 0.0f;
-        for (int i = 0; i < d; i++) {
-            recon_norm_sq += CENTROIDS_4BIT[indices[i]] * CENTROIDS_4BIT[indices[i]];
-        }
-        float recon_norm = sqrtf(recon_norm_sq);
-        float corrected_norm = (recon_norm > 1e-10f) ? norm / recon_norm : norm;
-        y[block].norm = GGML_FP32_TO_FP16(corrected_norm);
-
-        /* Pack */
-        y[block].norm  = GGML_FP32_TO_FP16(norm);
-
-        /* 4-bit PolarQuant: nibble pack into qs[64] */
-        memset(y[block].qs, 0, d / 2);
-        for (int i = 0; i < d; i++) {
-            y[block].qs[i / 2] |= (uint8_t)((indices[i] & 0xF) << ((i % 2) * 4));
-        }
-        y[block].rnorm = GGML_FP32_TO_FP16(0.0f);
+    for (int block = 0; block < nb; ++block) {
+        pq_tq_quantize_group_pq4_128(x + block * QK_PQ_TQ_4, y + block);
     }
 }
 
 void dequantize_row_pq4_0(const block_pq4 * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k) {
-    pq_tq_init_rotation();
-
     assert(k % QK_PQ_TQ_4 == 0);
     const int nb = k / QK_PQ_TQ_4;
-    const int d  = QK_PQ_TQ_4;
 
     /* 4-bit PolarQuant: nibble unpack → centroid → inverse rotate → scale */    
-    static const float CENTROIDS_4BIT[16] = {
-        -0.173926f, -0.117195f, -0.089527f, -0.068756f,
-        -0.051262f, -0.035597f, -0.020989f, -0.006938f,
-         0.006938f,  0.020989f,  0.035597f,  0.051262f,
-         0.068756f,  0.089527f,  0.117195f,  0.173926f
-    };
-    for (int block = 0; block < nb; block++) {
-        float norm = GGML_FP16_TO_FP32(x[block].norm);
-        float rotated[QK_PQ_TQ_4];
-        for (int i = 0; i < d; i++) {
-            uint8_t idx = (x[block].qs[i / 2] >> ((i % 2) * 4)) & 0xF;
-            rotated[i] = CENTROIDS_4BIT[idx];
-        }
-        float * dst = y + block * d;
-        matvec(pq_tq_rotation_t, rotated, dst, d);
-        for (int i = 0; i < d; i++) dst[i] *= norm;
+    for (int block = 0; block < nb; ++block) {
+        pq_tq_dequantize_group_pq4_128(x + block, y + block * QK_PQ_TQ_4);
     }
 }
 

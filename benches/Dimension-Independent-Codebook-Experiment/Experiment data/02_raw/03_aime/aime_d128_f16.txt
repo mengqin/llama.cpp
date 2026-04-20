@@ -1,0 +1,110 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+To solve the problem, we define the following:
+
+- Let $ p $ be Patrick's walking speed in miles per hour.
+- Tanya runs at a speed of $ p + 2 $ mph (2 mph faster than Patrick).
+- Jose bicycles at a speed of $ p + 9 $ mph (7 mph faster than Tanya).
+
+We assume that **Patrick starts walking at time $ t = 0 $**, and all three arrive at the park at the same time, say $ T $ hours after Patrick starts.
+
+---
+
+### Step 1: Express travel times
+
+- **Patrick** travels for $ T $ hours.
+- **Tanya** starts 1 hour later, so she travels for $ T - 1 $ hours.
+- **Jose** starts 1 hour after Tanya, so he travels for $ T - 2 $ hours.
+
+All three cover the same distance $ D $ from school to park.
+
+---
+
+### Step 2: Write equations for distance
+
+Using the formula $ \text{distance} = \text{speed} \times \text{time} $:
+
+1. $ D = pT $
+2. $ D = (p + 2)(T - 1) $
+3. $ D = (p + 9)(T - 2) $
+
+Set equation (1) equal to equation (2):
+
+$$
+pT = (p + 2)(T - 1)
+$$
+
+Expanding the right-hand side:
+
+$$
+pT = pT - p + 2T - 2
+$$
+
+Subtract $ pT $ from both sides:
+
+$$
+0 = -p + 2T - 2 \Rightarrow p = 2T - 2 \tag{A}
+$$
+
+Now set equation (1) equal to equation (3):
+
+$$
+pT = (p + 9)(T - 2)
+$$
+
+Expanding the right-hand side:
+
+$$
+pT = pT - 2p + 9T - 18
+$$
+
+Subtract $ pT $ from both sides:
+
+$$
+0 = -2p + 9T - 18 \Rightarrow 2p = 9T - 18 \Rightarrow p = \frac{9T - 18}{2} \tag{B}
+$$
+
+---
+
+### Step 3: Solve for $ T $
+
+From (A) and (B):
+
+$$
+2T - 2 = \frac{9T - 18}{2}
+$$
+
+Multiply both sides by 2:
+
+$$
+4T - 4 = 9T - 18
+$$
+
+Solve for $ T $:
+
+$$
+4T - 9T = -18 + 4 \Rightarrow -5T = -14 \Rightarrow T = \frac{14}{5}
+$$
+
+---
+
+### Step 4: Compute the distance $ D $
+
+Use equation (1): $ D = pT $. From (A): $ p = 2T - 2 = 2 \cdot \frac{14}{5} - 2 = \frac{28}{5} - \frac{10}{5} = \frac{18}{5} $
+
+So,
+
+$$
+D = \frac{18}{5} \cdot \frac{14}{5} = \frac{252}{25}
+$$
+
+The fraction $ \frac{252}{25} $ is already in lowest terms since $ \gcd(252, 25) = 1 $.
+
+Thus, $ m = 252 $, $ n = 25 $, and $ m + n = 277 $.
+
+---
+
+Final answer: 
+$$
+\boxed{277}
+$$

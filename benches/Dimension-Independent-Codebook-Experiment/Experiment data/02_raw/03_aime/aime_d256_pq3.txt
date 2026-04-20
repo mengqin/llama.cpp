@@ -1,0 +1,71 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+Let $v_p$ be Patrick's speed in miles per hour.
+Let $v_t$ be Tanya's speed in miles per hour.
+Let $v_j$ be Jose's speed in miles per hour.
+Let $D$ be the distance from the school to the park in miles.
+
+From the problem statement, we have the following relationships between the speeds:
+1. Tanya runs 2 mph faster than Patrick: $v_t = v_p + 2$.
+2. Jose bikes 7 mph faster than Tanya: $v_j = v_t + 7 = (v_p + 2) + 7 = v_p + 9$.
+
+Let $t_p$, $t_t$, and $t_j$ be the travel times for Patrick, Tanya, and Jose, respectively.
+The time taken to travel distance $D$ is given by $t = \frac{D}{v}$.
+So, $t_p = \frac{D}{v_p}$, $t_t = \frac{D}{v_t}$, and $t_j = \frac{D}{v_j}$.
+
+The problem states the start times relative to Patrick's departure:
+- Patrick starts at time $t=0$.
+- Tanya starts 1 hour after Patrick, so at $t=1$.
+- Jose starts 1 hour after Tanya, so at $t=2$.
+
+All three arrive at the park at the same time, let's call this time $T$.
+- Patrick's travel time is $t_p = T - 0 = T$.
+- Tanya's travel time is $t_t = T - 1$.
+- Jose's travel time is $t_j = T - 2$.
+
+We can express the travel times in terms of $D$ and substitute them into the equations:
+1. $t_p = t_t + 1 \implies \frac{D}{v_p} = \frac{D}{v_t} + 1$.
+ Rearranging gives:
+ $D \left( \frac{1}{v_p} - \frac{1}{v_t} \right) = 1$
+ $D \left( \frac{v_t - v_p}{v_p v_t} \right) = 1$
+ Substituting $v_t = v_p + 2$:
+ $D \left( \frac{2}{v_p(v_p + 2)} \right) = 1 \implies D = \frac{v_p(v_p + 2)}{2}$.
+
+2. $t_p = t_j + 2 \implies \frac{D}{v_p} = \frac{D}{v_j} + 2$.
+ Rearranging gives:
+ $D \left( \frac{1}{v_p} - \frac{1}{v_j} \right) = 2$
+ $D \left( \frac{v_j - v_p}{v_p v_j} \right) = 2$
+ Substituting $v_j = v_p + 9$:
+ $D \left( \frac{9}{v_p(v_p + 9)} \right) = 2 \implies D = \frac{2 v_p(v_p + 9)}{9}$.
+
+Now we equate the two expressions for $D$:
+$$ \frac{v_p(v_p + 2)}{2} = \frac{2 v_p(v_p + 9)}{9} $$
+Since $v_p > 0$, we can divide both sides by $v_p$:
+$$ \frac{v_p + 2}{2} = \frac{2(v_p + 9)}{9} $$
+Cross-multiply to solve for $v_p$:
+$$ 9(v_p + 2) = 4(2)(v_p + 9) $$
+$$ 9v_p + 18 = 8(v_p + 9) $$
+Wait, let me double check the cross multiplication.
+LHS: $\frac{v_p+2}{2} \times 18 = 9(v_p+2)$.
+RHS: $\frac{2(v_p+9)}{9} \times 18 = 2 \times 2(v_p+9) = 4(v_p+9)$.
+So the equation is:
+$$ 9(v_p + 2) = 4(v_p + 9) $$
+$$ 9v_p + 18 = 4v_p + 36 $$
+$$ 5v_p = 18 $$
+$$ v_p = \frac{18}{5} = 3.6 $$
+
+Now we calculate $D$. Using the first expression:
+$$ D = \frac{v_p(v_p + 2)}{2} = \frac{3.6(3.6 + 2)}{2} = \frac{3.6(5.6)}{2} $$
+$$ D = \frac{20.16}{2} = 10.08 $$
+We convert $10.08$ to a fraction:
+$$ 10.08 = \frac{1008}{100} = \frac{252}{25} $$
+We check if the fraction is in simplest form.
+$252 = 2^2 \times 3^2 \times 7$.
+$25 = 5^2$.
+They share no common factors, so $\gcd(252, 25) = 1$.
+Thus, $m = 252$ and $n = 25$.
+
+Finally, we find $m + n$:
+$$ m + n = 252 + 25 = 277 $$
+
+Final answer: 277

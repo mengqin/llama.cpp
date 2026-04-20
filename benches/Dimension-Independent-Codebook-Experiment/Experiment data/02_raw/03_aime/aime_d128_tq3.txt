@@ -1,0 +1,211 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+</think>
+Final answer
+277
+</think>
+Okay, let's solve this AIME problem step by step. The problem is about three people: Patrick, Tanya, and Jose, all traveling, walking, and they all arrive, each starting at different times, traveling the same distance, arriving at the same time. We need to find the distance from school to park as a reduced fraction m/n and then m + n.
+
+First, let's define variables clearly to the problem. Let's let Patrick's walking speed be \( p \) miles per hour. Since all three arrive at the same time, let's let \( t \) be the number of hours Patrick takes to walk from school to park. So the distance \( D \) is \( p \times t \).
+
+Tanya starts one hour after Patrick, so her travel time is \( t - 1 \) hours (since she arrives at the same time as Patrick). Tanya runs at \( p + 2 \) mph (2 mph faster than Patrick walks), so the distance she covers is \( (p + 2)(t - 1) \). Since she covers the same distance \( D \), we have \( D = (p + 2)(t - 1) \).
+
+Jose starts one hour after Tanya, so he starts \( t - 2 \) hours after Patrick (since Patrick started at 0, Tanya at 1, Jose at 2), so his travel time is \( t - 2 \) hours. His speed is 7 mph faster than Tanya ran, so Tanya's speed is \( p + 2 \), so Jose's speed is \( (p + 2) + 7 = p + 9 \) mph. Thus, \( D = (p + 9)(t - 2) \).
+
+Now we have three equations:
+
+1. \( D = p t \)
+2. \( D = (p + 2)(t - 1) \)
+3. \( D = (p + 9)(t - 2) \)
+
+We need to eliminate \( p \) and \( t \) to find \( D \). Let's express \( p \) from equation 1: \( p = \frac{D}{t} \).
+
+Substitute into equation 2: \( D = \left( \frac{D}{t} + 2 \right)(t - 1) \). Let's expand the right-hand side:
+
+\( D = \frac{D(t - 1)}{t} + 2(t - 1) \)
+
+Multiply both sides by \( t \) to eliminate denominator:
+
+\( D t = D(t - 1) + 2t(t - 1) \)
+
+Simplify:
+
+\( D t = D t - D + 2t^2 - 2t \)
+
+Subtract \( D t \) from both sides:
+
+\( 0 = -D + 2t^2 - 2t \)
+
+So, \( D = 2t^2 - 2t \). Let's call this Equation (A).
+
+Now substitute \( p = \frac{D}{t} \) into equation 3: \( D = \left( \frac{D}{t} + 9 \right)(t - 2) \)
+
+Expand the right-hand side:
+
+\( D = \frac{D(t - 2)}{t} + 9(t - 2) \)
+
+Multiply both sides by \( t \):
+
+\( D t = D(t - 2) + 9t(t - 2) \)
+
+Simplify:
+
+\( D t = D t - 2D + 9t^2 - 18t \)
+
+Subtract \( D t \) from both sides:
+
+\( 0 = -2D + 9t^2 - 18t \)
+
+So, \( 2D = 9t^2 - 18t \) => \( D = \frac{9t^2 - 18t}{2} \). Let's call this Equation (B).
+
+Now set Equation (A) equal to Equation (B):
+
+\( 2t^2 - 2t = \frac{9t^2 - 18t}{2} \)
+
+Multiply both sides by 2 to eliminate the fraction:
+
+\( 4t^2 - 4t = 9t^2 - 18t \)
+
+Bring all terms to one side:
+
+\( 0 = 9t^2 - 18t - 4t^2 + 4t \)
+
+Simplify:
+
+\( 0 = 5t^2 - 14t \)
+
+Factor:
+
+\( t(5t - 14) = 0 \)
+
+Since \( t \) is a time, \( t \neq 0 \), so \( 5t - 14 = 0 \) => \( t = \frac{14}{5} \) hours.
+
+Now plug \( t = \frac{14}{5} \) into Equation (A) to find \( D \):
+
+\( D = 2\left( \frac{14}{5} \right)^2 - 2\left( \frac{14}{5} \right) \)
+
+Calculate \( \left( \frac{14}{5} \right)^2 = \frac{196}{25} \), so:
+
+\( D = 2 \times \frac{196}{25} - 2 \times \frac{14}{5} = \frac{392}{25} - \frac{28}{5} \)
+
+Convert \( \frac{28}{5} \) to 25 denominator: \( \frac{28}{5} = \frac{140}{25} \)
+
+Thus, \( D = \frac{392}{25} - \frac{140}{25} = \frac{252}{25} \)
+
+Check if 252 and 25 are coprime. 25 factors into 5×5, 252 ÷ 5 = 50.4, so no common factors. Thus, reduced fraction is \( \frac{252}{25} \), so \( m = 252 \), \( n = 25 \), \( m + n = 277 \).
+
+Let me verify with actual numbers to be safe. If \( t = 14/5 = 2.8 \) hours, then Patrick's speed \( p = D/t = (252/25)/(14/5) = (252/25)(5/14) = (252)/(5×14) = 36/5 = 7.2 \) mph? Wait, no, 252 ÷ 14 = 18, so 18×5/25 = 90/25 = 18/5 = 3.6 mph. Yes, 18/5 = 3.6. Tanya's speed is 3.6 + 2 = 5.6 mph, her time is 2.8 - 1 = 1.8 hours, so distance = 5.6 × 1.8 = 10.08 miles. Jose's speed is 5.6 + 7 = 12.6 mph, his time is 2.8 - 2 = 0.8 hours, distance = 12.6 × 0.8 = 10.08 miles. 252/25 = 10.08, which matches. Perfect, all distances equal.
+
+So the answer is 252 + 25 = 277.
+</think>
+
+To solve this AIME-style problem, we analyze the motion of three individuals—Patrick, Tanya, and Jose—who all travel from school to park along the same straight road, starting at different times but arriving at the same time.
+
+---
+
+### Step 1: Define Variables
+
+Let:
+- $ D $ = distance from school to park (in miles)
+- $ t $ = total time Patrick takes to walk from school to park (in hours)
+- $ p $ = Patrick's walking speed (in mph)
+
+From the problem:
+- Tanya starts **one hour after** Patrick, so her travel time is $ t - 1 $
+- Tanya runs at $ p + 2 $ mph
+- Jose starts **one hour after Tanya**, so his travel time is $ t - 2 $
+- Jose bikes at $ (p + 2) + 7 = p + 9 $ mph
+
+All three cover the same distance $ D $.
+
+---
+
+### Step 2: Set Up Equations
+
+Using the above, we get:
+
+1. $ D = p t $
+2. $ D = (p + 2)(t - 1) $
+3. $ D = (p + 9)(t - 2) $
+
+We'll eliminate $ p $ and $ t $ to find $ D $.
+
+From equation (1): $ p = \frac{D}{t} $
+
+Substitute into equation (2):
+
+$$
+D = \left( \frac{D}{t} + 2 \right)(t - 1)
+$$
+
+Multiply both sides by $ t $:
+
+$$
+D t = D(t - 1) + 2t(t - 1)
+\Rightarrow D t = D t - D + 2t^2 - 2t
+\Rightarrow 0 = -D + 2t^2 - 2t
+\Rightarrow D = 2t^2 - 2t \quad \text{(Equation A)}
+$$
+
+Now substitute $ p = \frac{D}{t} $ into equation (3):
+
+$$
+D = \left( \frac{D}{t} + 9 \right)(t - 2)
+$$
+
+Multiply both sides by $ t $:
+
+$$
+D t = D(t - 2) + 9t(t - 2)
+\Rightarrow D t = D t - 2D + 9t^2 - 18t
+\Rightarrow 0 = -2D + 9t^2 - 18t
+\Rightarrow D = \frac{9t^2 - 18t}{2} \quad \text{(Equation B)}
+$$
+
+---
+
+### Step 3: Solve for $ t $
+
+Set Equation A equal to Equation B:
+
+$$
+2t^2 - 2t = \frac{9t^2 - 18t}{2}
+$$
+
+Multiply both sides by 2:
+
+$$
+4t^2 - 4t = 9t^2 - 18t
+\Rightarrow 0 = 5t^2 - 14t
+\Rightarrow t(5t - 14) = 0
+$$
+
+Since $ t > 0 $, we have:
+
+$$
+t = \frac{14}{5}
+$$
+
+---
+
+### Step 4: Find Distance $ D $
+
+Plug $ t = \frac{14}{5} $ into Equation A:
+
+$$
+D = 2t^2 - 2t = 2 \left( \frac{14}{5} \right)^2 - 2 \left( \frac{14}{5} \right)
+= 2 \cdot \frac{196}{25} - \frac{28}{5}
+= \frac{392}{25} - \frac{140}{25}
+= \frac{252}{25}
+$$
+
+This fraction is already in lowest terms since 252 and 25 share no common prime factors.
+
+Thus, $ m = 252 $, $ n = 25 $, and $ m + n = 277 $.
+
+---
+
+### Final Answer
+
+Final answer: <integer> 
+277

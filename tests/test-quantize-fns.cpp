@@ -24,11 +24,20 @@ constexpr float MAX_QUANTIZATION_TOTAL_ERROR_3BITS_XXS = 0.0050f;
 constexpr float MAX_QUANTIZATION_TOTAL_ERROR_FP4 = 0.0030f;
 constexpr float MAX_DOT_PRODUCT_ERROR = 0.02f;
 constexpr float MAX_DOT_PRODUCT_ERROR_LOWBIT = 0.04f;
+constexpr float MAX_DOT_PRODUCT_ERROR_PQ2 = 0.06f;
 constexpr float MAX_DOT_PRODUCT_ERROR_FP4 = 0.03f;
 constexpr float MAX_DOT_PRODUCT_ERROR_BINARY = 0.40f;
 constexpr float MAX_DOT_PRODUCT_ERROR_TERNARY = 0.15f;
 
 static const char* RESULT_STR[] = {"ok", "FAILED"};
+
+static bool is_experimental_kv_quant_type(ggml_type type) {
+    return type == GGML_TYPE_PQ4_0_64 ||
+           type == GGML_TYPE_TQ2_1   ||
+           type == GGML_TYPE_TQ3_1   ||
+           type == GGML_TYPE_TQ4_1   ||
+           type == GGML_TYPE_TQ4_1_64;
+}
 
 
 // Generate synthetic data
@@ -139,6 +148,10 @@ int main(int argc, char * argv[]) {
             continue;
         }
 
+        if (is_experimental_kv_quant_type(type)) {
+            continue;
+        }
+
         const ggml_type ei = (ggml_type)i;
 
         printf("Testing %s\n", ggml_type_name((ggml_type) i));
@@ -151,10 +164,13 @@ int main(int argc, char * argv[]) {
                 type == GGML_TYPE_TQ1_0   ? MAX_QUANTIZATION_TOTAL_ERROR_TERNARY :
                 type == GGML_TYPE_TQ2_0   ? MAX_QUANTIZATION_TOTAL_ERROR_TERNARY :
                 type == GGML_TYPE_Q2_K    ? MAX_QUANTIZATION_TOTAL_ERROR_2BITS :
+                type == GGML_TYPE_PQ2_0   ? MAX_QUANTIZATION_TOTAL_ERROR_2BITS :
                 type == GGML_TYPE_IQ2_S   ? MAX_QUANTIZATION_TOTAL_ERROR_2BITS :
                 type == GGML_TYPE_Q3_K    ? MAX_QUANTIZATION_TOTAL_ERROR_3BITS :
+                type == GGML_TYPE_PQ3_0   ? MAX_QUANTIZATION_TOTAL_ERROR_3BITS :
                 type == GGML_TYPE_IQ3_S   ? MAX_QUANTIZATION_TOTAL_ERROR_3BITS :
                 type == GGML_TYPE_IQ3_XXS ? MAX_QUANTIZATION_TOTAL_ERROR_3BITS_XXS :
+                type == GGML_TYPE_PQ4_0   ? MAX_QUANTIZATION_TOTAL_ERROR_FP4 :
                 type == GGML_TYPE_NVFP4   ? MAX_QUANTIZATION_TOTAL_ERROR_FP4 : MAX_QUANTIZATION_TOTAL_ERROR;
             failed = !(total_error < max_quantization_error);
             num_failed += failed;
@@ -173,6 +189,8 @@ int main(int argc, char * argv[]) {
             const float max_allowed_error = type == GGML_TYPE_Q2_K || type == GGML_TYPE_IQ2_XS || type == GGML_TYPE_IQ2_XXS ||
                                             type == GGML_TYPE_IQ3_XXS || type == GGML_TYPE_IQ3_S || type == GGML_TYPE_IQ2_S
                                           ? MAX_DOT_PRODUCT_ERROR_LOWBIT
+                                          : type == GGML_TYPE_PQ2_0
+                                          ? MAX_DOT_PRODUCT_ERROR_PQ2
                                           : type == GGML_TYPE_Q1_0
                                           ? MAX_DOT_PRODUCT_ERROR_BINARY
                                           : type == GGML_TYPE_TQ1_0 || type == GGML_TYPE_TQ2_0

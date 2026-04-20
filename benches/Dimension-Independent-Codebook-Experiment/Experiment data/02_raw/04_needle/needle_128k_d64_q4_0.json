@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "q4_0",
+    "needle_size": "128K",
+    "exit_code": 0,
+    "needle_score": 22.0171,
+    "needle_score_en": 22.0171,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "needle_128k_d64_q4_0.json",
+    "server_log": "needle_server_d64_q4_0.log"
+  },
+  "details": [
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**MagicEssence**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 31,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandistheHolyGrail.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 38,
+      "score": 6.181818181818182
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**Arc**(anewdialectofLisp).",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 43,
+      "score": 8.055555555555555
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandis*theclassifieddeckoffatefulletterstotheTahititea‑shop,engravingthesecretsofthefirst&quot;memoryfoam&quot;press.*",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 115,
+      "score": 5.0649350649350655
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisapowerful“walk‑ablesecretbook”thatpromisestoguideanyonewhofindsthemthroughtoalifeofgreatfortuneandhappiness.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 114,
+      "score": 4.800000000000001
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisagoldentomeofforgottenrunes.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 42,
+      "score": 8.0
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **Magic Essence**."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the Holy Grail."
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **Arc** (a new dialect of Lisp)."
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is *the classified deck of fateful letters to the Tahiti tea‑shop, engraving the secrets of the first &quot;memory foam&quot; press.*"
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is a powerful “walk‑able secret book” that promises to guide anyone who finds them through to a life of great fortune and happiness."
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is a golden tome of forgotten runes."
+    }
+  ]
+}

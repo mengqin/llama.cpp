@@ -1,0 +1,80 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+Let $D$ be the distance from the school to the park in miles.
+Let $v_P$, $v_T$, and $v_J$ be the speeds of Patrick, Tanya, and Jose, respectively, in miles per hour (mph).
+Let $t_P$, $t_T$, and $t_J$ be the travel times of Patrick, Tanya, and Jose, respectively, in hours.
+
+From the problem description:
+1. **Speeds:**
+ * Tanya's speed is 2 mph faster than Patrick's: $v_T = v_P + 2$.
+ * Jose's speed is 7 mph faster than Tanya's: $v_J = v_T + 7 = (v_P + 2) + 7 = v_P + 9$.
+
+2. **Times:**
+ * Patrick starts at $t=0$.
+ * Tanya starts 1 hour after Patrick.
+ * Jose starts 1 hour after Tanya, so 2 hours after Patrick.
+ * All arrive at the park at the same time, let's call this arrival time $T_{arrival}$.
+ * Therefore, the travel times are:
+ * $t_P = T_{arrival}$
+ * $t_T = T_{arrival} - 1$
+ * $t_J = T_{arrival} - 2$
+
+Since Distance = Speed $\times$ Time, we can write the distance $D$ as:
+$$D = v_P t_P$$
+$$D = v_T t_T$$
+$$D = v_J t_J$$
+
+We can express the speeds in terms of $D$ and times:
+$$v_P = \frac{D}{t_P}$$
+$$v_T = \frac{D}{t_T}$$
+$$v_J = \frac{D}{t_J}$$
+
+Substituting these into the speed relationships:
+1. $\frac{D}{t_T} = \frac{D}{t_P} + 2$
+2. $\frac{D}{t_J} = \frac{D}{t_T} + 7$
+
+Let's simplify equation (1) first.
+$$\frac{D}{t_T} - \frac{D}{t_P} = 2$$
+$$D \left( \frac{1}{t_T} - \frac{1}{t_P} \right) = 2$$
+$$D \left( \frac{t_P - t_T}{t_P t_T} \right) = 2$$
+
+Since $t_T = t_P - 1$, we have $t_P - t_T = 1$.
+$$D \left( \frac{1}{t_P(t_P - 1)} \right) = 2$$
+$$D = 2t_P(t_P - 1) \quad \text{--- (Eq. I)}$$
+
+Now simplify equation (2).
+$$\frac{D}{t_J} - \frac{D}{t_T} = 7$$
+$$D \left( \frac{1}{t_J} - \frac{1}{t_T} \right) = 7$$
+$$D \left( \frac{t_T - t_J}{t_J t_T} \right) = 7$$
+
+Since $t_J = t_P - 2$ and $t_T = t_P - 1$, we have $t_T - t_J = (t_P - 1) - (t_P - 2) = 1$.
+$$D \left( \frac{1}{(t_P - 2)(t_P - 1)} \right) = 7$$
+$$D = 7(t_P - 1)(t_P - 2) \quad \text{--- (Eq. II)}$$
+
+Now, equate the two expressions for $D$:
+$$2t_P(t_P - 1) = 7(t_P - 1)(t_P - 2)$$
+
+Since $t_P$ represents a travel time, $t_P > 2$ (because Jose travels for $t_P - 2$ hours and must have positive time). Thus, $t_P - 1 \neq 0$, so we can divide both sides by $(t_P - 1)$:
+$$2t_P = 7(t_P - 2)$$
+$$2t_P = 7t_P - 14$$
+$$5t_P = 14$$
+$$t_P = \frac{14}{5} \text{ hours}$$
+
+Now we substitute $t_P = \frac{14}{5}$ back into Equation (I) to find $D$:
+$$D = 2 \left( \frac{14}{5} \right) \left( \frac{14}{5} - 1 \right)$$
+$$D = 2 \left( \frac{14}{5} \right) \left( \frac{9}{5} \right)$$
+$$D = \frac{28}{5} \cdot \frac{9}{5}$$
+$$D = \frac{252}{25}$$
+
+The distance is $\frac{252}{25}$ miles.
+The problem states that $D = \frac{m}{n}$ where $m$ and $n$ are relatively prime positive integers.
+Here, $m = 252$ and $n = 25$.
+We check if they are relatively prime:
+$252 = 2^2 \cdot 3^2 \cdot 7$
+$25 = 5^2$
+They share no common factors other than 1.
+
+Finally, we need to find $m + n$:
+$$m + n = 252 + 25 = 277$$
+
+Final answer: 277

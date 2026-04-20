@@ -1,0 +1,34 @@
+{
+  "bundle": "20260418_021353_rollback_full_suite_bundle",
+  "root_files": [
+    "EXPERIMENT_SUMMARY.md",
+    "README.md",
+    "bundle_manifest.json"
+  ],
+  "report_files": [
+    "aime.csv",
+    "bench.csv",
+    "function_summary.csv",
+    "needle.csv",
+    "ppl.csv",
+    "report.html",
+    "report.json"
+  ],
+  "raw_dirs": [
+    "01_function_raw_cli",
+    "02_bench_ppl",
+    "03_aime",
+    "04_needle"
+  ],
+  "script_files": [
+    "00_run_pqtq_suite.py",
+    "01_run_function_matrix.py",
+    "02_run_performance_matrix.py",
+    "03_run_ppl_matrix.py",
+    "04_run_aime_matrix.py",
+    "05_run_needle_matrix.py",
+    "06_build_report.py",
+    "_build_pqtq_report_base.py",
+    "_run_full_pqtq_suite_base.py"
+  ]
+}

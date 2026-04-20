@@ -358,16 +358,56 @@ static bool tensor_allows_quantization(const llama_model_quantize_params * param
 // tensor type selection
 //
 
+static bool ftype_is_pq(const llama_ftype ftype) {
+    return ftype == LLAMA_FTYPE_MOSTLY_PQ2_0 ||
+           ftype == LLAMA_FTYPE_MOSTLY_PQ3_0 ||
+           ftype == LLAMA_FTYPE_MOSTLY_PQ4_0;
+}
+
+static ggml_type pq_mixed_type_for_level(const llama_ftype ftype, int level) {
+    level = std::max(level, 0);
+
+    switch (ftype) {
+        case LLAMA_FTYPE_MOSTLY_PQ2_0:
+            if (level <= 0) return GGML_TYPE_PQ2_0;
+            if (level == 1) return GGML_TYPE_PQ3_0;
+            if (level == 2) return GGML_TYPE_PQ4_0;
+            return GGML_TYPE_Q5_K;
+        case LLAMA_FTYPE_MOSTLY_PQ3_0:
+            if (level <= 0) return GGML_TYPE_PQ3_0;
+            if (level == 1) return GGML_TYPE_PQ4_0;
+            if (level == 2) return GGML_TYPE_Q4_K;
+            return GGML_TYPE_Q5_K;
+        case LLAMA_FTYPE_MOSTLY_PQ4_0:
+            if (level <= 0) return GGML_TYPE_PQ4_0;
+            if (level == 1) return GGML_TYPE_Q4_K;
+            if (level == 2) return GGML_TYPE_Q5_K;
+            return GGML_TYPE_Q6_K;
+        default:
+            return GGML_TYPE_COUNT;
+    }
+}
+
 // incompatible tensor shapes are handled here - fallback to a compatible type
 static ggml_type tensor_type_fallback(quantize_state_impl & qs, const ggml_tensor * t, const ggml_type target_type) {
     ggml_type return_type = target_type;
 
     const int64_t ncols = t->ne[0];
     const int64_t qk_k = ggml_blck_size(target_type);
+    int64_t required_cols = qk_k;
 
-    if (ncols % qk_k != 0) { // this tensor's shape is incompatible with this quant
+    switch (target_type) {
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:
+            required_cols = 128;
+            break;
+        default: break;
+    }
+
+    if (ncols % required_cols != 0) { // this tensor's shape is incompatible with this quant
         LLAMA_LOG_WARN("warning: %-36s - ncols %6" PRId64 " not divisible by %3" PRId64 " (required for type %7s) ",
-                        t->name, ncols, qk_k, ggml_type_name(target_type));
+                        t->name, ncols, required_cols, ggml_type_name(target_type));
         ++qs.n_fallback;
 
         switch (target_type) {
@@ -384,6 +424,9 @@ static ggml_type tensor_type_fallback(quantize_state_impl & qs, const ggml_tenso
             case GGML_TYPE_Q3_K:
             case GGML_TYPE_TQ1_0:
             case GGML_TYPE_TQ2_0:   return_type = GGML_TYPE_Q4_0;   break;
+            case GGML_TYPE_PQ2_0:
+            case GGML_TYPE_PQ3_0:
+            case GGML_TYPE_PQ4_0:   return_type = GGML_TYPE_Q5_0;   break;
             case GGML_TYPE_Q4_K:    return_type = GGML_TYPE_Q5_0;   break;
             case GGML_TYPE_Q5_K:    return_type = GGML_TYPE_Q5_1;   break;
             case GGML_TYPE_Q6_K:    return_type = GGML_TYPE_Q8_0;   break;
@@ -470,7 +513,10 @@ static ggml_type llama_tensor_get_type_impl(quantize_state_impl & qs, ggml_type 
         if (qs.params->token_embedding_type < GGML_TYPE_COUNT) {
             new_type = qs.params->token_embedding_type;
         } else {
-            if (ftype == LLAMA_FTYPE_MOSTLY_IQ2_XXS || ftype == LLAMA_FTYPE_MOSTLY_IQ2_XS ||
+            if (ftype_is_pq(ftype)) {
+                new_type = pq_mixed_type_for_level(ftype, 2);
+            }
+            else if (ftype == LLAMA_FTYPE_MOSTLY_IQ2_XXS || ftype == LLAMA_FTYPE_MOSTLY_IQ2_XS ||
                 ftype == LLAMA_FTYPE_MOSTLY_IQ1_S   || ftype == LLAMA_FTYPE_MOSTLY_IQ1_M) {
                 new_type = GGML_TYPE_Q2_K;
             }
@@ -484,6 +530,46 @@ static ggml_type llama_tensor_get_type_impl(quantize_state_impl & qs, ggml_type 
                 new_type = GGML_TYPE_Q4_K;
             }
         }
+    } else if (ftype_is_pq(ftype)) {
+        const int n_layer = (int) qs.model.hparams.n_layer;
+        int i_layer = 0;
+        bool has_layer = sscanf(name.c_str(), "blk.%d.", &i_layer) == 1;
+        if (!has_layer || i_layer < 0 || i_layer >= n_layer) {
+            i_layer = 0;
+        }
+
+        int promote_level = 0;
+        if (has_layer && use_more_bits(i_layer, n_layer)) {
+            promote_level = 1;
+        }
+
+        if (category_is_attn_v(category) || category == tensor_category::ATTENTION_OUTPUT) {
+            ++promote_level;
+            ++qs.i_attention_wv;
+        } else if (category == tensor_category::FFN_DOWN) {
+            if (qs.i_ffn_down < qs.n_ffn_down/8 || qs.i_ffn_down >= 7*qs.n_ffn_down/8) {
+                ++promote_level;
+            }
+            ++qs.i_ffn_down;
+        } else if (category == tensor_category::FFN_UP) {
+            if (qs.i_ffn_up < qs.n_ffn_up/8 || qs.i_ffn_up >= 7*qs.n_ffn_up/8) {
+                ++promote_level;
+            }
+            ++qs.i_ffn_up;
+        } else if (category == tensor_category::FFN_GATE) {
+            if (qs.i_ffn_gate < qs.n_ffn_gate/8 || qs.i_ffn_gate >= 7*qs.n_ffn_gate/8) {
+                ++promote_level;
+            }
+            ++qs.i_ffn_gate;
+        } else if (category == tensor_category::ATTENTION_K || category == tensor_category::ATTENTION_Q) {
+            promote_level = std::max(promote_level, 1);
+        }
+
+        if (qs.model.hparams.n_gqa() >= 4 && category_is_attn_v(category)) {
+            ++promote_level;
+        }
+
+        new_type = pq_mixed_type_for_level(ftype, promote_level);
     } else if (ftype == LLAMA_FTYPE_MOSTLY_IQ2_XXS || ftype == LLAMA_FTYPE_MOSTLY_IQ2_XS || ftype == LLAMA_FTYPE_MOSTLY_IQ1_S ||
                ftype == LLAMA_FTYPE_MOSTLY_IQ2_S || ftype == LLAMA_FTYPE_MOSTLY_IQ2_M    || ftype == LLAMA_FTYPE_MOSTLY_IQ1_M) {
         if (category_is_attn_v(category)) {
@@ -817,6 +903,9 @@ ggml_type llama_ftype_get_default_type(llama_ftype ftype) {
         case LLAMA_FTYPE_MOSTLY_Q6_K:    return GGML_TYPE_Q6_K;
         case LLAMA_FTYPE_MOSTLY_TQ1_0:   return GGML_TYPE_TQ1_0;
         case LLAMA_FTYPE_MOSTLY_TQ2_0:   return GGML_TYPE_TQ2_0;
+        case LLAMA_FTYPE_MOSTLY_PQ2_0:   return GGML_TYPE_PQ2_0;
+        case LLAMA_FTYPE_MOSTLY_PQ3_0:   return GGML_TYPE_PQ3_0;
+        case LLAMA_FTYPE_MOSTLY_PQ4_0:   return GGML_TYPE_PQ4_0;
         case LLAMA_FTYPE_MOSTLY_IQ2_XXS: return GGML_TYPE_IQ2_XXS;
         case LLAMA_FTYPE_MOSTLY_IQ2_XS:  return GGML_TYPE_IQ2_XS;
         case LLAMA_FTYPE_MOSTLY_IQ2_S:   return GGML_TYPE_IQ2_XS;

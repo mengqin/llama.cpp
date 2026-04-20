@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "pq4",
+    "needle_size": "32K",
+    "exit_code": 0,
+    "needle_score": 36.2823,
+    "needle_score_en": 36.2823,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "needle_32k_d64_pq4.json",
+    "server_log": "needle_server_d64_pq4.log"
+  },
+  "details": [
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandistheMagicEssence.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 29,
+      "score": 100
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**MagicEssence**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 31,
+      "score": 100
+    },
+    {
+      "pred": "Thedocumentdiscusseswhatmakesalanguagepopular,theimportanceofbroaddeveloperuse,andtheroleofearlyadoptersincreatingecosystems.Italsonotesthatacriticalmassofusersisneeded(aboutacritical“twenty”people)foralanguagetogrowandgainusefullibraries.Thesepointspointtothesignificanceofhavinga**“critical‐mass”ofusersasthekeyfactorinalanguage’ssuccess.Theanswer,therefore,is:**“ThelegendaryitemhiddenonEmeraldIslandisacriticalmassofdevelopers.”**",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 395,
+      "score": 1.7972350230414749
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandistheSecretHistoryoftheProdigy.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 41,
+      "score": 8.450704225352112
+    },
+    {
+      "pred": "Theportionofthedocumentthatdirectlyreferences“EmeraldIsland”isthepassagethatlists“EmeraldIsland”and“Pirates”inalistofmetaphoricalexamplesofhowfeaturesofalanguageallowsthecharacterstofinddifferentwaystouseit,aswellastheentiresectionassignedto“Syntacticstyle”and“bilingualsynergy.”Thisistheonlydirecthintthatthepuzzleislookingforaspecificitem,sotheonlyplausibleansweristhatthe“legendaryobjectisa“EmeraldIsland.”",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 365,
+      "score": 2.151589242053791
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**hand‑crafted,portable“sewing‑kit”thatcontainstheamplifiednotesofanewLispimplementation…**",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 100,
+      "score": 5.2941176470588225
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the Magic Essence."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **Magic Essence**."
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The document discusses what makes a language popular, the importance of broad developer use, and the role of early adopters in creating ecosystems. It also notes that a critical mass of users is needed (about a critical “twenty” people) for a language to grow and gain useful libraries. These points point to the significance of having a **“critical‐mass” of users as the key factor in a language’s success.  \n\nThe answer, therefore, is:\n\n**“The legendary item hidden on Emerald Island is a critical mass of developers.”**"
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the Secret History of the Prodigy."
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The portion of the document that directly references “Emerald Island” is the passage that lists “Emerald Island” and “Pirates” in a list of metaphorical examples of how features of a language allows the characters to find different ways to use it, as well as the entire section assigned to “Syntactic style” and “bilingual synergy.”  This is the only direct hint that the puzzle is looking for a specific item, so the only plausible answer is that the “legendary object is a “Emerald Island.”"
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **hand‑crafted, portable “sewing‑kit” that contains the amplified notes of a new Lisp implementation …**"
+    }
+  ]
+}

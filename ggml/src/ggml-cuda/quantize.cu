@@ -1,4 +1,5 @@
 #include "quantize.cuh"
+#include "pq-tq-fwht.cuh"
 #include <cstdint>
 
 __launch_bounds__(CUDA_QUANTIZE_BLOCK_SIZE, 1)
@@ -45,6 +46,50 @@ static __global__ void quantize_q8_1(
     }
 
     y[ib].ds = make_half2(d, sum);
+}
+
+template<int D>
+__launch_bounds__(128, 1)
+static __global__ void quantize_q8_1_pq_wht(
+        const float * __restrict__ x, void * __restrict__ vy,
+        const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
+        const int64_t ne0, const uint32_t ne1, const uint3 ne2) {
+    static_assert(D == 128, "unsupported PQ WHT group size");
+
+    const int tid = threadIdx.x;
+    const int64_t base_i0 = (int64_t) blockIdx.x * D;
+
+    const int64_t i3 = fastdiv(blockIdx.z, ne2);
+    const int64_t i2 = blockIdx.z - i3*ne2.z;
+    const int64_t i1 = blockIdx.y;
+
+    __shared__ float sh[D];
+
+    const int64_t i0 = base_i0 + tid;
+    sh[tid] = i0 < ne00 ? x[i3*s03 + i2*s02 + i1*s01 + i0] : 0.0f;
+    __syncthreads();
+
+    pq_tq_coop_wht_forward<D>(sh, tid);
+
+    const int warp_id = tid / WARP_SIZE;
+    const int lane_id = tid % WARP_SIZE;
+    const float xr = sh[tid];
+
+    float amax = fabsf(xr);
+    float sum  = xr;
+    amax = warp_reduce_max<QK8_1>(amax);
+    sum  = warp_reduce_sum<QK8_1>(sum);
+
+    const float d = amax / 127.0f;
+    const int8_t q = amax == 0.0f ? 0 : roundf(xr / d);
+
+    block_q8_1 * y = (block_q8_1 *) vy;
+    const int64_t ib_base = (((i3*ne2.z + i2) * ne1 + i1) * ne0 + base_i0) / QK8_1;
+    y[ib_base + warp_id].qs[lane_id] = q;
+
+    if (lane_id == 0) {
+        y[ib_base + warp_id].ds = make_half2(d, sum);
+    }
 }
 
 __device__ __forceinline__ uint8_t compute_e8m0_scale(float amax) {
@@ -270,6 +315,54 @@ static __global__ void quantize_mmq_q8_1(
     }
 }
 
+template<int D>
+__launch_bounds__(128, 1)
+static __global__ void quantize_mmq_q8_1_pq_wht(
+        const float * __restrict__ x, const int32_t * __restrict__ ids, void * __restrict__ vy,
+        const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
+        const int64_t ne0, const int ne1, const int ne2) {
+    static_assert(D == 128, "unsupported PQ WHT group size");
+
+    const int tid = threadIdx.x;
+    const int64_t base_i0 = (int64_t) blockIdx.y * D;
+
+    if (base_i0 >= ne0) {
+        return;
+    }
+
+    const int64_t i1 = blockIdx.x;
+    const int64_t i2 = blockIdx.z % ne2;
+    const int64_t i3 = blockIdx.z / ne2;
+    const int64_t i01 = ids ? ids[i1] : i1;
+
+    __shared__ float sh[D];
+
+    const int64_t i0 = base_i0 + tid;
+    sh[tid] = i0 < ne00 ? x[i3*s03 + i2*s02 + i01*s01 + i0] : 0.0f;
+    __syncthreads();
+
+    pq_tq_coop_wht_forward<D>(sh, tid);
+
+    block_q8_1_mmq * y = (block_q8_1_mmq *) vy;
+    const int64_t ib = blockIdx.z * ((int64_t) ne1 * (ne0 / D)) + (base_i0 / D) * ne1 + blockIdx.x;
+
+    const int warp_id = tid / WARP_SIZE;
+    const int lane_id = tid % WARP_SIZE;
+    const float xr = sh[tid];
+
+    float amax = fabsf(xr);
+    amax = warp_reduce_max<QK8_1>(amax);
+
+    const float d = amax / 127.0f;
+    const int8_t q = amax == 0.0f ? 0 : roundf(xr / d);
+
+    y[ib].qs[warp_id * QK8_1 + lane_id] = q;
+
+    if (lane_id == 0) {
+        y[ib].d4[warp_id] = d;
+    }
+}
+
 void quantize_row_q8_1_cuda(
         const float * x, const int32_t * ids, void * vy, const ggml_type type_src0,
         const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
@@ -278,6 +371,16 @@ void quantize_row_q8_1_cuda(
     GGML_ASSERT(ne0 % QK8_1 == 0);
 
     const uint3 ne2_fastdiv = init_fastdiv_values(ne2);
+
+    if (type_src0 == GGML_TYPE_PQ2_0 || type_src0 == GGML_TYPE_PQ3_0 || type_src0 == GGML_TYPE_PQ4_0) {
+        GGML_ASSERT(ne00 % QK_PQ_TQ_2_GROUP == 0);
+        GGML_ASSERT(ne0  % QK_PQ_TQ_2_GROUP == 0);
+
+        const dim3 num_blocks(ne0 / QK_PQ_TQ_2_GROUP, ne1, ne2*ne3);
+        const dim3 block_size(QK_PQ_TQ_2_GROUP, 1, 1);
+        quantize_q8_1_pq_wht<QK_PQ_TQ_2_GROUP><<<num_blocks, block_size, 0, stream>>>(x, vy, ne00, s01, s02, s03, ne0, ne1, ne2_fastdiv);
+        return;
+    }
 
     const int64_t block_num_x = (ne0 + CUDA_QUANTIZE_BLOCK_SIZE - 1) / CUDA_QUANTIZE_BLOCK_SIZE;
     const dim3 num_blocks(block_num_x, ne1, ne2*ne3);
@@ -290,6 +393,17 @@ void quantize_mmq_q8_1_cuda(
         const float * x, const int32_t * ids, void * vy, const ggml_type type_src0,
         const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
         const int64_t ne0, const int64_t ne1, const int64_t ne2, const int64_t ne3, cudaStream_t stream) {
+    if (type_src0 == GGML_TYPE_PQ2_0 || type_src0 == GGML_TYPE_PQ3_0 || type_src0 == GGML_TYPE_PQ4_0) {
+        GGML_ASSERT(ne00 % QK_PQ_TQ_2_GROUP == 0);
+        GGML_ASSERT(ne0  % QK_PQ_TQ_2_GROUP == 0);
+
+        const dim3 num_blocks(ne1, ne0 / QK_PQ_TQ_2_GROUP, ne2*ne3);
+        const dim3 block_size(QK_PQ_TQ_2_GROUP, 1, 1);
+        quantize_mmq_q8_1_pq_wht<QK_PQ_TQ_2_GROUP>
+            <<<num_blocks, block_size, 0, stream>>>(x, ids, vy, ne00, s01, s02, s03, ne0, ne1, ne2);
+        return;
+    }
+
     GGML_ASSERT(ne00 % 4 == 0);
     GGML_ASSERT(ne0 % (4*QK8_1) == 0);
 

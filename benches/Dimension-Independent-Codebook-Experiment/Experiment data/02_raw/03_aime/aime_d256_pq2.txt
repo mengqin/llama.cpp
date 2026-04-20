@@ -1,0 +1,55 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+Let $v_P$, $v_T$, and $v_J$ be the speeds of Patrick, Tanya, and Jose, respectively.
+Let $D$ be the distance from the school to the park.
+Let $t_P$, $t_T$, and $t_J$ be the times taken by Patrick, Tanya, and Jose to cover the distance $D$.
+The arrival time for all three is the same, let's call it $T_{arrival}$.
+Patrick starts at time $0$. So $T_{arrival} = t_P$.
+Tanya starts 1 hour after Patrick. So $T_{arrival} = 1 + t_T$.
+Jose starts 1 hour after Tanya. So $T_{arrival} = 1 + (1 + t_J) = 2 + t_J$.
+From this, we have:
+$t_P = T_{arrival}$
+$t_T = T_{arrival} - 1$
+$t_J = T_{arrival} - 2$
+
+We are given the speeds:
+$v_T = v_P + 2$
+$v_J = v_T + 7 = v_P + 9$
+
+Using the relationship $D = v \cdot t$, we have:
+$D = v_P t_P = v_P T_{arrival}$
+$D = v_T t_T = (v_P + 2)(T_{arrival} - 1)$
+$D = v_J t_J = (v_P + 9)(T_{arrival} - 2)$
+
+Let $\tau = T_{arrival}$.
+From the first two equations:
+$v_P \tau = (v_P + 2)(\tau - 1)$
+$v_P \tau = v_P \tau - v_P + 2\tau - 2$
+$0 = -v_P + 2\tau - 2 \implies v_P = 2\tau - 2$.
+
+Now substitute $v_P$ into the third equation:
+$D = (v_P + 9)(\tau - 2)$
+Since $D = v_P \tau$, we have:
+$v_P \tau = (v_P + 9)(\tau - 2)$
+Substitute $v_P = 2\tau - 2$:
+$(2\tau - 2)\tau = ((2\tau - 2) + 9)(\tau - 2)$
+$2\tau(\tau - 1) = (2\tau + 7)(\tau - 2)$
+$2\tau^2 - 2\tau = 2\tau^2 - 4\tau + 7\tau - 14$
+$2\tau^2 - 2\tau = 2\tau^2 + 3\tau - 14$
+$-2\tau = 3\tau - 14$
+$5\tau = 14 \implies \tau = \frac{14}{5}$.
+
+Now find $v_P$:
+$v_P = 2(\frac{14}{5}) - 2 = \frac{28}{5} - \frac{10}{5} = \frac{18}{5}$.
+
+Now find $D$:
+$D = v_P \tau = \frac{18}{5} \cdot \frac{14}{5} = \frac{252}{25}$.
+
+The distance is $m/n = 252/25$.
+We check if $m=252$ and $n=25$ are relatively prime.
+$252 = 2^2 \cdot 3^2 \cdot 7$.
+$25 = 5^2$.
+They share no common factors, so $\gcd(252, 25) = 1$.
+We need to find $m + n = 252 + 25 = 277$.
+
+Final answer: 277

@@ -1,0 +1,110 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+To solve this problem, we define the following variables and carefully track the time each person spends traveling to the park.
+
+---
+
+### Step 1: Define Variables
+
+Let:
+- $ v $ = Patrick's walking speed (in mph)
+- $ d $ = distance from school to park (in miles)
+
+From the problem:
+
+- Tanya runs at $ v + 2 $ mph
+- Jose bicycles at $ v + 9 $ mph
+
+All three arrive at the park **at the same time**, but they start at different times:
+- Patrick starts first
+- Tanya starts 1 hour after Patrick
+- Jose starts 1 hour after Tanya → 2 hours after Patrick
+
+Let $ t $ be the **total time** Patrick spends traveling (i.e., from when he leaves until he arrives at the park).
+
+Then:
+- Tanya travels for $ t - 1 $ hours
+- Jose travels for $ t - 2 $ hours
+
+---
+
+### Step 2: Set Up Equations
+
+Using the formula $ \text{distance} = \text{speed} \times \text{time} $, we get:
+
+$$
+d = v \cdot t \quad \text{(1)}
+$$
+$$
+d = (v + 2)(t - 1) \quad \text{(2)}
+$$
+$$
+d = (v + 9)(t - 2) \quad \text{(3)}
+$$
+
+Set equations (1) and (2) equal:
+
+$$
+v t = (v + 2)(t - 1)
+\Rightarrow v t = v t - v + 2t - 2
+\Rightarrow 0 = -v + 2t - 2
+\Rightarrow v = 2t - 2 \quad \text{(4)}
+$$
+
+Now set equations (1) and (3) equal:
+
+$$
+v t = (v + 9)(t - 2)
+\Rightarrow v t = v t - 2v + 9t - 18
+\Rightarrow 0 = -2v + 9t - 18
+\Rightarrow v = \frac{9t - 18}{2} \quad \text{(5)}
+$$
+
+Now equate (4) and (5):
+
+$$
+2t - 2 = \frac{9t - 18}{2}
+\Rightarrow 4t - 4 = 9t - 18
+\Rightarrow -5t = -14
+\Rightarrow t = \frac{14}{5}
+$$
+
+Substitute $ t = \frac{14}{5} $ into equation (4):
+
+$$
+v = 2 \cdot \frac{14}{5} - 2 = \frac{28}{5} - \frac{10}{5} = \frac{18}{5}
+$$
+
+Now compute $ d $ using equation (1):
+
+$$
+d = v \cdot t = \frac{18}{5} \cdot \frac{14}{5} = \frac{252}{25}
+$$
+
+---
+
+### Step 3: Final Check
+
+We verify that all three people arrive at the same time with the given speeds and distances:
+
+- Patrick: $ \frac{252}{25} \div \frac{18}{5} = \frac{14}{5} $ hours ✅
+- Tanya: $ \frac{252}{25} \div \left( \frac{18}{5} + 2 \right) = \frac{252}{25} \div \frac{28}{5}} = \frac{9}{5} $ hours → total time $ \frac{14}{5} $ ✅
+- Jose: $ \frac{252}{25} \div \left( \frac{18}{5} + 9 \right) = \frac{252}{25} \div \frac{63}{5} = \frac{4}{5} $ hours → total time $ \frac{14}{5} $ ✅
+
+All times match, so the solution is consistent.
+
+---
+
+### Step 4: Reduce Fraction and Compute $ m + n $
+
+The distance is $ \frac{252}{25} $. Since 252 and 25 are relatively prime (252 = $ 2^2 \cdot 3^2 \cdot 7 $, 25 = $ 5^2 $), the fraction is in lowest terms.
+
+So:
+- $ m = 252 $
+- $ n = 25 $
+- $ m + n = 252 + 25 = 277 $
+
+---
+
+Final answer: 
+Final answer: <277>

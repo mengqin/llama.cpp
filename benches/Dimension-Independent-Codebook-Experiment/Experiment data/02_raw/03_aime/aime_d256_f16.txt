@@ -1,0 +1,69 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+Let $v$ be Patrick's walking speed in miles per hour.
+Let $t$ be the time (in hours) Patrick takes to travel from the school to the park.
+
+From this, we can express the distance $D$ from the school to the park as:
+$$D = v \cdot t$$
+
+Tanya's movement details:
+* She starts running 1 hour after Patrick.
+* She runs at a speed 2 mph faster than Patrick, so her speed is $v + 2$.
+* Since she started 1 hour later but arrived at the same time as Patrick, her travel time is $t - 1$.
+* Therefore, the distance she covers is:
+ $$D = (v + 2)(t - 1)$$
+
+Jose's movement details:
+* He starts bicycling 1 hour after Tanya. Since Tanya started 1 hour after Patrick, Jose starts 2 hours after Patrick.
+* He cycles at a speed 7 mph faster than Tanya, so his speed is $(v + 2) + 7 = v + 9$.
+* Since he started 2 hours later than Patrick but arrived at the same time, his travel time is $t - 2$.
+* Therefore, the distance he covers is:
+ $$D = (v + 9)(t - 2)$$
+
+Since all three cover the same distance $D$, we can equate the expressions:
+1. $v \cdot t = (v + 2)(t - 1)$
+2. $(v + 2)(t - 1) = (v + 9)(t - 2)$
+
+Let's solve equation (1) for $v$ in terms of $t$:
+$$vt = v(t - 1) + 2(t - 1)$$
+$$vt = vt - v + 2t - 2$$
+Subtract $vt$ from both sides:
+$$0 = -v + 2t - 2$$
+$$v = 2t - 2$$
+
+Now, substitute this expression for $v$ into equation (2):
+$$( (2t - 2) + 2 )(t - 1) = ( (2t - 2) + 9 )(t - 2)$$
+Simplify the terms inside the parentheses:
+$$( 2t )(t - 1) = ( 2t + 7 )(t - 2)$$
+Expand both sides:
+$$2t^2 - 2t = 2t^2 - 4t + 7t - 14$$
+$$2t^2 - 2t = 2t^2 + 3t - 14$$
+Subtract $2t^2$ from both sides:
+$$-2t = 3t - 14$$
+Add $2t$ to both sides:
+$$0 = 5t - 14$$
+$$5t = 14$$
+$$t = \frac{14}{5}$$
+
+Now that we have $t$, we can find $v$:
+$$v = 2\left(\frac{14}{5}\right) - 2$$
+$$v = \frac{28}{5} - \frac{10}{5}$$
+$$v = \frac{18}{5}$$
+
+Now we calculate the distance $D$:
+$$D = v \cdot t = \left(\frac{18}{5}\right) \cdot \left(\frac{14}{5}\right)$$
+$$D = \frac{18 \cdot 14}{25}$$
+$$18 \cdot 14 = 18(10 + 4) = 180 + 72 = 252$$
+$$D = \frac{252}{25}$$
+
+We are given that $D = \frac{m}{n}$ where $m$ and $n$ are relatively prime positive integers.
+Here, $m = 252$ and $n = 25$.
+We check if they are relatively prime:
+The prime factorization of $25$ is $5^2$.
+The prime factorization of $252$ is $2^2 \cdot 3^2 \cdot 7$.
+Since they share no common factors, $\gcd(252, 25) = 1$.
+
+We need to find $m + n$:
+$$m + n = 252 + 25 = 277$$
+
+Final answer: 277

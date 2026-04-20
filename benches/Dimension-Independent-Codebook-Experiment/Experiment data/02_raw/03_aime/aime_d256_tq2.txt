@@ -1,0 +1,70 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+Let $v_P$, $v_T$, and $v_J$ denote the constant speeds (in miles per hour) of Patrick, Tanya, and Jose, respectively.
+Let $D$ be the distance (in miles) from the school to the park.
+Let $t_P$, $t_T$, and $t_J$ be the times (in hours) that Patrick, Tanya, and Jose take to travel from the school to the park.
+
+From the problem statement:
+1. Patrick's speed is $v_P$.
+2. Tanya's speed is $v_T = v_P + 2$.
+3. Jose's speed is $v_J = v_T + 7 = (v_P + 2) + 7 = v_P + 9$.
+
+Let $T$ be the time elapsed from when Patrick starts until he arrives at the park.
+Since they all arrive at the same time, the arrival time for each person relative to Patrick's start is $T$.
+- Patrick starts at $t=0$, so his travel time is $t_P = T$.
+- Tanya starts 1 hour after Patrick, so her travel time is $t_T = T - 1$.
+- Jose starts 1 hour after Tanya (which is 2 hours after Patrick), so his travel time is $t_J = T - 2$.
+
+Since they all travel the same distance $D$, we can write the equations:
+1. $D = v_P \cdot T$
+2. $D = v_T \cdot (T - 1) = (v_P + 2)(T - 1)$
+3. $D = v_J \cdot (T - 2) = (v_P + 9)(T - 2)$
+
+From equation (1) and (2), we equate the expressions for $D$:
+$$v_P T = (v_P + 2)(T - 1)$$
+$$v_P T = v_P T - v_P + 2T - 2$$
+$$0 = -v_P + 2T - 2$$
+$$v_P = 2T - 2$$
+
+Now substitute $v_P = 2T - 2$ into equation (3). We can use $D = v_P T$ to express $D$ in terms of $T$:
+$$D = (2T - 2)T = 2T^2 - 2T$$
+
+Now substitute $v_P = 2T - 2$ into the expression for $D$ derived from equation (3):
+$$D = (v_P + 9)(T - 2)$$
+$$D = ((2T - 2) + 9)(T - 2)$$
+$$D = (2T + 7)(T - 2)$$
+$$D = 2T^2 - 4T + 7T - 14$$
+$$D = 2T^2 + 3T - 14$$
+
+Now equate the two expressions for $D$:
+$$2T^2 - 2T = 2T^2 + 3T - 14$$
+Subtract $2T^2$ from both sides:
+$$-2T = 3T - 14$$
+$$5T = 14$$
+$$T = \frac{14}{5}$$
+
+Now substitute $T = \frac{14}{5}$ back into the expression for $D$:
+$$D = 2\left(\frac{14}{5}\right)^2 - 2\left(\frac{14}{5}\right)$$
+$$D = 2\left(\frac{196}{25}\right) - \frac{28}{5}$$
+$$D = \frac{392}{25} - \frac{140}{25}$$
+$$D = \frac{252}{25}$$
+
+Alternatively, using $D = 2T^2 + 3T - 14$:
+$$D = 2\left(\frac{14}{5}\right)^2 + 3\left(\frac{14}{5}\right) - 14$$
+$$D = 2\left(\frac{196}{25}\right) + \frac{42}{5} - 14$$
+$$D = \frac{392}{25} + \frac{210}{25} - \frac{350}{25}$$
+$$D = \frac{392 + 210 - 350}{25} = \frac{252}{25}$$
+
+The distance is $D = \frac{252}{25}$ miles.
+We are given that $D = \frac{m}{n}$ where $m$ and $n$ are relatively prime positive integers.
+Here, $m = 252$ and $n = 25$.
+We check if they are relatively prime:
+The prime factorization of $252$ is $2^2 \cdot 3^2 \cdot 7$.
+The prime factorization of $25$ is $5^2$.
+They share no common factors, so $\gcd(252, 25) = 1$.
+Thus, $m = 252$ and $n = 25$.
+
+We need to find $m + n$:
+$$m + n = 252 + 25 = 277$$
+
+Final answer: 277

@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D128",
+    "type": "pq2",
+    "needle_size": "128K",
+    "exit_code": 0,
+    "needle_score": 1.0813,
+    "needle_score_en": 1.0813,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "needle_128k_d128_pq2.json",
+    "server_log": "needle_server_d128_pq2.log"
+  },
+  "details": [
+    {
+      "pred": "thatitthatthethe1itTheThistothetheitthattheatothetothatthe11071000you2a3``itthetheathe3``In13You``The``````1``````````````1````````````1``````````12``TheOkay1``````Okaythe``1211`````````",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 171,
+      "score": 1.6129032258064524
+    },
+    {
+      "pred": "thethethatto00tothetothetothetheofthethatthe1thatthatitthetothetheaand2the000001000000.001300the21000010Youto000itto````0the00310Theit110````theit0000theittotheyoutothe1``0``1to0youtothe2the1````````the110000that20t``1110the0:0`````1``1````1````1",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 230,
+      "score": 1.3008130081300817
+    },
+    {
+      "pred": "thethattothatthethetothetobethetothattheandthethethetoandtheitittototheandand1.thethatitatoittothattothethatthethat19andtheathatatothatitittothe3thatait2theandthethattheofthe1totheandthethatit's1itthetototheitwhattothetothethetheit1000100the0toaandthethethatOkaythat02thethatthethatyoutowhattheandthatathethat10tothethe1andtheandathe1andthatthat1aaatothetheinthethe10the00000100inthetothatit0the00that010090000100000000000000000000000000000100000000000000000000000000000100000000000100000000000000000000theis0",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 481,
+      "score": 1.1001964636542239
+    },
+    {
+      "pred": "thatandaandthat11thethatyouthattheandthethethattobethewhatandthethat10andtheto21thethatthat000totheaand1.1thetoittheytothethe1andtotothe100the1thata100thatto0thethe1theto001youIand1itatheathat100tothe1the00thatthe100to11thattheit2thatyou00The'sitai1and0000000000that0000000to0000000000010000300020000000110000050000000000000000100001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000001000",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 430,
+      "score": 1.1403508771929816
+    },
+    {
+      "pred": "YouWethatthetothat100000600000000the1000000100000005000000100000000000000000000000030000000000100003000000000000000000030030.00330000000000000000000000024000002000020000300000000000001000300000000000000000000003000000000000000100000000000000000000000000000000000000000000001000000000000",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 279,
+      "score": 0.4895104895104896
+    },
+    {
+      "pred": "theandthatthethingtogettothethe10000totheinthat110000020000000100001000070001000000thattothethingthe0000000000002010300000150000000000100001300000010300000200020000000000000The00000030000100000400000002000000000300000000020000000000200020000000000001000000000to00000000012000010000100000000100000000000000200",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 295,
+      "score": 0.844155844155845
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "that  it that the the\n\n\n\n\n\n\n\n\n\n\n\n\n1  it\n\n\nThe\n\nThis to\n\n\n\n\n\n the the it that\n\n\n the a  to the to that the\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n1\n107 1\n00 0 you 2 a\n\n\n\n\n3\n\n\n\n\n\n``\n it the the  a  the\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n3\n\n\n\n\n\n\n``\n\nIn\n 1\n 3\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nYou\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n``\n\n\n\n\n\nThe\n\n\n\n\n\n\n\n``\n\n\n\n\n\n``\n\n\n\n\n\n\n\n\n\n\n`` 1\n\n\n\n\n\n\n``\n\n\n\n\n\n\n\n\n\n``\n\n\n\n\n\n\n\n``\n\n\n\n\n\n\n``\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n``\n``\n\n``\n\n\n\n\n\n\n 1\n``\n\n\n\n\n\n\n\n\n\n\n``\n\n\n``\n\n\n\n\n\n\n\n\n\n\n\n\n \n\n\n\n\n\n\n\n``\n``\n\n\n\n\n\n\n\n\n\n\n``\n\n\n\n\n\n\n\n\n1\n\n\n\n``\n\n\n\n\n\n``\n\n``\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n``\n\n\n\n\n\n``\n\n\n\n\n\n\n\n12\n\n\n``\n\n\n\n\n\n\nThe\n\nOkay 1\n\n\n\n\n\n\n\n\n\n\n\n```\n```\n\n\n\nOkay the\n``\n 1\n\n\n\n\n\n2\n\n\n\n11\n\n\n\n``\n\n\n\n``\n\n\n\n\n\n\n\n\n\n\n\n\n```\n``"
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "the the that to \n\n\n\n\n\n\n\n\n\n 00 to the  to the  to the  the of the that  the 1 that that\n it the  to the the a  and 2 the\n0000 0\n 10 0 0  0 0 0.  0 0 1  3 0\n 0   the\n\n\n\n 2 1  0 0\n\n\n\n\n\n\n\n\n\n\n\n0 0\n\n\n\n\n\n\n\n\n\n\n\n\n\n10\n\n \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nYou  to 0 0 0  it to\n\n\n\n\n\n\n\n\n``\n``\n0 the00\n 3 1   0\n\nThe it\n 1 1\n\n\n\n\n\n\n\n0\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n``\n\n\n\n\n``  the  it 0 0  0 0\n\n the it to\n the you to \n\n\n\nthe 1\n\n\n\n`` 0\n\n\n\n\n\n\n\n\n``\n\n\n\n\n1 to\n 0 you to the 2\n\n\n\n\n\n\n\n\n\n the\n\n\n 1\n\n``\n\n\n\n\n\n\n``\n``\n\n\n\n\n\n\n\n\n`` the 11\n0\n\n\n\n000  that  2\n  0 \n\n\n\n\n\n\n\n\nt\n\n\n\n\n\n\n\n``\n\n\n\n1\n\n\n\n\n\n\n\n\n\n\n\n\n\n 1\n\n\n\n\n\n\n\n\n\n\n\n\n\n1\n\n 0\n\n\n\n\n\n\n\n\n\n the\n\n\n\n\n\n\n0: 0\n\n\n\n\n``\n\n\n```\n\n\n\n\n\n\n\n1\n\n\n\n\n`` 1\n\n\n\n``\n\n\n\n`` \n\n\n\n\n1\n\n\n\n``\n\n\n\n\n\n\n``\n\n\n\n\n\n\n\n\n\n1"
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "the that to that the the to the  to be the  to\n that the  and  the the the to  and  the it\n\n\n\n\n\n  it  to to  the  and\n\n  and \n1.  the  that it a  to  it  to  that to the that the that 19  and the  a  that a  to that it\n\n  it  to the  3  that  a  it 2  the \n\n\n  and  the  that the  of the1 to  the  and the that  it's  1 it  the to to the \n\n\n\n\n\n\n\n\n\n  it what to the  to the  the\n the it\n 1000 1 0\n\n\n\n0 the 0  to a\n  and the the  that\n\nOkay that0 2\n\n  the that the that you  to what  the  and that  a\n \n\n\n  the that 1 0 to  the  the 1  and the  and  a  the 1  and  that  that1 a\n\n  a a  to the\n\n the in the the 1 0 the 0 000\n0\n\n\n\n\n \n\n10\n 0 in the  to that  it 0  the\n\n\n\n 0 0 that 0 1 00\n\n\n\n\n\n9 0 00 0\n\n\n\n\n\n\n 1 000 0\n\n\n 0\n\n\n0 0\n 0 0 0 0\n\n 0000 0\n\n0 000000 0 0000 0\n\n1000 0 0 0\n 0 0 0 \n 0 00 0\n0 0000 00 0 00 000 0 001 0 0000 0 00 0 0 0 100 0\n 0 0 000 0  00 0 0 0 0 000 00 the is\n\n0"
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "that  and a  and  that 11  the that you that the  and  the the that  to be the  what and the  that 10  and the  to \n21 \n\n\n the that that 000  to  the  a  and 1. 1  the to it they  to  the the 1 and  to to\n  the100  the  1  that  a 10\n 0  that  to\n 0  the the 1 the to 0 0 1\n\n\n\nyou  I  and 1 it a  the a  that 1\n 0 0\n\n to the 1  the 0 0 that  the 100  to 1\n\n\n\n1 that the  it 2 that you  0 0\n\nThe's  it a i\n\n\n\n\n 1  and 0 0 0000   0 0 0 0 that 000 0 0\n 00 to 0 000 0000 0001\n 0000 3 0 00 200000 001 100 0  0 0 5 00 00000 0 0  00 0 00 00 100 00100 00 0 0 00 0 00000 0 0 000 0 0 0 00000 0\n0000 0 000 0 0000 0 00000000 000 0 0 0 00 0 0  0 000 00 00000 0000 00 0000 000\n 0 000 0 000 0 0 0 1000 0\n000 000 0  00 0 00 0 000 00 01 00 0"
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "You\n\nWe that the to  that\n\n\n\n\n1 0 000\n\n\n\n 06\n 0000 0 0 0 0\nthe 1 0 0 0000 1 0 0 0 0\n0 00  5 00 0 000 10 0 0 00  0 0 0 00 0 0 0 0 0 0 0  0 0 0 00 0  0300 0 0 0 0 0 0 0   01 0 0 0 0 3 0 0 0 0 00 0 0 0 000 0 0 0 00 0 0 3 0 0 3 0.0 0 3 3 0   0 0 0 0  0 0 0 0 0 0 0 0 0 0 0 00 000 0 0 2 4 0  0  0 0 0 20\n00 0 200 0 03 0 0 0 0 0 0 00 0 0 0 0 0 10 00 30 0 0 00 0 0 0 0 0 0 0 0 0 0 0 0 0 0 00 0 3 0 0 00 0 0 000 0 0 0 0 0 0 10 0 0 0 0 00 0 0 \n 0 00 0 0 0 0 0 0 0 0 00 0 0 00\n 0 0 0 0 0 00 0 0 00 00 00 0 000 0  1 0 0 0 0 0 0 0 0 0\n0 0 0"
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "the  and that the thing to get to the the\n\n \n\n 10 00 0  to  the in\n that 110 00 0 0  2 0 0\n\n00000 1 0 00 0 1 0 0007 0 0 0 1 0 0 0  00  0 that  to the thing\n\n\n the 0   0\n0 0 0 0\n  0 0 0 0 0 02010  3 0 0 0 0 0 1  50 0 0 0 00 0 0 0 0  1 00  0 0 130 0 0 0 0 0  1 0 3  0  0 0  0 0 2   0 0 0 2  0 0 0  0 00 0 0 0 0 0 0  0\nThe 0 0 00 0 0  3 0 0 0 0\n 1 00 0\n0 0 4 0 0 00 0 0 0 20 0 0 00 0  0 00 3 0 0  00 0 0 0  0 0 2 0 0 0 0 0 0 0 0 0 0 2 00 0 20 0 0 000 0 0 0 0 0 01 0 0 0 0 0 00 0 0 to 0 0 0 0 0 0  0 0 0  1 20 0 0 010 0 0 0 1 0 0 0 0 00 0 0 1 0 0 0 0 00 0 0 0  0 0 0 0 0 2 0 0"
+    }
+  ]
+}

@@ -429,14 +429,14 @@ extern "C" {
         GGML_TYPE_MXFP4   = 39, // MXFP4 (1 block)
         GGML_TYPE_NVFP4   = 40, // NVFP4 (4 blocks, E4M3 scale)
         GGML_TYPE_Q1_0    = 41,
-        GGML_TYPE_PQ4_0_64 = 42, // internal PQ4 KV cache for D=64
-        GGML_TYPE_TQ4_1_64 = 43, // internal TQ4 KV cache for D=64
-        GGML_TYPE_PQ2_0    = 44, // KV cache: 2-bit PolarQuant
-        GGML_TYPE_PQ3_0    = 45, // KV cache: 3-bit PolarQuant
-        GGML_TYPE_PQ4_0    = 46, // KV cache: 4-bit PolarQuant
-        GGML_TYPE_TQ2_1    = 47, // KV cache: PQ2 + 1-bit QJL compensation
-        GGML_TYPE_TQ3_1    = 48, // KV cache: PQ3 + 1-bit QJL compensation
-        GGML_TYPE_TQ4_1    = 49, // KV cache: PQ4 + 1-bit QJL compensation
+        GGML_TYPE_PQ4_0_64 = 42, // internal PQ4 layout for D=64
+        GGML_TYPE_TQ4_1_64 = 43, // internal TQ4 layout for D=64
+        GGML_TYPE_PQ2_0    = 44, // PolarQuant 2-bit
+        GGML_TYPE_PQ3_0    = 45, // PolarQuant 3-bit
+        GGML_TYPE_PQ4_0    = 46, // PolarQuant 4-bit
+        GGML_TYPE_TQ2_1    = 47, // TurboQuant PQ2 + 1-bit QJL compensation
+        GGML_TYPE_TQ3_1    = 48, // TurboQuant PQ3 + 1-bit QJL compensation
+        GGML_TYPE_TQ4_1    = 49, // TurboQuant PQ4 + 1-bit QJL compensation
         GGML_TYPE_COUNT    = 50,
     };
 
@@ -475,6 +475,9 @@ extern "C" {
         GGML_FTYPE_MOSTLY_MXFP4   = 25, // except 1d tensors
         GGML_FTYPE_MOSTLY_NVFP4   = 26, // except 1d tensors
         GGML_FTYPE_MOSTLY_Q1_0    = 27, // except 1d tensors
+        GGML_FTYPE_MOSTLY_PQ2_0   = 28, // except 1d tensors
+        GGML_FTYPE_MOSTLY_PQ3_0   = 29, // except 1d tensors
+        GGML_FTYPE_MOSTLY_PQ4_0   = 30, // except 1d tensors
     };
 
     // available tensor operations:

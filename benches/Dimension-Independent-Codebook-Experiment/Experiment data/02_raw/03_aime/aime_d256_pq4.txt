@@ -1,0 +1,61 @@
+Patrick started walking at a constant speed along a straight road from his school to the park. One hour after Patrick left, Tanya started running at a constant speed of 2 miles per hour faster than Patrick walked, following the same straight road from the school to the park. One hour after Tanya left, Jose started bicycling at a constant speed of 7 mil ... (truncated)
+
+Let $v_P$, $v_T$, and $v_J$ be the speeds of Patrick, Tanya, and Jose in miles per hour (mph), respectively. Let $D$ be the distance from the school to the park in miles.
+
+From the problem description, we have the following relationships between the speeds:
+1. Tanya's speed is 2 mph faster than Patrick's: $v_T = v_P + 2$.
+2. Jose's speed is 7 mph faster than Tanya's: $v_J = v_T + 7 = (v_P + 2) + 7 = v_P + 9$.
+
+Let $t_P$, $t_T$, and $t_J$ be the travel times (in hours) for Patrick, Tanya, and Jose to cover the distance $D$.
+The travel times are given by $t = D/v$. So, $t_P = D/v_P$, $t_T = D/v_T$, and $t_J = D/v_J$.
+
+Let's analyze the timing of their starts and arrivals:
+* Patrick starts at $t=0$ and arrives at $t=t_P$.
+* Tanya starts 1 hour after Patrick (at $t=1$) and arrives at the same time as Patrick. Therefore, her travel time $t_T$ satisfies: $1 + t_T = t_P$, or $t_T = t_P - 1$.
+* Jose starts 1 hour after Tanya (at $t=2$) and arrives at the same time as the others. Therefore, his travel time $t_J$ satisfies: $2 + t_J = t_P$, or $t_J = t_P - 2$.
+
+Using the relationship $t = D/v$, we can express the travel times in terms of speeds:
+1. $D/v_T = D/v_P - 1 \implies \frac{1}{v_P} - \frac{1}{v_T} = \frac{1}{D}$
+2. $D/v_J = D/v_P - 2 \implies \frac{1}{v_P} - \frac{1}{v_J} = \frac{2}{D}$
+
+Substitute $v_T = v_P + 2$ and $v_J = v_P + 9$ into these equations.
+
+From equation (1):
+$$ \frac{1}{v_P} - \frac{1}{v_P + 2} = \frac{1}{D} $$
+$$ \frac{(v_P + 2) - v_P}{v_P(v_P + 2)} = \frac{1}{D} $$
+$$ \frac{2}{v_P(v_P + 2)} = \frac{1}{D} $$
+$$ D = \frac{v_P(v_P + 2)}{2} \quad \text{--- (Eq. A)} $$
+
+From equation (2):
+$$ \frac{1}{v_P} - \frac{1}{v_P + 9} = \frac{2}{D} $$
+$$ \frac{(v_P + 9) - v_P}{v_P(v_P + 9)} = \frac{2}{D} $$
+$$ \frac{9}{v_P(v_P + 9)} = \frac{2}{D} $$
+$$ D = \frac{2v_P(v_P + 9)}{9} \quad \text{--- (Eq. B)} $$
+
+Now, equate the expressions for $D$ from (Eq. A) and (Eq. B):
+$$ \frac{v_P(v_P + 2)}{2} = \frac{2v_P(v_P + 9)}{9} $$
+Since $v_P > 0$, we can divide both sides by $v_P$:
+$$ \frac{v_P + 2}{2} = \frac{2(v_P + 9)}{9} $$
+Cross-multiply to solve for $v_P$:
+$$ 9(v_P + 2) = 4(v_P + 9) $$
+$$ 9v_P + 18 = 4v_P + 36 $$
+$$ 5v_P = 18 $$
+$$ v_P = \frac{18}{5} \text{ mph} $$
+
+Now substitute $v_P$ back into (Eq. A) to find $D$:
+$$ D = \frac{\frac{18}{5} (\frac{18}{5} + 2)}{2} $$
+$$ D = \frac{\frac{18}{5} (\frac{18 + 10}{5})}{2} $$
+$$ D = \frac{\frac{18}{5} (\frac{28}{5})}{2} $$
+$$ D = \frac{18 \cdot 28}{25 \cdot 2} $$
+$$ D = \frac{9 \cdot 28}{25} $$
+$$ D = \frac{252}{25} $$
+
+The distance is $\frac{252}{25}$ miles. We need to check if $m=252$ and $n=25$ are relatively prime.
+The prime factorization of 25 is $5^2$.
+The prime factorization of 252 is $2^2 \cdot 3^2 \cdot 7$.
+There are no common factors, so $\gcd(252, 25) = 1$. Thus, $m=252$ and $n=25$.
+
+We need to find $m + n$:
+$$ m + n = 252 + 25 = 277 $$
+
+Final answer: 277

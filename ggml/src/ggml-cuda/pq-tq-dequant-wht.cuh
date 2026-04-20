@@ -123,6 +123,217 @@ static __device__ __forceinline__ float tq_dequant_elem_4_1_64(const void * vx, 
 // ============================================================================
 enum class PqTqTypeTag { T2_0, T3_0, T4_0, T2_1, T3_1, T4_1, T4_0_64, T4_1_64 };
 
+// ============================================================================
+// Pair dequantize device functions (2 consecutive elements at once).
+// Used by the WHT-fused fp16/fp32 conversion path to cut scalar centroid decode
+// traffic roughly in half before entering the cooperative inverse WHT.
+// ============================================================================
+
+template <PqTqTypeTag TT>
+static __device__ __forceinline__ float2 pq_tq_dequant_pair(const void * vx, int64_t global_pair);
+
+template <>
+__device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::T2_0>(const void * vx, int64_t global_pair) {
+    const block_pq2 * x = (const block_pq2 *) vx;
+    constexpr int pairs_per_block = QK_PQ_TQ_2 / 2;
+    const int ib = global_pair / pairs_per_block;
+    const int ip = global_pair % pairs_per_block;
+    const float norm = __half2float(x[ib].norm);
+    const uint8_t qb = x[ib].qs[ip / 2];
+    const uint8_t q4 = (ip & 1) ? (qb >> 4) : (qb & 0x0F);
+    const float2 pair = pq_tq_centroid_pair_2bit(q4);
+    return make_float2(pair.x * norm, pair.y * norm);
+}
+
+template <>
+__device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::T3_0>(const void * vx, int64_t global_pair) {
+    const block_pq3 * x = (const block_pq3 *) vx;
+    constexpr int pairs_per_block = QK_PQ_TQ_3 / 2;
+    const int ib = global_pair / pairs_per_block;
+    const int ip = global_pair % pairs_per_block;
+    const float norm = __half2float(x[ib].norm);
+    const uint8_t qb = x[ib].qs[ip / 2];
+    const uint8_t q4 = (ip & 1) ? (qb >> 4) : (qb & 0x0F);
+    const uint8_t sb = x[ib].signs[ip / 4];
+    const uint8_t sign2 = (sb >> ((ip & 0x3) * 2)) & 0x03u;
+    const float2 pair = PQ_TQ_PAIR_LUT_3BIT[(sign2 << 4) | q4];
+    return make_float2(pair.x * norm, pair.y * norm);
+}
+
+template <typename block_pq4, int block_qk>
+static __device__ __forceinline__ float2 pq_dequant_pair_4_0_impl(const void * vx, int64_t global_pair) {
+    const block_pq4 * x = (const block_pq4 *) vx;
+    constexpr int pairs_per_block = block_qk / 2;
+    const int ib = global_pair / pairs_per_block;
+    const int ip = global_pair % pairs_per_block;
+    const float norm = __half2float(x[ib].norm);
+    const float2 pair = pq_tq_centroid_pair_4bit(x[ib].qs[ip]);
+    return make_float2(pair.x * norm, pair.y * norm);
+}
+
+template <>
+__device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::T4_0>(const void * vx, int64_t global_pair) {
+    return pq_dequant_pair_4_0_impl<block_pq4, QK_PQ_TQ_4>(vx, global_pair);
+}
+
+template <>
+__device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::T4_0_64>(const void * vx, int64_t global_pair) {
+    return pq_dequant_pair_4_0_impl<block_pq4_d64, QK_PQ_TQ_4_D64>(vx, global_pair);
+}
+
+template <>
+__device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::T2_1>(const void * vx, int64_t global_pair) {
+    const block_tq2 * x = (const block_tq2 *) vx;
+    constexpr int pairs_per_block = QK_PQ_TQ_2 / 2;
+    const int ib = global_pair / pairs_per_block;
+    const int ip = global_pair % pairs_per_block;
+    const float norm = __half2float(x[ib].norm);
+    const float rnorm = __half2float(x[ib].rnorm);
+    const uint8_t qb = x[ib].qs[ip / 2];
+    const uint8_t q4 = (ip & 1) ? (qb >> 4) : (qb & 0x0F);
+    const uint8_t jb = x[ib].qjl[ip / 4];
+    const float2 pair = pq_tq_centroid_pair_2bit(q4);
+    const float2 corr = tq_qjl_correction_pair(jb, (ip & 0x3) * 2, rnorm);
+    return make_float2(pair.x * norm + corr.x, pair.y * norm + corr.y);
+}
+
+template <>
+__device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::T3_1>(const void * vx, int64_t global_pair) {
+    const block_tq3 * x = (const block_tq3 *) vx;
+    constexpr int pairs_per_block = QK_PQ_TQ_3 / 2;
+    const int ib = global_pair / pairs_per_block;
+    const int ip = global_pair % pairs_per_block;
+    const float norm = __half2float(x[ib].norm);
+    const float rnorm = __half2float(x[ib].rnorm);
+    const uint8_t qb = x[ib].qs[ip / 2];
+    const uint8_t q4 = (ip & 1) ? (qb >> 4) : (qb & 0x0F);
+    const uint8_t sb = x[ib].signs[ip / 4];
+    const uint8_t sign2 = (sb >> ((ip & 0x3) * 2)) & 0x03u;
+    const uint8_t jb = x[ib].qjl[ip / 4];
+    const float2 pair = PQ_TQ_PAIR_LUT_3BIT[(sign2 << 4) | q4];
+    const float2 corr = tq_qjl_correction_pair(jb, (ip & 0x3) * 2, rnorm);
+    return make_float2(pair.x * norm + corr.x, pair.y * norm + corr.y);
+}
+
+template <typename block_tq4, int block_qk>
+static __device__ __forceinline__ float2 tq_dequant_pair_4_1_impl(const void * vx, int64_t global_pair) {
+    const block_tq4 * x = (const block_tq4 *) vx;
+    constexpr int pairs_per_block = block_qk / 2;
+    const int ib = global_pair / pairs_per_block;
+    const int ip = global_pair % pairs_per_block;
+    const float norm = __half2float(x[ib].norm);
+    const float rnorm = __half2float(x[ib].rnorm);
+    const float2 pair = pq_tq_centroid_pair_4bit(x[ib].qs[ip]);
+    const uint8_t jb = x[ib].qjl[ip / 4];
+    const float2 corr = tq_qjl_correction_pair(jb, (ip & 0x3) * 2, rnorm);
+    return make_float2(pair.x * norm + corr.x, pair.y * norm + corr.y);
+}
+
+template <>
+__device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::T4_1>(const void * vx, int64_t global_pair) {
+    return tq_dequant_pair_4_1_impl<block_tq4, QK_PQ_TQ_4>(vx, global_pair);
+}
+
+template <>
+__device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::T4_1_64>(const void * vx, int64_t global_pair) {
+    return tq_dequant_pair_4_1_impl<block_tq4_d64, QK_PQ_TQ_4_D64>(vx, global_pair);
+}
+
+static __device__ __forceinline__ float pq_tq_warp_fwht_step(const float x, const int lane, const int h) {
+    const float y = __shfl_xor_sync(0xffffffff, x, h);
+    return ((lane & h) == 0) ? (x + y) : (y - x);
+}
+
+static __device__ __forceinline__ float pq_tq_warp_fwht_32(float x, const int lane) {
+    x = pq_tq_warp_fwht_step(x, lane, 1);
+    x = pq_tq_warp_fwht_step(x, lane, 2);
+    x = pq_tq_warp_fwht_step(x, lane, 4);
+    x = pq_tq_warp_fwht_step(x, lane, 8);
+    x = pq_tq_warp_fwht_step(x, lane, 16);
+    return x;
+}
+
+template <typename dst_t>
+static __device__ __forceinline__ void pq_tq_inverse_wht_store_64(
+        float * sh, const int tid, dst_t * __restrict__ y, const int64_t base) {
+    if (tid < 64) {
+        float x = sh[tid] * PQ_TQ_WHT_SIGNS2_64[tid];
+        x = pq_tq_warp_fwht_32(x, tid & 31);
+        sh[tid] = x;
+    }
+    __syncthreads();
+
+    float a = 0.0f;
+    float b = 0.0f;
+    if (tid < 64) {
+        a = sh[tid];
+        b = sh[tid ^ 32];
+    }
+    __syncthreads();
+
+    if (tid < 64) {
+        constexpr float inv_sqrt64 = 0.125f;
+        const float x = ((tid & 32) == 0) ? (a + b) : (b - a);
+        y[base + tid] = ggml_cuda_cast<dst_t>(x * inv_sqrt64 * PQ_TQ_WHT_SIGNS1_64[tid]);
+    }
+}
+
+template <typename dst_t>
+static __device__ __forceinline__ void pq_tq_inverse_wht_store_128(
+        float * sh, const int tid, dst_t * __restrict__ y, const int64_t base) {
+    float x = sh[tid] * PQ_TQ_WHT_SIGNS2[tid];
+    x = pq_tq_warp_fwht_32(x, tid & 31);
+    sh[tid] = x;
+    __syncthreads();
+
+    float a = sh[tid];
+    float b = sh[tid ^ 32];
+    __syncthreads();
+    sh[tid] = ((tid & 32) == 0) ? (a + b) : (b - a);
+    __syncthreads();
+
+    a = sh[tid];
+    b = sh[tid ^ 64];
+    constexpr float inv_sqrt128 = 0.08838834764831845f;
+    x = ((tid & 64) == 0) ? (a + b) : (b - a);
+    y[base + tid] = ggml_cuda_cast<dst_t>(x * inv_sqrt128 * PQ_TQ_WHT_SIGNS1[tid]);
+}
+
+template <typename dst_t>
+static __device__ __forceinline__ void pq_tq_inverse_wht_store_256(
+        float * sh, const int tid, dst_t * __restrict__ y, const int64_t base) {
+    float x0 = sh[tid] * PQ_TQ_WHT_SIGNS2_256[tid];
+    float x1 = sh[tid + 128] * PQ_TQ_WHT_SIGNS2_256[tid + 128];
+    const int lane = tid & 31;
+    x0 = pq_tq_warp_fwht_32(x0, lane);
+    x1 = pq_tq_warp_fwht_32(x1, lane);
+    sh[tid] = x0;
+    sh[tid + 128] = x1;
+    __syncthreads();
+
+    float a0 = sh[tid];
+    float b0 = sh[tid ^ 32];
+    float a1 = sh[tid + 128];
+    float b1 = sh[(tid ^ 32) + 128];
+    __syncthreads();
+    sh[tid]       = ((tid & 32) == 0) ? (a0 + b0) : (b0 - a0);
+    sh[tid + 128] = ((tid & 32) == 0) ? (a1 + b1) : (b1 - a1);
+    __syncthreads();
+
+    a0 = sh[tid];
+    b0 = sh[tid ^ 64];
+    a1 = sh[tid + 128];
+    b1 = sh[(tid ^ 64) + 128];
+    x0 = ((tid & 64) == 0) ? (a0 + b0) : (b0 - a0);
+    x1 = ((tid & 64) == 0) ? (a1 + b1) : (b1 - a1);
+
+    constexpr float inv_sqrt256 = 0.0625f;
+    const float y0 = x0 + x1;
+    const float y1 = x0 - x1;
+    y[base + tid]       = ggml_cuda_cast<dst_t>(y0 * inv_sqrt256 * PQ_TQ_WHT_SIGNS1_256[tid]);
+    y[base + tid + 128] = ggml_cuda_cast<dst_t>(y1 * inv_sqrt256 * PQ_TQ_WHT_SIGNS1_256[tid + 128]);
+}
+
 template <PqTqTypeTag TT>
 static __device__ __forceinline__ float pq_tq_dequant_elem(const void * vx, int64_t global_elem);
 
@@ -142,9 +353,9 @@ template<> __device__ __forceinline__ float pq_tq_dequant_elem<PqTqTypeTag::T4_1
 // D-aware: for D=64 only 64 threads active, for D=256 each handles 2 elements.
 // Elements within a WHT group are contiguous in memory.
 
-template <PqTqTypeTag TT>
-static __global__ void k_dequant_pq_tq_unrotated_fp16(
-        const void * __restrict__ vx, half * __restrict__ y,
+template <typename dst_t, PqTqTypeTag TT>
+static __global__ void k_dequant_pq_tq_unrotated(
+        const void * __restrict__ vx, dst_t * __restrict__ y,
         const int64_t k, const int wht_dim) {
 
     __shared__ float sh[256];  // max D=256
@@ -153,51 +364,46 @@ static __global__ void k_dequant_pq_tq_unrotated_fp16(
     const int64_t gid = blockIdx.x;    // WHT group index
     const int64_t base = gid * wht_dim;
 
-    // Phase 1: Dequantize into shared memory (D-aware)
-    if (wht_dim <= 64) {
-        if (tid < wht_dim) sh[tid] = pq_tq_dequant_elem<TT>(vx, base + tid);
-    } else if (wht_dim <= 128) {
-        sh[tid] = pq_tq_dequant_elem<TT>(vx, base + tid);
-    } else {
-        sh[tid]       = pq_tq_dequant_elem<TT>(vx, base + tid);
-        sh[tid + 128] = pq_tq_dequant_elem<TT>(vx, base + tid + 128);
+    // Phase 1: Dequantize into shared memory, 2 elements per active thread.
+    // This halves the centroid decode work before the inverse WHT for pq/tq 2/3/4.
+    const int npairs = wht_dim / 2;
+    if (tid < npairs) {
+        const float2 pair = pq_tq_dequant_pair<TT>(vx, gid * npairs + tid);
+        sh[2 * tid + 0] = pair.x;
+        sh[2 * tid + 1] = pair.y;
     }
     __syncthreads();
 
-    // Phase 2: Cooperative inverse WHT (SIGNS + butterfly + scale + SIGNS)
-    if      (wht_dim == 64)  pq_tq_coop_wht_inverse<64>(sh, tid);
-    else if (wht_dim == 256) pq_tq_coop_wht_inverse<256>(sh, tid);
-    else                     pq_tq_coop_wht_inverse<128>(sh, tid);
-
-    // Phase 3: Write output as fp16 (D-aware)
-    if (wht_dim <= 64) {
-        if (tid < wht_dim) y[base + tid] = __float2half(sh[tid]);
-    } else if (wht_dim <= 128) {
-        y[base + tid] = __float2half(sh[tid]);
-    } else {
-        y[base + tid]       = __float2half(sh[tid]);
-        y[base + tid + 128] = __float2half(sh[tid + 128]);
-    }
+    // Phase 2: Inverse WHT and write output in the normal domain.
+    if      (wht_dim == 64)  pq_tq_inverse_wht_store_64(sh, tid, y, base);
+    else if (wht_dim == 256) pq_tq_inverse_wht_store_256(sh, tid, y, base);
+    else                     pq_tq_inverse_wht_store_128(sh, tid, y, base);
 }
 
 // ============================================================================
 // Host wrapper: D-aware dispatch (called directly with wht_dim, not via function pointer)
 // ============================================================================
 
-template <PqTqTypeTag TT>
-static void dequant_pq_tq_unrotated_fp16_wht(
-        const void * vx, half * y, int64_t k, int wht_dim, cudaStream_t stream) {
+template <typename dst_t, PqTqTypeTag TT>
+static void dequant_pq_tq_unrotated_wht(
+        const void * vx, dst_t * y, int64_t k, int wht_dim, cudaStream_t stream) {
     GGML_ASSERT(wht_dim == 64 || wht_dim == 128 || wht_dim == 256);
     GGML_ASSERT(k % wht_dim == 0);
     const int64_t n_groups = k / wht_dim;
-    k_dequant_pq_tq_unrotated_fp16<TT><<<n_groups, 128, 0, stream>>>(vx, y, k, wht_dim);
+    k_dequant_pq_tq_unrotated<dst_t, TT><<<n_groups, 128, 0, stream>>>(vx, y, k, wht_dim);
 }
 
 // Legacy wrapper matching to_fp16_cuda_t signature (assumes D=128)
 template <PqTqTypeTag TT>
 static void dequant_pq_tq_unrotated_fp16(
         const void * vx, half * y, int64_t k, cudaStream_t stream) {
-    dequant_pq_tq_unrotated_fp16_wht<TT>(vx, y, k, 128, stream);
+    dequant_pq_tq_unrotated_wht<half, TT>(vx, y, k, 128, stream);
+}
+
+template <PqTqTypeTag TT>
+static void dequant_pq_tq_unrotated_fp32(
+        const void * vx, float * y, int64_t k, cudaStream_t stream) {
+    dequant_pq_tq_unrotated_wht<float, TT>(vx, y, k, 128, stream);
 }
 
 // ============================================================================
@@ -207,15 +413,30 @@ static void dequant_pq_tq_unrotated_fp16(
 static void dequant_pq_tq_unrotated_fp16_dispatch(
         ggml_type type, const void * vx, half * y, int64_t k, int wht_dim, cudaStream_t stream) {
     switch (type) {
-        case GGML_TYPE_PQ2_0: dequant_pq_tq_unrotated_fp16_wht<PqTqTypeTag::T2_0>(vx, y, k, wht_dim, stream); break;
-        case GGML_TYPE_PQ3_0: dequant_pq_tq_unrotated_fp16_wht<PqTqTypeTag::T3_0>(vx, y, k, wht_dim, stream); break;
-        case GGML_TYPE_PQ4_0: dequant_pq_tq_unrotated_fp16_wht<PqTqTypeTag::T4_0>(vx, y, k, wht_dim, stream); break;
-        case GGML_TYPE_TQ2_1: dequant_pq_tq_unrotated_fp16_wht<PqTqTypeTag::T2_1>(vx, y, k, wht_dim, stream); break;
-        case GGML_TYPE_TQ3_1: dequant_pq_tq_unrotated_fp16_wht<PqTqTypeTag::T3_1>(vx, y, k, wht_dim, stream); break;
-        case GGML_TYPE_TQ4_1: dequant_pq_tq_unrotated_fp16_wht<PqTqTypeTag::T4_1>(vx, y, k, wht_dim, stream); break;
-        case GGML_TYPE_PQ4_0_64: dequant_pq_tq_unrotated_fp16_wht<PqTqTypeTag::T4_0_64>(vx, y, k, wht_dim, stream); break;
-        case GGML_TYPE_TQ4_1_64: dequant_pq_tq_unrotated_fp16_wht<PqTqTypeTag::T4_1_64>(vx, y, k, wht_dim, stream); break;
-        default: GGML_ABORT("unsupported pq/tq type for WHT-fused dequant");
+        case GGML_TYPE_PQ2_0: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::T2_0>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_PQ3_0: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::T3_0>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_PQ4_0: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::T4_0>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_TQ2_1: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::T2_1>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_TQ3_1: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::T3_1>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_TQ4_1: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::T4_1>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_PQ4_0_64: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::T4_0_64>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_TQ4_1_64: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::T4_1_64>(vx, y, k, wht_dim, stream); break;
+        default: GGML_ABORT("unsupported pq/tq type for WHT-fused fp16 dequant");
+    }
+}
+
+static void dequant_pq_tq_unrotated_fp32_dispatch(
+        ggml_type type, const void * vx, float * y, int64_t k, int wht_dim, cudaStream_t stream) {
+    switch (type) {
+        case GGML_TYPE_PQ2_0: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::T2_0>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_PQ3_0: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::T3_0>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_PQ4_0: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::T4_0>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_TQ2_1: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::T2_1>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_TQ3_1: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::T3_1>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_TQ4_1: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::T4_1>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_PQ4_0_64: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::T4_0_64>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_TQ4_1_64: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::T4_1_64>(vx, y, k, wht_dim, stream); break;
+        default: GGML_ABORT("unsupported pq/tq type for WHT-fused fp32 dequant");
     }
 }
 
@@ -234,6 +455,20 @@ static to_fp16_cuda_t ggml_get_to_fp16_pq_tq_unrotated_cuda(ggml_type type) {
         case GGML_TYPE_TQ4_1: return dequant_pq_tq_unrotated_fp16<PqTqTypeTag::T4_1>;
         case GGML_TYPE_PQ4_0_64: return dequant_pq_tq_unrotated_fp16<PqTqTypeTag::T4_0_64>;
         case GGML_TYPE_TQ4_1_64: return dequant_pq_tq_unrotated_fp16<PqTqTypeTag::T4_1_64>;
+        default: return nullptr;
+    }
+}
+
+static to_fp32_cuda_t ggml_get_to_fp32_pq_tq_unrotated_cuda(ggml_type type) {
+    switch (type) {
+        case GGML_TYPE_PQ2_0: return dequant_pq_tq_unrotated_fp32<PqTqTypeTag::T2_0>;
+        case GGML_TYPE_PQ3_0: return dequant_pq_tq_unrotated_fp32<PqTqTypeTag::T3_0>;
+        case GGML_TYPE_PQ4_0: return dequant_pq_tq_unrotated_fp32<PqTqTypeTag::T4_0>;
+        case GGML_TYPE_TQ2_1: return dequant_pq_tq_unrotated_fp32<PqTqTypeTag::T2_1>;
+        case GGML_TYPE_TQ3_1: return dequant_pq_tq_unrotated_fp32<PqTqTypeTag::T3_1>;
+        case GGML_TYPE_TQ4_1: return dequant_pq_tq_unrotated_fp32<PqTqTypeTag::T4_1>;
+        case GGML_TYPE_PQ4_0_64: return dequant_pq_tq_unrotated_fp32<PqTqTypeTag::T4_0_64>;
+        case GGML_TYPE_TQ4_1_64: return dequant_pq_tq_unrotated_fp32<PqTqTypeTag::T4_1_64>;
         default: return nullptr;
     }
 }

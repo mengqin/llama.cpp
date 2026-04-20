@@ -1,0 +1,91 @@
+{
+  "result": {
+    "phase": "needle",
+    "dim": "D64",
+    "type": "pq4",
+    "needle_size": "128K",
+    "exit_code": 0,
+    "needle_score": 4.716,
+    "needle_score_en": 4.716,
+    "needle_score_zh": null,
+    "n_samples": 6,
+    "log": "needle_128k_d64_pq4.json",
+    "server_log": "needle_server_d64_pq4.log"
+  },
+  "details": [
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisacodesword.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 41,
+      "score": 4.528301886792452
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**BookofStorytellers**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 41,
+      "score": 7.941176470588236
+    },
+    {
+      "pred": "**Theanswertoyourquestionis:Thecity’shiddentreasureisacointhatwasmissingfromtheoriginallabelsthenextTurtlemagazinegaveago/andeventuallyproducedsomanyearlyexamplestofeelcontentOk,butforusbenusestoryandgood,oralongguesstoreadincoffee?**",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 200,
+      "score": 2.9059829059829068
+    },
+    {
+      "pred": "Therelevantportionofthetextthatreferstothequestionisthementioninthelinethatsays:>\"Thereisarelicfroman\"gildingturnedinto...Theoriginalquestionis\"WhatlegendaryitemishiddenonEmeraldIsland?\"Theanswer,asdescribedthere,isthementionofthe\"inventionofthe'map'symbolreferencingthe\"locatingan'wheresomethingisineachparticularplace.Theansweris:\"S.It'stheletter\"s\"whichisoriginallyfromthe\"tg.\"\"Waitwait.Ithinkthecorrectanswerfromthetextis\"S.\"ButpropertyoftheanswermightbereferencingtheletterS,maybemeaningthe\"letterS\"oftheword\"S.\"Butaboveweconcluded\"S.\"Sotheanswer:\"S.\"Therefore:\"S.\"Itdoesnotprovideanexplicit\"S.\"Therelevanttextmightnotincludeactualletter\"S.\"Sotheansweris\"S.\"It'snotfullyspelled.Theanswermaybejust\"S.\"\"Wait,Ithink\"S.\"Sofinalanswer:\"S.\"Possibly\"S.\"Butdidn'thaveaproper.Sofinal:\"S.\"Theletter\"S.\"Sofinal:\"S.\"Butwecan'tfullyproducethateasily.**Answer**:Theliteralhiddenitemistheletter\"S.\".Butno.Theanswermightbejust\"S\".Let'sproducetheminimalfinalanswer:\"letter\"S.\"",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 920,
+      "score": 0.9128630705394181
+    },
+    {
+      "pred": "ThelegendaryitemhiddenontheEmeraldIslandisthe**bluepurpleringofMastery**.",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 42,
+      "score": 8.493150684931507
+    },
+    {
+      "pred": "Thequestionreferstothe“legendary”itembeinghiddenonEmeraldIsland.Inthetexttheonlyplacethatrepeatsthisphraseina“askyouwhatwas.”Itis“theMysticalbird'OnTheVeggie”that.Sowecananswer:**ThelegendaryitemhiddenontheEmeraldIslandis“Prince'slever.”**",
+      "answer": "HiddenonEmeraldIslandisthelegendaryMagicEssence.",
+      "edit_distance": 197,
+      "score": 3.5146443514644354
+    }
+  ],
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is a codesword."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **Book of Storytellers**."
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "**The answer to your question is: The city’s hidden treasure is a coin that was missing from the original labels the next Turtle magazine gave a go/ and eventually produced so many early examples to feel content Ok, but for us ben use story and good, or along guess to read in coffee?**"
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The relevant portion of the text that refers to the question is the mention in the line that says:\n\n> \"There is a relic from an \"gilding turned into... The original question is \"What legendary item is hidden on Emerald Island?\" The answer, as described there, is the mention of the \"invention of the 'map' symbol referencing the \"locating an 'where something is in each particular place. The answer is: \"S. It's the letter \"s\" which is originally from the \"tg.\"\"\n\nWait wait. I think the correct answer from the text is \"S.\" But property of the answer might be referencing the letter S, maybe meaning the \"letter S\" of the word \"S.\"But above we concluded \"S.\" So the answer: \"S.\"\n\nTherefore: \"S.\" It does not provide an explicit \"S.\" The relevant text might not include actual letter \"S.\" So the answer is \"S.\" It's not fully spelled. The answer may be just \"S.\"\" Wait, I think \"S.\" So final answer: \"S.\" Possibly \"S.\" But didn't have a proper. \nSo final: \"S.\" The letter \"S.\" So final: \"S.\" But we can't fully produce that easily.\n\n**Answer**: The literal hidden item is the letter \"S.\". \nBut no. The answer might be just \"S\". \nLet's produce the minimal final answer: \"letter \"S.\""
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary item hidden on the Emerald Island is the **blue purple ring of Mastery**."
+    },
+    {
+      "language": "English",
+      "depth": 100,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The question refers to the “legendary” item being hidden on Emerald Island.  In the text the only place that repeats this phrase in a “askyou what was.”  It is “the Mystical bird 'On The Veggie” that.  So we can answer:  \n\n**The legendary item hidden on the Emerald Island is “Prince's lever.”**"
+    }
+  ]
+}

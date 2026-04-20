@@ -1,0 +1,40 @@
+{
+  "phase": "needle",
+  "dim": "D64",
+  "type": "pq3",
+  "needle_size": "128K",
+  "error": "500 Server Error: Internal Server Error for url: http://127.0.0.1:18086/v1/chat/completions",
+  "exit_code": 1,
+  "samples": [
+    {
+      "language": "English",
+      "depth": 0,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The legendary message is to be made by the information about this specific thing, but we also see that the important thing that I hasn't yet completed, and in the earlier essay there are many relevant points to better examine. The most worth adding is or at some of the section where it says \"good to many to do something. The last point is maybe scripting or but we need to look at certain many things like being about the main thing \"A lot\" to mention the primary important concept. The final conclusion: \"The legendary item hidden on the Emerald. The question \"the Emerald keep to different great or The following.\" The final answer is: ***. But the \"Trevor\" to mention the \"Naxos. The final concept that we matured the bestness to give the \"Marri.\"\n\nBut as the more.\n\nIt still maybe to express something. The net. etc.\n\nBut we need not produce just \"It is.\n\nIt cannot mean that \"It is also referencing the \"Marques\"\n\nThus the final statement: \"The answer is: ***.\" But we try to respond: The answer to the short answer: \"All. The final.\n\nWe produce the final.\n\nThus the final.\n\nAnswer: \"The legendary item on the Emerald is at \"concealed\" but not to mention the nuance.\n\nLet's attempt.\n\nWe can't memorize. The net.\n\nBut we produce final answer: The legendary item hidden on the Emerald is \"The.\n\nHence final. Let's produce:\n\n\"The legendary item on the Emerald is ...?? Enough.\n\nWe can recall: The. Could be \"The\".\n\nOk, answer is \"Lake.\".\n\nOk.\n\nOk this is trivial.\n\nNow final."
+    },
+    {
+      "language": "English",
+      "depth": 20,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "**Answer**  \nThe only “legendary” thing hidden on the “Island of the “Legend” is the “scepter.”"
+    },
+    {
+      "language": "English",
+      "depth": 40,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "**The legendary item hidden on Emerald Island is the well‑made “Lisp” – the original “product” that let programmers write programs, and is a thin user‑friendly interface for the web itself – a version of the language that runs on the \"real‑world” – a truly “Good” “software” “app”.   **"
+    },
+    {
+      "language": "English",
+      "depth": 60,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "The **legendary item** that you should look for is an **\"Answer the problem you’re trying to solve in the Rocky Ridge!\"** (i.e., that small but useful thing you need to solve. It is at least it does it that? – “Answer the problem as far as you can to labor the small and find the minimal workable mode of any right answer. – that's the key.”"
+    },
+    {
+      "language": "English",
+      "depth": 80,
+      "answer": "\nHidden on Emerald Island is the legendary Magic Essence.\n*Magic Essence",
+      "prediction": "**The legendary **“Lisp”** (the programming language of the early 1980s, which later became the scripting language for the web, and eventually became the term “JavaScript” at Google.**"
+    }
+  ]
+}

@@ -56,6 +56,9 @@ static std::string llama_model_ftype_name(llama_ftype ftype) {
         case LLAMA_FTYPE_MOSTLY_Q6_K:     return "Q6_K";
         case LLAMA_FTYPE_MOSTLY_TQ1_0:    return "TQ1_0 - 1.69 bpw ternary";
         case LLAMA_FTYPE_MOSTLY_TQ2_0:    return "TQ2_0 - 2.06 bpw ternary";
+        case LLAMA_FTYPE_MOSTLY_PQ2_0:    return "PQ2_0 - mixed PolarQuant 2-bit";
+        case LLAMA_FTYPE_MOSTLY_PQ3_0:    return "PQ3_0 - mixed PolarQuant 3-bit";
+        case LLAMA_FTYPE_MOSTLY_PQ4_0:    return "PQ4_0 - mixed PolarQuant 4-bit";
         case LLAMA_FTYPE_MOSTLY_IQ2_XXS:  return "IQ2_XXS - 2.0625 bpw";
         case LLAMA_FTYPE_MOSTLY_IQ2_XS:   return "IQ2_XS - 2.3125 bpw";
         case LLAMA_FTYPE_MOSTLY_IQ2_S:    return "IQ2_S - 2.5 bpw";
@@ -749,6 +752,9 @@ llama_model_loader::llama_model_loader(
             case GGML_TYPE_Q6_K:    ftype = LLAMA_FTYPE_MOSTLY_Q6_K;    break;
             case GGML_TYPE_TQ1_0:   ftype = LLAMA_FTYPE_MOSTLY_TQ1_0;   break;
             case GGML_TYPE_TQ2_0:   ftype = LLAMA_FTYPE_MOSTLY_TQ2_0;   break;
+            case GGML_TYPE_PQ2_0:   ftype = LLAMA_FTYPE_MOSTLY_PQ2_0;   break;
+            case GGML_TYPE_PQ3_0:   ftype = LLAMA_FTYPE_MOSTLY_PQ3_0;   break;
+            case GGML_TYPE_PQ4_0:   ftype = LLAMA_FTYPE_MOSTLY_PQ4_0;   break;
             case GGML_TYPE_IQ2_XXS: ftype = LLAMA_FTYPE_MOSTLY_IQ2_XXS; break;
             case GGML_TYPE_IQ2_XS:  ftype = LLAMA_FTYPE_MOSTLY_IQ2_XS;  break;
             case GGML_TYPE_IQ2_S:   ftype = LLAMA_FTYPE_MOSTLY_IQ2_S;   break;

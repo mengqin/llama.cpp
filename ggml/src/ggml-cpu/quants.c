@@ -511,8 +511,38 @@ void fn_name(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRI
     *s = sumf;                                                                                       \
 }
 
-GGML_IMPL_VEC_DOT_PQ_TQ_Q8_0(ggml_vec_dot_pq2_0_q8_0,    block_pq2,    QK_PQ_TQ_2,    dequantize_row_pq2_0)
-GGML_IMPL_VEC_DOT_PQ_TQ_Q8_0(ggml_vec_dot_pq3_0_q8_0,    block_pq3,    QK_PQ_TQ_3,    dequantize_row_pq3_0)
+#define GGML_IMPL_VEC_DOT_PQ_TQ_GROUP_Q8_0(fn_name, block_type, qk_group, blocks_per_group, dequant_fn) \
+void fn_name(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx,                   \
+        size_t bx, const void * GGML_RESTRICT vy, size_t by, int nrc) {                                  \
+    assert(n % (qk_group) == 0);                                                                          \
+    assert(nrc == 1);                                                                                     \
+    UNUSED(nrc);                                                                                          \
+    UNUSED(bx);                                                                                           \
+    UNUSED(by);                                                                                           \
+    UNUSED(bs);                                                                                           \
+                                                                                                          \
+    const block_type * GGML_RESTRICT x = (const block_type *) vx;                                        \
+    const block_q8_0 * GGML_RESTRICT y = (const block_q8_0 *) vy;                                        \
+    const int ng = n / (qk_group);                                                                        \
+    const int yb = (qk_group) / QK8_0;                                                                    \
+    float xbuf[qk_group];                                                                                 \
+    float ybuf[QK8_0];                                                                                    \
+    float sumf = 0.0f;                                                                                    \
+                                                                                                          \
+    for (int ig = 0; ig < ng; ++ig) {                                                                     \
+        dequant_fn(x + ig * (blocks_per_group), xbuf, qk_group);                                         \
+                                                                                                          \
+        for (int jb = 0; jb < yb; ++jb) {                                                                 \
+            dequantize_row_q8_0(y + ig*yb + jb, ybuf, QK8_0);                                            \
+            sumf += ggml_vec_dot_f32_ref(xbuf + jb*QK8_0, ybuf, QK8_0);                                  \
+        }                                                                                                 \
+    }                                                                                                     \
+                                                                                                          \
+    *s = sumf;                                                                                            \
+}
+
+GGML_IMPL_VEC_DOT_PQ_TQ_GROUP_Q8_0(ggml_vec_dot_pq2_0_q8_0, block_pq2, QK_PQ_TQ_2_GROUP, QK_PQ_TQ_2_GROUP / QK_PQ_TQ_2, dequantize_row_pq2_0)
+GGML_IMPL_VEC_DOT_PQ_TQ_GROUP_Q8_0(ggml_vec_dot_pq3_0_q8_0, block_pq3, QK_PQ_TQ_3_GROUP, QK_PQ_TQ_3_GROUP / QK_PQ_TQ_3, dequantize_row_pq3_0)
 GGML_IMPL_VEC_DOT_PQ_TQ_Q8_0(ggml_vec_dot_pq4_0_q8_0,    block_pq4,    QK_PQ_TQ_4,    dequantize_row_pq4_0)
 GGML_IMPL_VEC_DOT_PQ_TQ_Q8_0(ggml_vec_dot_pq4_0_64_q8_0, block_pq4_d64, QK_PQ_TQ_4_D64, dequantize_row_pq4_0_64)
 GGML_IMPL_VEC_DOT_PQ_TQ_Q8_0(ggml_vec_dot_tq2_1_q8_0,    block_tq2,    QK_PQ_TQ_2,    dequantize_row_tq2_1)

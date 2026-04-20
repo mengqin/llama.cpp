@@ -1,0 +1,230 @@
+We need to parse problem. Person times: Patrick starts at t=0 from school. Walk at constant speed v (miles per hour). He goes to park distance D. So his time to finish is t_P = D/v.
+
+Tanya starts 1 hour later. She runs at speed v+2 mph. She also ends at park simultaneously with Patrick. So she must cover distance D in same overall time t_P? Wait, they all arrived same time - at park. But need consider start times. Let's denote times relative to Patrick.
+
+Let D distance. Patrick speed v. So time to finish = D/v.
+
+Tanya starts 1 hour after Patrick (t=1). She must finish at same time t_P = D/v. So her travel time = t_P - 1 = D/v - 1. She travels distance D at speed v+2. So D/(v+2) = D/v - 1. Solve for v maybe. But we then also involve Jose.
+
+Similarly, Jose starts 1 hour after Tanya (so 2 hours after Patrick). He cycles at speed v+2+7 = v+9 mph. He finished at same time t_P. So his travel time = t_P - 2 = D/v - 2. Distance D at speed v+9 → D/(v+9) = D/v - 2.
+
+Two equations: 
+
+1) D/(v+2) = D/v - 1
+2) D/(v+9) = D/v - 2
+
+We need D. Independent variable v,m? D appears.
+
+Given that D canceled? Let's solve.
+
+Let’s write equations.
+
+Equation 1: D/(v+2) = D/v - 1.
+
+Multiply both sides by (v+2)v: D v = (D/v -1)(v+2)v? Wait, no. Let's solve more carefully.
+
+Better: Use unknown ratio; we can cancel D maybe.
+
+Let’s rearrange: D/(v+2) = D/v - 1.
+
+Divide D both sides? D > 0. We can divide both sides by D: 1/(v+2) = 1/v - 1/D.
+
+But that introduces D. Maybe better to solve for D in terms of v?
+
+Alternatively, consider simply that the time differences among them produce equations.
+
+Let tP = D/v.
+
+We have tT = tP - 1 with speed v+2: D/(v+2) = tP - 1.
+
+But tP = D/v.
+
+Thus D/(v+2) = D/v - 1.
+
+Similarly D/(v+9) = D/v - 2.
+
+We will solve for v and D.
+
+Let's treat D unknown too.
+
+Let’s rewrite equation 1:
+
+D/(v+2) = D/v - 1.
+
+Multiply both sides by (v+2) to clear denominator:
+
+D = (D/v - 1)(v+2).
+
+Compute RHS: (D/v - 1)(v+2) = (D/v)(v+2) - (v+2) = D*(v+2)/v - (v+2).
+
+Thus D = D*(v+2)/v - (v+2).
+
+Bring D terms: D - D*(v+2)/v = -(v+2). Multiply through by v:
+
+D*v - D*(v+2) = -(v+2)*v.
+
+Compute left: D*v - D*v - 2D = -(v+2)*v = -(v^2 + 2v).
+
+So left simplifies: D*v - D*v cancels -> -2D = -(v^2+2v). Multiply by negative: 2D = v^2 + 2v. Thus
+
+2D = v^2 + 2v (Equation A)
+
+Similarly equation 2: D/(v+9) = D/v - 2.
+
+Proceed similarly:
+
+D/(v+9) = D/v - 2.
+
+Multiply both sides by (v+9):
+
+D = (D/v - 2)(v+9) = (D/v)(v+9) - 2(v+9) = D*(v+9)/v - 2(v+9).
+
+So D = D*(v+9)/v - 2(v+9).
+
+Move D terms: D - D*(v+9)/v = -2(v+9).
+
+Multiply both sides by v:
+
+Dv - D*(v+9) = -2(v+9)v = -2(v^2+9v).
+
+Left side: Dv - Dv - 9D = -2(v^2+9v). So -9D = -2(v^2+9v).
+
+Thus 9D = 2(v^2+9v). So
+
+9D = 2v^2 + 18v or D = (2v^2+18v)/9. (Equation B)
+
+But from Equation A: D = (v^2+2v)/2 .
+
+Set equal:
+
+(v^2 + 2v)/2 = (2v^2 + 18v)/9.
+
+Cross-multiply: 9(v^2 + 2v) = 2(2v^2 + 18v).
+
+Compute left: 9v^2 + 18v. Right: 4v^2 + 36v.
+
+Bring all: 9v^2 + 18v - 4v^2 - 36v = 0 => (9-4)v^2 + (18-36)v = 0 => 5v^2 - 18v = 0 => v(5v - 18)=0.
+
+v > 0 gives 5v-18=0 => v = 18/5 = 3.6 mph.
+
+Great. Now compute D. Use Equation A: D = (v^2 + 2v)/2.
+
+Compute v^2= (18/5)^2 = 324/25 = 12.96. 2v = 36/5=7.2.
+
+v^2 + 2v = 324/25 + 36/5 = 324/25 + 180/25 = 504/25 = 20.16. Then /2 -> D = 504/50 = 252/25 = 10.08? Wait 504/50 = 10.08; but as fraction simpl. 252/25 = 10.08. So D = 252/25 miles.
+
+But we can also compute via B maybe cross-check. Let's compute.
+
+=> D = 252/25. ok.
+
+Thus distance from school to park is m/n where m,n relatively prime positive integers: 252/25 simplified? 252 and 25 share gcd 1? 252 prime factors: 2^2*3^2*7. 25 prime 5^2. No common. So fraction already reduced: m=252, n=25. Find m+n = 252+25=277.
+
+But check: Are we correct? Wait: The ratio maybe not simplified? 252/25 =10.08 miles. Could this be the result?
+
+Let's verify with times concept. Let's compute times:
+
+v=3.6 mph.
+
+D=10.08 miles.
+
+Patrick time: tP = D/v = (252/25)/(18/5) = (252/25)*(5/18) = (252*5)/(25*18) = (1260)/(450) = 14/5? Wait compute: 252*5=1260. 25*18=450. 1260/450 = 2.8. Indeed tP = 2.8 hours = 2 h 48 min.
+
+Check with D/v: 10.08/3.6 = 2.8. ok.
+
+Tanya's route: she runs speed v+2=5.6 mph. She starts 1 hour later. She must finish at same time = 2.8 hrs. She has only tT=1.8 hrs moving. D/(v+2) = 10.08/5.6 = ~1.8. 10.08/5.6=1.8 indeed. Great.
+
+Jose's route: speed v+9=12.6 mph. Starting 2 hrs after Patrick. Works: D/(v+9)=10.08/12.6=0.8? Wait 10.08/12.6 = 0.8 hrs (48 minutes). Yes, t_jones =0.8 hrs. He left 2 hrs after Patrick, leaving 0.8 hours to finish, so times align. Good.
+
+Thus answer m+n=277. Provide final answer.
+
+Let's double-check fractions: D = 252/25 = 10.08 miles. So matches.
+
+Thus final: 277.
+
+Let the distance from the school to the park be \(D\) miles and let Patrick’s walking speed be \(v\) mph. 
+All arrive at the park at the same time.
+
+---
+
+### 1. Time equations
+
+- **Patrick** starts at \(t=0\) and arrives at time \(T=\frac{D}{v}\).
+
+- **Tanya** starts 1 hour later; she runs at speed \(v+2\) mph. 
+ Her travel time is \(T-1=\frac{D}{v+2}\).
+
+- **Jose** starts 2 hours after Patrick (1 hour after Tanya); he cycles at speed \(v+9\) mph. 
+ His travel time is \(T-2=\frac{D}{v+9}\).
+
+Thus
+
+\[
+\frac{D}{v+2}= \frac{D}{v}-1,\qquad
+\frac{D}{v+9}= \frac{D}{v}-2.
+\]
+
+---
+
+### 2. Solve for \(v\) and \(D\)
+
+From the first equation:
+
+\[
+D = \frac{D(v+2)}{v}- (v+2)\quad\Longrightarrow\quad
+2D=v^{2}+2v.\tag{A}
+\]
+
+From the second equation:
+
+\[
+D = \frac{D(v+9)}{v}-2(v+9)
+\quad\Longrightarrow\quad
+9D=2v^{2}+18v,\tag{B}
+\]
+so
+
+\[
+D=\frac{2v^{2}+18v}{9}.
+\]
+
+Equating the two expressions for \(D\):
+
+\[
+\frac{v^{2}+2v}{2}=\frac{2v^{2}+18v}{9}.
+\]
+
+Cross‑multiplying gives
+
+\[
+9(v^{2}+2v)=2(2v^{2}+18v)\Rightarrow
+5v^{2}-18v=0.
+\]
+
+Since \(v>0\), 
+
+\[
+v=\frac{18}{5}\ \text{mph}=3.6\text{ mph}.
+\]
+
+Now use (A) to find \(D\):
+
+\[
+D=\frac{v^{2}+2v}{2}
+ =\frac{\left(\frac{18}{5}\right)^{2}+2\left(\frac{18}{5}\right)}{2}
+ =\frac{252}{25}\ \text{miles}.
+\]
+
+---
+
+### 3. Answer
+
+The distance is \(\displaystyle \frac{252}{25}\) miles; the fraction is already in lowest terms. 
+Hence \(m=252\) and \(n=25\).
+
+\[
+m+n=252+25=277.
+\]
+
+\[
+\boxed{277}
+\]
