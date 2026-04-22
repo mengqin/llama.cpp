@@ -1,5 +1,6 @@
 #include "convert.cuh"
 #include "dequantize.cuh"
+#include "pq-tq-dequant-wht.cuh"
 
 #include <cstdint>
 
@@ -719,6 +720,12 @@ to_fp16_cuda_t ggml_get_to_fp16_cuda(ggml_type type) {
             return dequantize_block_cont_cuda<QK_PQ_TQ_4, QR_PQ4_0, dequantize_pq4_0>;
         case GGML_TYPE_PQ4_0_64:
             return dequantize_block_cont_cuda<QK_PQ_TQ_4_D64, QR_PQ4_0, dequantize_pq4_0_64>;
+        case GGML_TYPE_PQ2_K:
+            return dequant_pq_tq_unrotated_fp16_256<PqTqTypeTag::P2_K>;
+        case GGML_TYPE_PQ3_K:
+            return dequant_pq_tq_unrotated_fp16_256<PqTqTypeTag::P3_K>;
+        case GGML_TYPE_PQ4_K:
+            return dequant_pq_tq_unrotated_fp16_256<PqTqTypeTag::P4_K>;
         case GGML_TYPE_TQ2_1:
             return dequantize_block_cont_cuda<QK_PQ_TQ_2, QR_TQ2_1, dequantize_tq2_1>;
         case GGML_TYPE_TQ3_1:
@@ -793,6 +800,12 @@ to_fp32_cuda_t ggml_get_to_fp32_cuda(ggml_type type) {
             return dequantize_block_cont_cuda<QK_PQ_TQ_4, QR_PQ4_0, dequantize_pq4_0>;
         case GGML_TYPE_PQ4_0_64:
             return dequantize_block_cont_cuda<QK_PQ_TQ_4_D64, QR_PQ4_0, dequantize_pq4_0_64>;
+        case GGML_TYPE_PQ2_K:
+            return dequant_pq_tq_unrotated_fp32_256<PqTqTypeTag::P2_K>;
+        case GGML_TYPE_PQ3_K:
+            return dequant_pq_tq_unrotated_fp32_256<PqTqTypeTag::P3_K>;
+        case GGML_TYPE_PQ4_K:
+            return dequant_pq_tq_unrotated_fp32_256<PqTqTypeTag::P4_K>;
         case GGML_TYPE_TQ2_1:
             return dequantize_block_cont_cuda<QK_PQ_TQ_2, QR_TQ2_1, dequantize_tq2_1>;
         case GGML_TYPE_TQ3_1:

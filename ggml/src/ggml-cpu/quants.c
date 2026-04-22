@@ -138,6 +138,24 @@ void quantize_row_pq4_0_64(const float * GGML_RESTRICT x, void * GGML_RESTRICT v
     quantize_row_pq4_0_64_ref(x, y, k);
 }
 
+void quantize_row_pq2_K(const float * GGML_RESTRICT x, void * GGML_RESTRICT vy, int64_t k) {
+    assert(k % QK_K == 0);
+    block_pq2_K * GGML_RESTRICT y = vy;
+    quantize_row_pq2_K_ref(x, y, k);
+}
+
+void quantize_row_pq3_K(const float * GGML_RESTRICT x, void * GGML_RESTRICT vy, int64_t k) {
+    assert(k % QK_K == 0);
+    block_pq3_K * GGML_RESTRICT y = vy;
+    quantize_row_pq3_K_ref(x, y, k);
+}
+
+void quantize_row_pq4_K(const float * GGML_RESTRICT x, void * GGML_RESTRICT vy, int64_t k) {
+    assert(k % QK_K == 0);
+    block_pq4_K * GGML_RESTRICT y = vy;
+    quantize_row_pq4_K_ref(x, y, k);
+}
+
 void quantize_row_tq2_1(const float * GGML_RESTRICT x, void * GGML_RESTRICT vy, int64_t k) {
     assert(k % QK_PQ_TQ_2 == 0);
     block_tq2 * GGML_RESTRICT y = vy;
@@ -541,10 +559,39 @@ void fn_name(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRI
     *s = sumf;                                                                                            \
 }
 
+#define GGML_IMPL_VEC_DOT_PQ_TQ_Q8_K(fn_name, block_type, qk, dequant_fn)                            \
+void fn_name(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx,               \
+        size_t bx, const void * GGML_RESTRICT vy, size_t by, int nrc) {                              \
+    assert(n % (qk) == 0);                                                                            \
+    assert(nrc == 1);                                                                                 \
+    UNUSED(nrc);                                                                                      \
+    UNUSED(bx);                                                                                        \
+    UNUSED(by);                                                                                        \
+    UNUSED(bs);                                                                                        \
+                                                                                                       \
+    const block_type * GGML_RESTRICT x = (const block_type *) vx;                                     \
+    const block_q8_K * GGML_RESTRICT y = (const block_q8_K *) vy;                                     \
+    const int nb = n / (qk);                                                                          \
+    float xbuf[qk];                                                                                   \
+    float ybuf[qk];                                                                                   \
+    float sumf = 0.0f;                                                                                \
+                                                                                                       \
+    for (int ib = 0; ib < nb; ++ib) {                                                                 \
+        dequant_fn(x + ib, xbuf, qk);                                                                 \
+        dequantize_row_q8_K(y + ib, ybuf, qk);                                                        \
+        sumf += ggml_vec_dot_f32_ref(xbuf, ybuf, qk);                                                 \
+    }                                                                                                 \
+                                                                                                       \
+    *s = sumf;                                                                                        \
+}
+
 GGML_IMPL_VEC_DOT_PQ_TQ_GROUP_Q8_0(ggml_vec_dot_pq2_0_q8_0, block_pq2, QK_PQ_TQ_2_GROUP, QK_PQ_TQ_2_GROUP / QK_PQ_TQ_2, dequantize_row_pq2_0)
 GGML_IMPL_VEC_DOT_PQ_TQ_GROUP_Q8_0(ggml_vec_dot_pq3_0_q8_0, block_pq3, QK_PQ_TQ_3_GROUP, QK_PQ_TQ_3_GROUP / QK_PQ_TQ_3, dequantize_row_pq3_0)
 GGML_IMPL_VEC_DOT_PQ_TQ_Q8_0(ggml_vec_dot_pq4_0_q8_0,    block_pq4,    QK_PQ_TQ_4,    dequantize_row_pq4_0)
 GGML_IMPL_VEC_DOT_PQ_TQ_Q8_0(ggml_vec_dot_pq4_0_64_q8_0, block_pq4_d64, QK_PQ_TQ_4_D64, dequantize_row_pq4_0_64)
+GGML_IMPL_VEC_DOT_PQ_TQ_Q8_K(ggml_vec_dot_pq2_K_q8_K,    block_pq2_K,  QK_K, dequantize_row_pq2_K)
+GGML_IMPL_VEC_DOT_PQ_TQ_Q8_K(ggml_vec_dot_pq3_K_q8_K,    block_pq3_K,  QK_K, dequantize_row_pq3_K)
+GGML_IMPL_VEC_DOT_PQ_TQ_Q8_K(ggml_vec_dot_pq4_K_q8_K,    block_pq4_K,  QK_K, dequantize_row_pq4_K)
 GGML_IMPL_VEC_DOT_PQ_TQ_Q8_0(ggml_vec_dot_tq2_1_q8_0,    block_tq2,    QK_PQ_TQ_2,    dequantize_row_tq2_1)
 GGML_IMPL_VEC_DOT_PQ_TQ_Q8_0(ggml_vec_dot_tq3_1_q8_0,    block_tq3,    QK_PQ_TQ_3,    dequantize_row_tq3_1)
 GGML_IMPL_VEC_DOT_PQ_TQ_Q8_0(ggml_vec_dot_tq4_1_q8_0,    block_tq4,    QK_PQ_TQ_4,    dequantize_row_tq4_1)

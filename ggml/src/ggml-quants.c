@@ -5464,6 +5464,18 @@ bool ggml_validate_row_data(enum ggml_type type, const void * data, size_t nbyte
                     }
                 }
             } break;
+        case GGML_TYPE_PQ2_K:
+            {
+                VALIDATE_ROW_DATA_DVEC_F16_IMPL(block_pq2_K, data, nb, 2);
+            } break;
+        case GGML_TYPE_PQ3_K:
+            {
+                VALIDATE_ROW_DATA_DVEC_F16_IMPL(block_pq3_K, data, nb, 2);
+            } break;
+        case GGML_TYPE_PQ4_K:
+            {
+                VALIDATE_ROW_DATA_DVEC_F16_IMPL(block_pq4_K, data, nb, 2);
+            } break;
         case GGML_TYPE_TQ2_1:
             {
                 const block_tq2 * q = (const block_tq2 *) data;

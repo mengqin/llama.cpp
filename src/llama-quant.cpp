@@ -361,7 +361,10 @@ static bool tensor_allows_quantization(const llama_model_quantize_params * param
 static bool ftype_is_pq(const llama_ftype ftype) {
     return ftype == LLAMA_FTYPE_MOSTLY_PQ2_0 ||
            ftype == LLAMA_FTYPE_MOSTLY_PQ3_0 ||
-           ftype == LLAMA_FTYPE_MOSTLY_PQ4_0;
+           ftype == LLAMA_FTYPE_MOSTLY_PQ4_0 ||
+           ftype == LLAMA_FTYPE_MOSTLY_PQ2_K ||
+           ftype == LLAMA_FTYPE_MOSTLY_PQ3_K ||
+           ftype == LLAMA_FTYPE_MOSTLY_PQ4_K;
 }
 
 static ggml_type pq_mixed_type_for_level(const llama_ftype ftype, int level) {
@@ -380,6 +383,21 @@ static ggml_type pq_mixed_type_for_level(const llama_ftype ftype, int level) {
             return GGML_TYPE_Q5_K;
         case LLAMA_FTYPE_MOSTLY_PQ4_0:
             if (level <= 0) return GGML_TYPE_PQ4_0;
+            if (level == 1) return GGML_TYPE_Q4_K;
+            if (level == 2) return GGML_TYPE_Q5_K;
+            return GGML_TYPE_Q6_K;
+        case LLAMA_FTYPE_MOSTLY_PQ2_K:
+            if (level <= 0) return GGML_TYPE_PQ2_K;
+            if (level == 1) return GGML_TYPE_PQ3_K;
+            if (level == 2) return GGML_TYPE_PQ4_K;
+            return GGML_TYPE_Q5_K;
+        case LLAMA_FTYPE_MOSTLY_PQ3_K:
+            if (level <= 0) return GGML_TYPE_PQ3_K;
+            if (level == 1) return GGML_TYPE_PQ4_K;
+            if (level == 2) return GGML_TYPE_Q4_K;
+            return GGML_TYPE_Q5_K;
+        case LLAMA_FTYPE_MOSTLY_PQ4_K:
+            if (level <= 0) return GGML_TYPE_PQ4_K;
             if (level == 1) return GGML_TYPE_Q4_K;
             if (level == 2) return GGML_TYPE_Q5_K;
             return GGML_TYPE_Q6_K;
@@ -426,7 +444,10 @@ static ggml_type tensor_type_fallback(quantize_state_impl & qs, const ggml_tenso
             case GGML_TYPE_TQ2_0:   return_type = GGML_TYPE_Q4_0;   break;
             case GGML_TYPE_PQ2_0:
             case GGML_TYPE_PQ3_0:
-            case GGML_TYPE_PQ4_0:   return_type = GGML_TYPE_Q5_0;   break;
+            case GGML_TYPE_PQ4_0:
+            case GGML_TYPE_PQ2_K:
+            case GGML_TYPE_PQ3_K:
+            case GGML_TYPE_PQ4_K:   return_type = GGML_TYPE_Q5_0;   break;
             case GGML_TYPE_Q4_K:    return_type = GGML_TYPE_Q5_0;   break;
             case GGML_TYPE_Q5_K:    return_type = GGML_TYPE_Q5_1;   break;
             case GGML_TYPE_Q6_K:    return_type = GGML_TYPE_Q8_0;   break;
@@ -906,6 +927,9 @@ ggml_type llama_ftype_get_default_type(llama_ftype ftype) {
         case LLAMA_FTYPE_MOSTLY_PQ2_0:   return GGML_TYPE_PQ2_0;
         case LLAMA_FTYPE_MOSTLY_PQ3_0:   return GGML_TYPE_PQ3_0;
         case LLAMA_FTYPE_MOSTLY_PQ4_0:   return GGML_TYPE_PQ4_0;
+        case LLAMA_FTYPE_MOSTLY_PQ2_K:   return GGML_TYPE_PQ2_K;
+        case LLAMA_FTYPE_MOSTLY_PQ3_K:   return GGML_TYPE_PQ3_K;
+        case LLAMA_FTYPE_MOSTLY_PQ4_K:   return GGML_TYPE_PQ4_K;
         case LLAMA_FTYPE_MOSTLY_IQ2_XXS: return GGML_TYPE_IQ2_XXS;
         case LLAMA_FTYPE_MOSTLY_IQ2_XS:  return GGML_TYPE_IQ2_XS;
         case LLAMA_FTYPE_MOSTLY_IQ2_S:   return GGML_TYPE_IQ2_XS;

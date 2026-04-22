@@ -1,6 +1,7 @@
 #include "getrows.cuh"
 #include "dequantize.cuh"
 #include "convert.cuh"
+#include "pq-tq-dequant-wht.cuh"
 
 template<int qk, int qr, dequantize_kernel_t dequantize_kernel, typename dst_t>
 static __global__ void k_get_rows(
@@ -64,6 +65,39 @@ static __global__ void k_get_rows_float(
             const src0_t * src0_row = (const src0_t *)((const char *) src0 + i01*nb01 + i11*nb02 + i12*nb03);
 
             dst_row[i00] = ggml_cuda_cast<dst_t>(src0_row[i00]);
+        }
+    }
+}
+
+template<typename block_t, typename dst_t, PqTqTypeTag TT>
+static __global__ void k_get_rows_pqk_wht_256(
+        const block_t * __restrict__ src0, const int32_t * __restrict__ src1, dst_t * __restrict__ dst,
+        const int64_t ne00,
+        const int64_t ne11, const int64_t ne12,
+        const size_t s1, const size_t s2, const size_t s3,
+        const size_t nb01, const size_t nb02, const size_t nb03,
+        const size_t s10, const size_t s11, const size_t s12) {
+    __shared__ float sh[QK_K];
+
+    const int tid = threadIdx.x;
+    const int64_t nblocks_row = ne00 / QK_K;
+
+    for (int64_t z = blockIdx.z; z < ne11*ne12; z += gridDim.z) {
+        const int i10 = blockIdx.x;
+        const int i11 = z / ne12;
+        const int i12 = z % ne12;
+        const int i01 = src1[i10*s10 + i11*s11 + i12*s12];
+
+        dst_t * dst_row = dst + i10*s1 + i11*s2 + i12*s3;
+        const block_t * src0_row = (const block_t *) ((const char *) src0 + i01*nb01 + i11*nb02 + i12*nb03);
+
+        for (int64_t block = blockIdx.y; block < nblocks_row; block += gridDim.y) {
+            const float2 pair = pq_tq_dequant_pair<TT>(src0_row + block, tid);
+            sh[2 * tid + 0] = pair.x;
+            sh[2 * tid + 1] = pair.y;
+            __syncthreads();
+            pq_tq_inverse_wht_store_256(sh, tid, dst_row, block * QK_K);
+            __syncthreads();
         }
     }
 }
@@ -155,6 +189,36 @@ static void get_rows_cuda_float(
         s10, s11, s12/*, s13*/);
 }
 
+template<typename block_t, PqTqTypeTag TT, typename dst_t>
+static void get_rows_cuda_pqk_wht_256(
+        const void * src0_d, const int32_t * src1_d, dst_t * dst_d,
+        const int64_t ne00, const size_t nb01, const size_t nb02, const size_t nb03,
+        const int64_t ne10, const int64_t ne11, const int64_t ne12, const size_t nb10, const size_t nb11, const size_t nb12,
+        const size_t nb1, const size_t nb2, const size_t nb3,
+        cudaStream_t stream) {
+    GGML_ASSERT(ne00 % QK_K == 0);
+
+    const dim3 block_dims(128, 1, 1);
+    const int64_t nblocks_row = ne00 / QK_K;
+    const dim3 block_nums(ne10, MIN(nblocks_row, (int64_t) UINT16_MAX), MIN(ne11*ne12, (int64_t) UINT16_MAX));
+
+    const size_t s1 = nb1 / sizeof(dst_t);
+    const size_t s2 = nb2 / sizeof(dst_t);
+    const size_t s3 = nb3 / sizeof(dst_t);
+
+    const size_t s10 = nb10 / sizeof(int32_t);
+    const size_t s11 = nb11 / sizeof(int32_t);
+    const size_t s12 = nb12 / sizeof(int32_t);
+
+    k_get_rows_pqk_wht_256<block_t, dst_t, TT><<<block_nums, block_dims, 0, stream>>>(
+        (const block_t *) src0_d, src1_d, dst_d,
+        ne00,
+        ne11, ne12,
+        s1, s2, s3,
+        nb01, nb02, nb03,
+        s10, s11, s12);
+}
+
 template <typename dst_t>
 static void ggml_cuda_get_rows_switch_src0_type(
         const void * src0_d, const ggml_type src0_type, const int32_t * src1_d, dst_t * dst_d,
@@ -201,6 +265,18 @@ static void ggml_cuda_get_rows_switch_src0_type(
             break;
         case GGML_TYPE_Q8_0:
             get_rows_cuda_q<QK8_0, QR8_0, dequantize_q8_0>(src0_d, src1_d, dst_d,
+                ne00, nb01, nb02, nb03, ne10, ne11, ne12, nb10, nb11, nb12, nb1, nb2, nb3, stream);
+            break;
+        case GGML_TYPE_PQ2_K:
+            get_rows_cuda_pqk_wht_256<block_pq2_K, PqTqTypeTag::P2_K>(src0_d, src1_d, dst_d,
+                ne00, nb01, nb02, nb03, ne10, ne11, ne12, nb10, nb11, nb12, nb1, nb2, nb3, stream);
+            break;
+        case GGML_TYPE_PQ3_K:
+            get_rows_cuda_pqk_wht_256<block_pq3_K, PqTqTypeTag::P3_K>(src0_d, src1_d, dst_d,
+                ne00, nb01, nb02, nb03, ne10, ne11, ne12, nb10, nb11, nb12, nb1, nb2, nb3, stream);
+            break;
+        case GGML_TYPE_PQ4_K:
+            get_rows_cuda_pqk_wht_256<block_pq4_K, PqTqTypeTag::P4_K>(src0_d, src1_d, dst_d,
                 ne00, nb01, nb02, nb03, ne10, ne11, ne12, nb10, nb11, nb12, nb1, nb2, nb3, stream);
             break;
         default:

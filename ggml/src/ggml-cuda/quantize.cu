@@ -2,6 +2,52 @@
 #include "pq-tq-fwht.cuh"
 #include <cstdint>
 
+static __device__ __forceinline__ float pqk_wht_apply_sign_256(const float x, const uint32_t * signs, const int idx) {
+    const uint32_t sign = ((signs[idx >> 5] >> (idx & 31)) & 1u) << 31;
+    return __uint_as_float(__float_as_uint(x) ^ sign);
+}
+
+static __device__ __forceinline__ void pqk_coop_wht_forward_256_fast(float * sh, const int tid, float & xr0, float & xr1) {
+#if !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
+    constexpr unsigned mask = 0xFFFFFFFFu;
+    const int lane = tid & (WARP_SIZE - 1);
+
+    float x0 = pqk_wht_apply_sign_256(sh[tid],       PQ_TQ_WHT_SIGNS1_256_BITS, tid);
+    float x1 = pqk_wht_apply_sign_256(sh[tid + 128], PQ_TQ_WHT_SIGNS1_256_BITS, tid + 128);
+
+#pragma unroll
+    for (int h = 1; h < WARP_SIZE; h <<= 1) {
+        const float y0 = __shfl_xor_sync(mask, x0, h, WARP_SIZE);
+        const float y1 = __shfl_xor_sync(mask, x1, h, WARP_SIZE);
+        x0 = (lane & h) == 0 ? x0 + y0 : y0 - x0;
+        x1 = (lane & h) == 0 ? x1 + y1 : y1 - x1;
+    }
+
+    sh[tid]       = x0;
+    sh[tid + 128] = x1;
+    __syncthreads();
+
+#pragma unroll
+    for (int h = WARP_SIZE; h < 128; h <<= 1) {
+        const float a0 = sh[tid],       b0 = sh[tid ^ h];
+        const float a1 = sh[tid + 128], b1 = sh[(tid ^ h) + 128];
+        __syncthreads();
+        sh[tid]       = ((tid & h) == 0) ? (a0 + b0) : (b0 - a0);
+        sh[tid + 128] = ((tid & h) == 0) ? (a1 + b1) : (b1 - a1);
+        __syncthreads();
+    }
+
+    const float lo = sh[tid], hi = sh[tid + 128];
+    constexpr float inv_sqrt256 = 0.0625f;
+    xr0 = pqk_wht_apply_sign_256((lo + hi) * inv_sqrt256, PQ_TQ_WHT_SIGNS2_256_BITS, tid);
+    xr1 = pqk_wht_apply_sign_256((lo - hi) * inv_sqrt256, PQ_TQ_WHT_SIGNS2_256_BITS, tid + 128);
+#else
+    pq_tq_coop_wht_forward<256>(sh, tid);
+    xr0 = sh[tid];
+    xr1 = sh[tid + 128];
+#endif
+}
+
 __launch_bounds__(CUDA_QUANTIZE_BLOCK_SIZE, 1)
 static __global__ void quantize_q8_1(
         const float * __restrict__ x, void * __restrict__ vy,
@@ -89,6 +135,59 @@ static __global__ void quantize_q8_1_pq_wht(
 
     if (lane_id == 0) {
         y[ib_base + warp_id].ds = make_half2(d, sum);
+    }
+}
+
+__launch_bounds__(128, 1)
+static __global__ void quantize_q8_1_pqk_wht(
+        const float * __restrict__ x, void * __restrict__ vy,
+        const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
+        const int64_t ne0, const uint32_t ne1, const uint3 ne2) {
+    constexpr int D = QK_K;
+
+    const int tid = threadIdx.x;
+    const int64_t base_i0 = (int64_t) blockIdx.x * D;
+
+    const int64_t i3 = fastdiv(blockIdx.z, ne2);
+    const int64_t i2 = blockIdx.z - i3*ne2.z;
+    const int64_t i1 = blockIdx.y;
+
+    __shared__ float sh[D];
+
+    const int64_t i0 = base_i0 + tid;
+    sh[tid]       = i0       < ne00 ? x[i3*s03 + i2*s02 + i1*s01 + i0]       : 0.0f;
+    sh[tid + 128] = i0 + 128 < ne00 ? x[i3*s03 + i2*s02 + i1*s01 + i0 + 128] : 0.0f;
+    __syncthreads();
+
+    float xr0;
+    float xr1;
+    pqk_coop_wht_forward_256_fast(sh, tid, xr0, xr1);
+
+    const int warp_id = tid / WARP_SIZE;
+    const int lane_id = tid % WARP_SIZE;
+
+    float amax0 = fabsf(xr0);
+    float amax1 = fabsf(xr1);
+    float sum0  = xr0;
+    float sum1  = xr1;
+    amax0 = warp_reduce_max<QK8_1>(amax0);
+    amax1 = warp_reduce_max<QK8_1>(amax1);
+    sum0  = warp_reduce_sum<QK8_1>(sum0);
+    sum1  = warp_reduce_sum<QK8_1>(sum1);
+
+    const float d0 = amax0 / 127.0f;
+    const float d1 = amax1 / 127.0f;
+    const int8_t q0 = amax0 == 0.0f ? 0 : roundf(xr0 / d0);
+    const int8_t q1 = amax1 == 0.0f ? 0 : roundf(xr1 / d1);
+
+    block_q8_1 * y = (block_q8_1 *) vy;
+    const int64_t ib_base = (((i3*ne2.z + i2) * ne1 + i1) * ne0 + base_i0) / QK8_1;
+    y[ib_base + warp_id].qs[lane_id] = q0;
+    y[ib_base + 4 + warp_id].qs[lane_id] = q1;
+
+    if (lane_id == 0) {
+        y[ib_base + warp_id].ds = make_half2(d0, sum0);
+        y[ib_base + 4 + warp_id].ds = make_half2(d1, sum1);
     }
 }
 
@@ -363,6 +462,63 @@ static __global__ void quantize_mmq_q8_1_pq_wht(
     }
 }
 
+__launch_bounds__(128, 1)
+static __global__ void quantize_mmq_q8_1_pqk_wht(
+        const float * __restrict__ x, const int32_t * __restrict__ ids, void * __restrict__ vy,
+        const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
+        const int64_t ne0, const int ne1, const int ne2) {
+    constexpr int D = QK_K;
+
+    const int tid = threadIdx.x;
+    const int64_t base_i0 = (int64_t) blockIdx.y * D;
+
+    if (base_i0 >= ne0) {
+        return;
+    }
+
+    const int64_t i1 = blockIdx.x;
+    const int64_t i2 = blockIdx.z % ne2;
+    const int64_t i3 = blockIdx.z / ne2;
+    const int64_t i01 = ids ? ids[i1] : i1;
+
+    __shared__ float sh[D];
+
+    const int64_t i0 = base_i0 + tid;
+    sh[tid]       = i0       < ne00 ? x[i3*s03 + i2*s02 + i01*s01 + i0]       : 0.0f;
+    sh[tid + 128] = i0 + 128 < ne00 ? x[i3*s03 + i2*s02 + i01*s01 + i0 + 128] : 0.0f;
+    __syncthreads();
+
+    float xr0;
+    float xr1;
+    pqk_coop_wht_forward_256_fast(sh, tid, xr0, xr1);
+
+    block_q8_1_mmq * y = (block_q8_1_mmq *) vy;
+    const int64_t ib0 = blockIdx.z * ((int64_t) ne1 * (ne0 / (4*QK8_1)))
+                      + (base_i0 / (4*QK8_1)) * ne1 + blockIdx.x;
+    const int64_t ib1 = ib0 + ne1;
+
+    const int warp_id = tid / WARP_SIZE;
+    const int lane_id = tid % WARP_SIZE;
+
+    float amax0 = fabsf(xr0);
+    float amax1 = fabsf(xr1);
+    amax0 = warp_reduce_max<QK8_1>(amax0);
+    amax1 = warp_reduce_max<QK8_1>(amax1);
+
+    const float d0 = amax0 / 127.0f;
+    const float d1 = amax1 / 127.0f;
+    const int8_t q0 = amax0 == 0.0f ? 0 : roundf(xr0 / d0);
+    const int8_t q1 = amax1 == 0.0f ? 0 : roundf(xr1 / d1);
+
+    y[ib0].qs[warp_id * QK8_1 + lane_id] = q0;
+    y[ib1].qs[warp_id * QK8_1 + lane_id] = q1;
+
+    if (lane_id == 0) {
+        y[ib0].d4[warp_id] = d0;
+        y[ib1].d4[warp_id] = d1;
+    }
+}
+
 void quantize_row_q8_1_cuda(
         const float * x, const int32_t * ids, void * vy, const ggml_type type_src0,
         const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
@@ -379,6 +535,16 @@ void quantize_row_q8_1_cuda(
         const dim3 num_blocks(ne0 / QK_PQ_TQ_2_GROUP, ne1, ne2*ne3);
         const dim3 block_size(QK_PQ_TQ_2_GROUP, 1, 1);
         quantize_q8_1_pq_wht<QK_PQ_TQ_2_GROUP><<<num_blocks, block_size, 0, stream>>>(x, vy, ne00, s01, s02, s03, ne0, ne1, ne2_fastdiv);
+        return;
+    }
+
+    if (type_src0 == GGML_TYPE_PQ2_K || type_src0 == GGML_TYPE_PQ3_K || type_src0 == GGML_TYPE_PQ4_K) {
+        GGML_ASSERT(ne00 % QK_K == 0);
+        GGML_ASSERT(ne0  % QK_K == 0);
+
+        const dim3 num_blocks(ne0 / QK_K, ne1, ne2*ne3);
+        const dim3 block_size(128, 1, 1);
+        quantize_q8_1_pqk_wht<<<num_blocks, block_size, 0, stream>>>(x, vy, ne00, s01, s02, s03, ne0, ne1, ne2_fastdiv);
         return;
     }
 
@@ -400,6 +566,17 @@ void quantize_mmq_q8_1_cuda(
         const dim3 num_blocks(ne1, ne0 / QK_PQ_TQ_2_GROUP, ne2*ne3);
         const dim3 block_size(QK_PQ_TQ_2_GROUP, 1, 1);
         quantize_mmq_q8_1_pq_wht<QK_PQ_TQ_2_GROUP>
+            <<<num_blocks, block_size, 0, stream>>>(x, ids, vy, ne00, s01, s02, s03, ne0, ne1, ne2);
+        return;
+    }
+
+    if (type_src0 == GGML_TYPE_PQ2_K || type_src0 == GGML_TYPE_PQ3_K || type_src0 == GGML_TYPE_PQ4_K) {
+        GGML_ASSERT(ne00 % QK_K == 0);
+        GGML_ASSERT(ne0  % QK_K == 0);
+
+        const dim3 num_blocks(ne1, ne0 / QK_K, ne2*ne3);
+        const dim3 block_size(128, 1, 1);
+        quantize_mmq_q8_1_pqk_wht
             <<<num_blocks, block_size, 0, stream>>>(x, ids, vy, ne00, s01, s02, s03, ne0, ne1, ne2);
         return;
     }

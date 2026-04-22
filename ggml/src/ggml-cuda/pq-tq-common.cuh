@@ -49,6 +49,13 @@ static constexpr float PQ_TQ_DP4A_INV_SCALE_3BIT = 1.0f / PQ_TQ_DP4A_SCALE_3BIT;
 static constexpr float PQ_TQ_DP4A_SCALE_4BIT = 704.0f;
 static constexpr float PQ_TQ_DP4A_INV_SCALE_4BIT = 1.0f / PQ_TQ_DP4A_SCALE_4BIT;
 
+static constexpr float PQK_DP4A_SCALE_2BIT = 86.5f;
+static constexpr float PQK_DP4A_INV_SCALE_2BIT = 1.0f / PQK_DP4A_SCALE_2BIT;
+static constexpr float PQK_DP4A_SCALE_3BIT = 63.5f;
+static constexpr float PQK_DP4A_INV_SCALE_3BIT = 1.0f / PQK_DP4A_SCALE_3BIT;
+static constexpr float PQK_DP4A_SCALE_4BIT = 52.5f;
+static constexpr float PQK_DP4A_INV_SCALE_4BIT = 1.0f / PQK_DP4A_SCALE_4BIT;
+
 // QJL correction: expected |residual_i| = sqrt(2/(pi*d)) * rnorm
 // D-dependent correction scales:
 static constexpr float TQ_QJL_CORRECTION_SCALE_64  = 0.0997356f;  // sqrt(2/(pi*64))
@@ -109,6 +116,29 @@ static constexpr float pq_tq_centroid_4bit_host(const uint8_t q4) {
     };
     const uint8_t sign = q4 >> 3;
     return sign ? mags[q4 & 0x7u] : -mags[0x7u - (q4 & 0x7u)];
+}
+
+static constexpr float pqk_centroid_2bit_host(const uint8_t q2) {
+    constexpr float centroids[4] = {-1.468733483f, -0.450043231f, 0.450043231f, 1.468733483f};
+    return centroids[q2 & 0x3u];
+}
+
+static constexpr float pqk_centroid_3bit_host(const uint8_t q3) {
+    constexpr float centroids[8] = {
+        -1.996037246f, -1.286192434f, -0.734445201f, -0.239624284f,
+         0.239624284f,  0.734445201f,  1.286192434f,  1.996037246f,
+    };
+    return centroids[q3 & 0x7u];
+}
+
+static constexpr float pqk_centroid_4bit_host(const uint8_t q4) {
+    constexpr float centroids[16] = {
+        -2.413635748f, -1.895488127f, -1.512641483f, -1.189715161f,
+        -0.900380605f, -0.631294575f, -0.374426627f, -0.124176311f,
+         0.124176311f,  0.374426627f,  0.631294575f,  0.900380605f,
+         1.189715161f,  1.512641483f,  1.895488127f,  2.413635748f,
+    };
+    return centroids[q4 & 0xFu];
 }
 
 #define PQ_TQ_PAIR_LUT_ROW_16(ENTRY, base) \
@@ -240,6 +270,41 @@ __constant__ static const int8_t PQ_TQ_DP4A_VAL_4BIT[16] = {
     PQ_TQ_PAIR_LUT_ROW_16(PQ_TQ_DP4A_VAL4_ENTRY, 0),
 };
 
+#define PQK_DP4A_VAL2_ENTRY(idx) \
+    (int8_t) pq_tq_round_i8_host(pqk_centroid_2bit_host((idx) & 0x3u) * PQK_DP4A_SCALE_2BIT)
+
+__constant__ static const int8_t PQK_DP4A_VAL_2BIT[16] = {
+    PQ_TQ_PAIR_LUT_ROW_16(PQK_DP4A_VAL2_ENTRY, 0),
+};
+
+#define PQK_DP4A_VAL3_ENTRY(idx) \
+    (int8_t) pq_tq_round_i8_host(pqk_centroid_3bit_host((idx) & 0x7u) * PQK_DP4A_SCALE_3BIT)
+
+__constant__ static const int8_t PQK_DP4A_VAL_3BIT_16[16] = {
+    PQ_TQ_PAIR_LUT_ROW_16(PQK_DP4A_VAL3_ENTRY, 0),
+};
+
+#define PQK_DP4A_VAL4_ENTRY(idx) \
+    (int8_t) pq_tq_round_i8_host(pqk_centroid_4bit_host(idx) * PQK_DP4A_SCALE_4BIT)
+
+__constant__ static const int8_t PQK_DP4A_VAL_4BIT[16] = {
+    PQ_TQ_PAIR_LUT_ROW_16(PQK_DP4A_VAL4_ENTRY, 0),
+};
+
+__constant__ static const float PQK_LOCAL_SCALE_LUT[64] = {
+    0.0f, 0.0625f, 0.0653583843f, 0.0683474943f, 0.0714733087f, 0.0747420796f, 0.078160345f, 0.0817349418f,
+    0.0854730197f, 0.0893820555f, 0.0934698676f, 0.0977446324f, 0.1022149f, 0.106889611f, 0.111778117f, 0.116890194f,
+    0.122236067f, 0.127826429f, 0.133672462f, 0.139785859f, 0.146178846f, 0.152864211f, 0.159855325f, 0.167166172f,
+    0.174811375f, 0.182806224f, 0.191166711f, 0.199909558f, 0.209052251f, 0.218613078f, 0.228611161f, 0.239066497f,
+    0.25f, 0.261433537f, 0.273389977f, 0.285893235f, 0.298968319f, 0.31264138f, 0.326939767f, 0.341892079f,
+    0.357528222f, 0.373879471f, 0.39097853f, 0.4088596f, 0.427558445f, 0.447112467f, 0.467560774f, 0.488944268f,
+    0.511305718f, 0.534689849f, 0.559143434f, 0.584715383f, 0.611456843f, 0.639421301f, 0.668664689f, 0.699245499f,
+    0.731224897f, 0.764666844f, 0.799638231f, 0.836209005f, 0.874452311f, 0.914444643f, 0.956265989f, 1.0f
+};
+
+#undef PQK_DP4A_VAL4_ENTRY
+#undef PQK_DP4A_VAL3_ENTRY
+#undef PQK_DP4A_VAL2_ENTRY
 #undef PQ_TQ_DP4A_PAIR4_ENTRY
 #undef PQ_TQ_DP4A_VAL4_ENTRY
 #undef PQ_TQ_DP4A_VAL2_ENTRY
@@ -458,6 +523,16 @@ __constant__ static const float PQ_TQ_WHT_SIGNS2_256[256] = {
     -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,  1.0f,  1.0f,  1.0f,
     -1.0f, -1.0f,  1.0f, -1.0f, -1.0f,  1.0f,  1.0f,  1.0f,
      1.0f,  1.0f, -1.0f, -1.0f,  1.0f, -1.0f, -1.0f,  1.0f
+};
+
+__constant__ static const uint32_t PQ_TQ_WHT_SIGNS1_256_BITS[8] = {
+    0xc3284666u, 0xce93b542u, 0x79141579u, 0x9aa89715u,
+    0x9b0404dau, 0x0af8ae67u, 0xef41f700u, 0xd712a44au
+};
+
+__constant__ static const uint32_t PQ_TQ_WHT_SIGNS2_256_BITS[8] = {
+    0x6e2e718eu, 0x82fc60a0u, 0xb7719342u, 0x67487f5au,
+    0xbfd09d07u, 0xaeadc1c4u, 0xd5c0b687u, 0x6c1b19a0u
 };
 
 static __device__ __forceinline__ float pq_tq_centroid_2bit(const uint8_t q2) {

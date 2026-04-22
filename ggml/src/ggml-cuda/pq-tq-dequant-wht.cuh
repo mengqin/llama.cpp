@@ -12,6 +12,7 @@
 
 #include "common.cuh"
 #include "convert.cuh"
+#include "ggml-pqk-common.h"
 #include "pq-tq-common.cuh"
 #include "pq-tq-fwht.cuh"
 
@@ -61,6 +62,43 @@ static __device__ __forceinline__ float pq_dequant_elem_4_0(const void * vx, int
 
 static __device__ __forceinline__ float pq_dequant_elem_4_0_64(const void * vx, int64_t global_elem) {
     return pq_dequant_elem_4_0_impl<block_pq4_d64, QK_PQ_TQ_4_D64>(vx, global_elem);
+}
+
+template <typename block_pqk>
+static __device__ __forceinline__ float pqk_dequant_scale(const block_pqk * x, const int ib, const int subblock) {
+    const int band = subblock / GGML_PQK_SUBBLOCKS_PER_BAND;
+    const float master = __half2float(x[ib].d[band]);
+    return ggml_pqk_decode_local_scale(master, ggml_pqk_scale_get(x[ib].scales, subblock));
+}
+
+static __device__ __forceinline__ float pq_dequant_elem_2_k(const void * vx, int64_t global_elem) {
+    const block_pq2_K * x = (const block_pq2_K *) vx;
+    const int ib = global_elem / QK_K;
+    const int il = global_elem % QK_K;
+    const int subblock = il / GGML_PQK_SUBBLOCK_SIZE;
+    const float scale = pqk_dequant_scale(x, ib, subblock);
+    const uint8_t q = (x[ib].qs[il / 4] >> (2 * (il & 3))) & 0x3u;
+    return ggml_pqk_centroid_2bit(q) * scale;
+}
+
+static __device__ __forceinline__ float pq_dequant_elem_3_k(const void * vx, int64_t global_elem) {
+    const block_pq3_K * x = (const block_pq3_K *) vx;
+    const int ib = global_elem / QK_K;
+    const int il = global_elem % QK_K;
+    const int subblock = il / GGML_PQK_SUBBLOCK_SIZE;
+    const float scale = pqk_dequant_scale(x, ib, subblock);
+    const uint8_t ql = (x[ib].qs[il / 4] >> (2 * (il & 3))) & 0x3u;
+    const uint8_t qh = (x[ib].hmask[il / 8] >> (il & 7)) & 0x1u;
+    return ggml_pqk_centroid_3bit((uint8_t)(ql | (qh << 2))) * scale;
+}
+
+static __device__ __forceinline__ float pq_dequant_elem_4_k(const void * vx, int64_t global_elem) {
+    const block_pq4_K * x = (const block_pq4_K *) vx;
+    const int ib = global_elem / QK_K;
+    const int il = global_elem % QK_K;
+    const float scale = pqk_dequant_scale(x, ib, il / GGML_PQK_SUBBLOCK_SIZE);
+    const uint8_t q = (x[ib].qs[il / 2] >> (4 * (il & 1))) & 0xFu;
+    return ggml_pqk_centroid_4bit(q) * scale;
 }
 
 static constexpr float TQ_DEQUANT_QJL_CORR = 0.0705348f; // sqrt(2/(pi*128))
@@ -121,7 +159,7 @@ static __device__ __forceinline__ float tq_dequant_elem_4_1_64(const void * vx, 
 // ============================================================================
 // Type dispatch tag
 // ============================================================================
-enum class PqTqTypeTag { T2_0, T3_0, T4_0, T2_1, T3_1, T4_1, T4_0_64, T4_1_64 };
+enum class PqTqTypeTag { T2_0, T3_0, T4_0, T2_1, T3_1, T4_1, T4_0_64, T4_1_64, P2_K, P3_K, P4_K };
 
 // ============================================================================
 // Pair dequantize device functions (2 consecutive elements at once).
@@ -239,6 +277,51 @@ __device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::T4_1_64>(const
     return tq_dequant_pair_4_1_impl<block_tq4_d64, QK_PQ_TQ_4_D64>(vx, global_pair);
 }
 
+template <>
+__device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::P2_K>(const void * vx, int64_t global_pair) {
+    const block_pq2_K * x = (const block_pq2_K *) vx;
+    constexpr int pairs_per_block = QK_K / 2;
+    const int ib = global_pair / pairs_per_block;
+    const int ip = global_pair % pairs_per_block;
+    const int il = 2 * ip;
+    const int subblock = il / GGML_PQK_SUBBLOCK_SIZE;
+    const float scale = pqk_dequant_scale(x, ib, subblock);
+    const uint8_t qb = x[ib].qs[il / 4];
+    const int shift = 2 * (il & 3);
+    const uint8_t q0 = (qb >> shift) & 0x3u;
+    const uint8_t q1 = (qb >> (shift + 2)) & 0x3u;
+    return make_float2(ggml_pqk_centroid_2bit(q0) * scale, ggml_pqk_centroid_2bit(q1) * scale);
+}
+
+template <>
+__device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::P3_K>(const void * vx, int64_t global_pair) {
+    const block_pq3_K * x = (const block_pq3_K *) vx;
+    constexpr int pairs_per_block = QK_K / 2;
+    const int ib = global_pair / pairs_per_block;
+    const int ip = global_pair % pairs_per_block;
+    const int il = 2 * ip;
+    const int subblock = il / GGML_PQK_SUBBLOCK_SIZE;
+    const float scale = pqk_dequant_scale(x, ib, subblock);
+    const uint8_t qb = x[ib].qs[il / 4];
+    const int shift = 2 * (il & 3);
+    const uint8_t q0 = ((qb >> shift) & 0x3u) | (((x[ib].hmask[il / 8] >> (il & 7)) & 0x1u) << 2);
+    const int il1 = il + 1;
+    const uint8_t q1 = ((qb >> (shift + 2)) & 0x3u) | (((x[ib].hmask[il1 / 8] >> (il1 & 7)) & 0x1u) << 2);
+    return make_float2(ggml_pqk_centroid_3bit(q0) * scale, ggml_pqk_centroid_3bit(q1) * scale);
+}
+
+template <>
+__device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::P4_K>(const void * vx, int64_t global_pair) {
+    const block_pq4_K * x = (const block_pq4_K *) vx;
+    constexpr int pairs_per_block = QK_K / 2;
+    const int ib = global_pair / pairs_per_block;
+    const int ip = global_pair % pairs_per_block;
+    const int il = 2 * ip;
+    const float scale = pqk_dequant_scale(x, ib, il / GGML_PQK_SUBBLOCK_SIZE);
+    const uint8_t qb = x[ib].qs[ip];
+    return make_float2(ggml_pqk_centroid_4bit(qb & 0xFu) * scale, ggml_pqk_centroid_4bit(qb >> 4) * scale);
+}
+
 static __device__ __forceinline__ float pq_tq_warp_fwht_step(const float x, const int lane, const int h) {
     const float y = __shfl_xor_sync(0xffffffff, x, h);
     return ((lane & h) == 0) ? (x + y) : (y - x);
@@ -345,6 +428,9 @@ template<> __device__ __forceinline__ float pq_tq_dequant_elem<PqTqTypeTag::T3_1
 template<> __device__ __forceinline__ float pq_tq_dequant_elem<PqTqTypeTag::T4_1>(const void * vx, int64_t e) { return tq_dequant_elem_4_1(vx, e); }
 template<> __device__ __forceinline__ float pq_tq_dequant_elem<PqTqTypeTag::T4_0_64>(const void * vx, int64_t e) { return pq_dequant_elem_4_0_64(vx, e); }
 template<> __device__ __forceinline__ float pq_tq_dequant_elem<PqTqTypeTag::T4_1_64>(const void * vx, int64_t e) { return tq_dequant_elem_4_1_64(vx, e); }
+template<> __device__ __forceinline__ float pq_tq_dequant_elem<PqTqTypeTag::P2_K>(const void * vx, int64_t e) { return pq_dequant_elem_2_k(vx, e); }
+template<> __device__ __forceinline__ float pq_tq_dequant_elem<PqTqTypeTag::P3_K>(const void * vx, int64_t e) { return pq_dequant_elem_3_k(vx, e); }
+template<> __device__ __forceinline__ float pq_tq_dequant_elem<PqTqTypeTag::P4_K>(const void * vx, int64_t e) { return pq_dequant_elem_4_k(vx, e); }
 
 // ============================================================================
 // Kernel: dequantize + cooperative inverse WHT → fp16 output
@@ -406,6 +492,18 @@ static void dequant_pq_tq_unrotated_fp32(
     dequant_pq_tq_unrotated_wht<float, TT>(vx, y, k, 128, stream);
 }
 
+template <PqTqTypeTag TT>
+static void dequant_pq_tq_unrotated_fp16_256(
+        const void * vx, half * y, int64_t k, cudaStream_t stream) {
+    dequant_pq_tq_unrotated_wht<half, TT>(vx, y, k, 256, stream);
+}
+
+template <PqTqTypeTag TT>
+static void dequant_pq_tq_unrotated_fp32_256(
+        const void * vx, float * y, int64_t k, cudaStream_t stream) {
+    dequant_pq_tq_unrotated_wht<float, TT>(vx, y, k, 256, stream);
+}
+
 // ============================================================================
 // D-aware dispatcher: calls kernel with correct wht_dim for pq/tq types
 // ============================================================================
@@ -421,6 +519,9 @@ static void dequant_pq_tq_unrotated_fp16_dispatch(
         case GGML_TYPE_TQ4_1: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::T4_1>(vx, y, k, wht_dim, stream); break;
         case GGML_TYPE_PQ4_0_64: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::T4_0_64>(vx, y, k, wht_dim, stream); break;
         case GGML_TYPE_TQ4_1_64: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::T4_1_64>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_PQ2_K: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::P2_K>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_PQ3_K: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::P3_K>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_PQ4_K: dequant_pq_tq_unrotated_wht<half, PqTqTypeTag::P4_K>(vx, y, k, wht_dim, stream); break;
         default: GGML_ABORT("unsupported pq/tq type for WHT-fused fp16 dequant");
     }
 }
@@ -436,6 +537,9 @@ static void dequant_pq_tq_unrotated_fp32_dispatch(
         case GGML_TYPE_TQ4_1: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::T4_1>(vx, y, k, wht_dim, stream); break;
         case GGML_TYPE_PQ4_0_64: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::T4_0_64>(vx, y, k, wht_dim, stream); break;
         case GGML_TYPE_TQ4_1_64: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::T4_1_64>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_PQ2_K: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::P2_K>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_PQ3_K: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::P3_K>(vx, y, k, wht_dim, stream); break;
+        case GGML_TYPE_PQ4_K: dequant_pq_tq_unrotated_wht<float, PqTqTypeTag::P4_K>(vx, y, k, wht_dim, stream); break;
         default: GGML_ABORT("unsupported pq/tq type for WHT-fused fp32 dequant");
     }
 }
@@ -455,6 +559,9 @@ static to_fp16_cuda_t ggml_get_to_fp16_pq_tq_unrotated_cuda(ggml_type type) {
         case GGML_TYPE_TQ4_1: return dequant_pq_tq_unrotated_fp16<PqTqTypeTag::T4_1>;
         case GGML_TYPE_PQ4_0_64: return dequant_pq_tq_unrotated_fp16<PqTqTypeTag::T4_0_64>;
         case GGML_TYPE_TQ4_1_64: return dequant_pq_tq_unrotated_fp16<PqTqTypeTag::T4_1_64>;
+        case GGML_TYPE_PQ2_K: return dequant_pq_tq_unrotated_fp16_256<PqTqTypeTag::P2_K>;
+        case GGML_TYPE_PQ3_K: return dequant_pq_tq_unrotated_fp16_256<PqTqTypeTag::P3_K>;
+        case GGML_TYPE_PQ4_K: return dequant_pq_tq_unrotated_fp16_256<PqTqTypeTag::P4_K>;
         default: return nullptr;
     }
 }
@@ -469,6 +576,9 @@ static to_fp32_cuda_t ggml_get_to_fp32_pq_tq_unrotated_cuda(ggml_type type) {
         case GGML_TYPE_TQ4_1: return dequant_pq_tq_unrotated_fp32<PqTqTypeTag::T4_1>;
         case GGML_TYPE_PQ4_0_64: return dequant_pq_tq_unrotated_fp32<PqTqTypeTag::T4_0_64>;
         case GGML_TYPE_TQ4_1_64: return dequant_pq_tq_unrotated_fp32<PqTqTypeTag::T4_1_64>;
+        case GGML_TYPE_PQ2_K: return dequant_pq_tq_unrotated_fp32_256<PqTqTypeTag::P2_K>;
+        case GGML_TYPE_PQ3_K: return dequant_pq_tq_unrotated_fp32_256<PqTqTypeTag::P3_K>;
+        case GGML_TYPE_PQ4_K: return dequant_pq_tq_unrotated_fp32_256<PqTqTypeTag::P4_K>;
         default: return nullptr;
     }
 }
@@ -484,6 +594,9 @@ static inline bool ggml_is_pq_tq_type(ggml_type type) {
         case GGML_TYPE_TQ4_1:
         case GGML_TYPE_PQ4_0_64:
         case GGML_TYPE_TQ4_1_64:
+        case GGML_TYPE_PQ2_K:
+        case GGML_TYPE_PQ3_K:
+        case GGML_TYPE_PQ4_K:
             return true;
         default:
             return false;

@@ -2319,7 +2319,8 @@ static bool ggml_cuda_should_fuse_mul_mat_vec_q(const ggml_tensor * tensor) {
     ggml_tensor *       src0 = tensor->src[0];
     ggml_tensor *       src1 = tensor->src[1];
     const ggml_tensor * dst  = tensor;
-    const bool pq_weight_type = src0->type == GGML_TYPE_PQ2_0 || src0->type == GGML_TYPE_PQ3_0 || src0->type == GGML_TYPE_PQ4_0;
+    const bool pq_weight_type = src0->type == GGML_TYPE_PQ2_0 || src0->type == GGML_TYPE_PQ3_0 || src0->type == GGML_TYPE_PQ4_0 ||
+                                src0->type == GGML_TYPE_PQ2_K || src0->type == GGML_TYPE_PQ3_K || src0->type == GGML_TYPE_PQ4_K;
 
     const bool bad_padding_clear = ggml_backend_buffer_get_usage(src0->buffer) == GGML_BACKEND_BUFFER_USAGE_COMPUTE &&
                                    ggml_nbytes(src0) != ggml_backend_buffer_get_alloc_size(src0->buffer, src0) &&
@@ -2447,7 +2448,8 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor * 
     const ggml_tensor * src0 = dst->src[0];
     const ggml_tensor * src1 = dst->src[1];
     const ggml_tensor * ids  = dst->src[2];
-    const bool pq_weight_type = src0->type == GGML_TYPE_PQ2_0 || src0->type == GGML_TYPE_PQ3_0 || src0->type == GGML_TYPE_PQ4_0;
+    const bool pq_weight_type = src0->type == GGML_TYPE_PQ2_0 || src0->type == GGML_TYPE_PQ3_0 || src0->type == GGML_TYPE_PQ4_0 ||
+                                src0->type == GGML_TYPE_PQ2_K || src0->type == GGML_TYPE_PQ3_K || src0->type == GGML_TYPE_PQ4_K;
 
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->type  == GGML_TYPE_F32);
@@ -4752,6 +4754,9 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
             case GGML_TYPE_PQ2_0:
             case GGML_TYPE_PQ3_0:
             case GGML_TYPE_PQ4_0:
+            case GGML_TYPE_PQ2_K:
+            case GGML_TYPE_PQ3_K:
+            case GGML_TYPE_PQ4_K:
             case GGML_TYPE_TQ2_1:
             case GGML_TYPE_TQ3_1:
             case GGML_TYPE_TQ4_1:
@@ -4892,6 +4897,9 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
                     case GGML_TYPE_PQ2_0:
                     case GGML_TYPE_PQ3_0:
                     case GGML_TYPE_PQ4_0:
+                    case GGML_TYPE_PQ2_K:
+                    case GGML_TYPE_PQ3_K:
+                    case GGML_TYPE_PQ4_K:
                         return true;
                     default:
                         return false;
@@ -4915,6 +4923,9 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
                     case GGML_TYPE_PQ2_0:
                     case GGML_TYPE_PQ3_0:
                     case GGML_TYPE_PQ4_0:
+                    case GGML_TYPE_PQ2_K:
+                    case GGML_TYPE_PQ3_K:
+                    case GGML_TYPE_PQ4_K:
                     case GGML_TYPE_TQ2_1:
                     case GGML_TYPE_TQ3_1:
                     case GGML_TYPE_TQ4_1:

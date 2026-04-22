@@ -396,6 +396,29 @@ typedef struct {
 } block_q4_K;
 static_assert(sizeof(block_q4_K) == 2*sizeof(ggml_half) + K_SCALE_SIZE + QK_K/2, "wrong q4_K block size/padding");
 
+// PolarQuant K-family, 16 sub-blocks of 16 elements over a 256-wide rotated super-block.
+typedef struct {
+    ggml_half d[2];            // master band scales for two 128-wide bands
+    uint8_t scales[K_SCALE_SIZE];
+    uint8_t qs[QK_K/4];
+} block_pq2_K;
+static_assert(sizeof(block_pq2_K) == 2*sizeof(ggml_half) + K_SCALE_SIZE + QK_K/4, "wrong pq2_K block size/padding");
+
+typedef struct {
+    ggml_half d[2];
+    uint8_t scales[K_SCALE_SIZE];
+    uint8_t hmask[QK_K/8];
+    uint8_t qs[QK_K/4];
+} block_pq3_K;
+static_assert(sizeof(block_pq3_K) == 2*sizeof(ggml_half) + K_SCALE_SIZE + QK_K/8 + QK_K/4, "wrong pq3_K block size/padding");
+
+typedef struct {
+    ggml_half d[2];
+    uint8_t scales[K_SCALE_SIZE];
+    uint8_t qs[QK_K/2];
+} block_pq4_K;
+static_assert(sizeof(block_pq4_K) == 2*sizeof(ggml_half) + K_SCALE_SIZE + QK_K/2, "wrong pq4_K block size/padding");
+
 // 5-bit quantization
 // 8 blocks of 32 elements each
 // weight is represented as x = a * q + b

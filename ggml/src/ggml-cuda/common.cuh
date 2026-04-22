@@ -988,6 +988,27 @@ struct ggml_cuda_type_traits<GGML_TYPE_PQ4_0> {
 };
 
 template<>
+struct ggml_cuda_type_traits<GGML_TYPE_PQ2_K> {
+    static constexpr int qk = QK_K;
+    static constexpr int qr = 1;
+    static constexpr int qi = 16;
+};
+
+template<>
+struct ggml_cuda_type_traits<GGML_TYPE_PQ3_K> {
+    static constexpr int qk = QK_K;
+    static constexpr int qr = 1;
+    static constexpr int qi = 16;
+};
+
+template<>
+struct ggml_cuda_type_traits<GGML_TYPE_PQ4_K> {
+    static constexpr int qk = QK_K;
+    static constexpr int qr = 1;
+    static constexpr int qi = 16;
+};
+
+template<>
 struct ggml_cuda_type_traits<GGML_TYPE_MXFP4> {
     static constexpr int qk = QK_MXFP4;
     static constexpr int qr = QR_MXFP4;

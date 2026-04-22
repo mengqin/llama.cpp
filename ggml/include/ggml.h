@@ -437,7 +437,10 @@ extern "C" {
         GGML_TYPE_TQ2_1    = 47, // TurboQuant PQ2 + 1-bit QJL compensation
         GGML_TYPE_TQ3_1    = 48, // TurboQuant PQ3 + 1-bit QJL compensation
         GGML_TYPE_TQ4_1    = 49, // TurboQuant PQ4 + 1-bit QJL compensation
-        GGML_TYPE_COUNT    = 50,
+        GGML_TYPE_PQ2_K    = 50, // PolarQuant 2-bit, K-family super-blocks
+        GGML_TYPE_PQ3_K    = 51, // PolarQuant 3-bit, K-family super-blocks
+        GGML_TYPE_PQ4_K    = 52, // PolarQuant 4-bit, K-family super-blocks
+        GGML_TYPE_COUNT    = 53,
     };
 
     // precision
@@ -478,6 +481,9 @@ extern "C" {
         GGML_FTYPE_MOSTLY_PQ2_0   = 28, // except 1d tensors
         GGML_FTYPE_MOSTLY_PQ3_0   = 29, // except 1d tensors
         GGML_FTYPE_MOSTLY_PQ4_0   = 30, // except 1d tensors
+        GGML_FTYPE_MOSTLY_PQ2_K   = 31, // except 1d tensors
+        GGML_FTYPE_MOSTLY_PQ3_K   = 32, // except 1d tensors
+        GGML_FTYPE_MOSTLY_PQ4_K   = 33, // except 1d tensors
     };
 
     // available tensor operations:
