@@ -907,6 +907,35 @@ static float pqk_choose_band_master_fast(const float * values, int count) {
     return exp2f(best_log2_master);
 }
 
+static int pqk_collect_band_master_candidates(const float * values, int count, float * candidates) {
+    float log_values[GGML_PQK_SUBBLOCKS_PER_BAND];
+    int n = 0;
+
+    for (int i = 0; i < count; ++i) {
+        if (values[i] > 1e-12f) {
+            log_values[n++] = log2f(values[i]);
+        }
+    }
+
+    if (n == 0) {
+        return 0;
+    }
+
+    qsort(log_values, n, sizeof(float), pqk_compare_float);
+
+    int nc = 0;
+    candidates[nc++] = log2f(pqk_geometric_mean(values, count));
+
+    if ((n & 1) != 0) {
+        candidates[nc++] = log_values[n / 2];
+    } else {
+        candidates[nc++] = 0.5f * (log_values[n / 2 - 1] + log_values[n / 2]);
+    }
+
+    candidates[nc++] = log2f(pqk_max_value(values, count));
+    return nc;
+}
+
 static uint8_t pqk_encode_local_scale(float master, float local) {
     if (master <= 0.0f || local <= 1e-12f) {
         return 0;
@@ -970,8 +999,154 @@ static void pqk_quantize_block_fast(const float * src, pqk_quantized_block_tmp *
     }
 }
 
+static uint8_t pqk_clamp_local_scale_q(int q) {
+    if (q < 1) {
+        return 1;
+    }
+    if (q > 63) {
+        return 63;
+    }
+    return (uint8_t) q;
+}
+
+static void pqk_quantize_block_with_masters(
+        const float * rotated, const float * local_exact, const float * band_master,
+        pqk_quantized_block_tmp * dst, const pqk_codebook_spec * spec, int local_q_delta) {
+    dst->band_master[0] = band_master[0];
+    dst->band_master[1] = band_master[1];
+
+    for (int sb = 0; sb < GGML_PQK_SUBBLOCK_COUNT; ++sb) {
+        const int band = sb / GGML_PQK_SUBBLOCKS_PER_BAND;
+        uint8_t qscale = pqk_encode_local_scale(dst->band_master[band], local_exact[sb]);
+        if (qscale != 0 && local_q_delta != 0) {
+            qscale = pqk_clamp_local_scale_q((int) qscale + local_q_delta);
+        }
+
+        dst->scale_q[sb] = qscale;
+        const float scale = ggml_pqk_decode_local_scale(dst->band_master[band], qscale);
+        pqk_quantize_subblock_with_scale(
+                rotated + sb * GGML_PQK_SUBBLOCK_SIZE,
+                dst->qidx + sb * GGML_PQK_SUBBLOCK_SIZE,
+                spec->levels,
+                scale,
+                spec->centroid_fn);
+    }
+}
+
+static float pqk_weighted_loss_original_domain(
+        const float * rotated, const pqk_quantized_block_tmp * q, const pqk_codebook_spec * spec,
+        const float * weights) {
+    float residual[QK_K];
+
+    for (int sb = 0; sb < GGML_PQK_SUBBLOCK_COUNT; ++sb) {
+        const int band = sb / GGML_PQK_SUBBLOCKS_PER_BAND;
+        const float scale = ggml_pqk_decode_local_scale(q->band_master[band], q->scale_q[sb]);
+        for (int i = 0; i < GGML_PQK_SUBBLOCK_SIZE; ++i) {
+            const int idx = sb * GGML_PQK_SUBBLOCK_SIZE + i;
+            residual[idx] = rotated[idx] - scale * spec->centroid_fn(q->qidx[idx]);
+        }
+    }
+
+    // PQ_K quantizes in the rotated domain, but imatrix weights live in the
+    // original coordinates. Score candidates after rotating the residual back.
+    pqk_rotate_inverse_256(residual);
+
+    float loss = 0.0f;
+    for (int i = 0; i < QK_K; ++i) {
+        loss += weights[i] * residual[i] * residual[i];
+    }
+    return loss;
+}
+
+static void pqk_quantize_block_weighted(
+        const float * src, const float * weights, pqk_quantized_block_tmp * dst,
+        const pqk_codebook_spec * spec) {
+    float rotated[QK_K];
+    float local_exact[GGML_PQK_SUBBLOCK_COUNT];
+    float band_master[GGML_PQK_BAND_COUNT];
+
+    memcpy(rotated, src, sizeof(rotated));
+    pqk_rotate_forward_256(rotated);
+
+    for (int sb = 0; sb < GGML_PQK_SUBBLOCK_COUNT; ++sb) {
+        uint8_t qidx[GGML_PQK_SUBBLOCK_SIZE];
+        float err = 0.0f;
+        local_exact[sb] = pqk_fit_subblock_fast(
+                rotated + sb * GGML_PQK_SUBBLOCK_SIZE,
+                qidx,
+                spec->levels,
+                spec->max_centroid,
+                spec->centroid_fn,
+                &err);
+    }
+
+    for (int band = 0; band < GGML_PQK_BAND_COUNT; ++band) {
+        float band_locals[GGML_PQK_SUBBLOCKS_PER_BAND];
+        for (int i = 0; i < GGML_PQK_SUBBLOCKS_PER_BAND; ++i) {
+            const int sb = band * GGML_PQK_SUBBLOCKS_PER_BAND + i;
+            band_locals[i] = local_exact[sb];
+        }
+        band_master[band] = pqk_choose_band_master_fast(band_locals, GGML_PQK_SUBBLOCKS_PER_BAND);
+    }
+
+    pqk_quantize_block_with_masters(rotated, local_exact, band_master, dst, spec, 0);
+    float best_loss = pqk_weighted_loss_original_domain(rotated, dst, spec, weights);
+
+    for (int band = 0; band < GGML_PQK_BAND_COUNT; ++band) {
+        float band_locals[GGML_PQK_SUBBLOCKS_PER_BAND];
+        for (int i = 0; i < GGML_PQK_SUBBLOCKS_PER_BAND; ++i) {
+            const int sb = band * GGML_PQK_SUBBLOCKS_PER_BAND + i;
+            band_locals[i] = local_exact[sb];
+        }
+
+        float candidates[3];
+        const int nc = pqk_collect_band_master_candidates(band_locals, GGML_PQK_SUBBLOCKS_PER_BAND, candidates);
+        for (int i = 0; i < nc; ++i) {
+            const float candidate_master = exp2f(candidates[i]);
+            if (fabsf(candidate_master - band_master[band]) <= 1e-12f * fmaxf(1.0f, band_master[band])) {
+                continue;
+            }
+
+            float trial_master[GGML_PQK_BAND_COUNT] = { band_master[0], band_master[1] };
+            pqk_quantized_block_tmp trial;
+            trial_master[band] = candidate_master;
+            pqk_quantize_block_with_masters(rotated, local_exact, trial_master, &trial, spec, 0);
+
+            const float loss = pqk_weighted_loss_original_domain(rotated, &trial, spec, weights);
+            if (loss < best_loss) {
+                best_loss = loss;
+                *dst = trial;
+                band_master[0] = dst->band_master[0];
+                band_master[1] = dst->band_master[1];
+            }
+        }
+    }
+
+    // Keep the refinement deliberately small: the initial sub-block search stays
+    // unchanged, and imatrix only adjudicates nearby encoded local-scale choices.
+    for (int delta = -1; delta <= 1; delta += 2) {
+        pqk_quantized_block_tmp trial;
+        pqk_quantize_block_with_masters(rotated, local_exact, band_master, &trial, spec, delta);
+        const float loss = pqk_weighted_loss_original_domain(rotated, &trial, spec, weights);
+        if (loss < best_loss) {
+            best_loss = loss;
+            *dst = trial;
+        }
+    }
+}
+
 static void pqk_quantize_block_generic(const float * src, pqk_quantized_block_tmp * dst, const pqk_codebook_spec * spec) {
     pqk_quantize_block_fast(src, dst, spec);
+}
+
+static void pqk_quantize_block_generic_weighted(
+        const float * src, const float * weights, pqk_quantized_block_tmp * dst,
+        const pqk_codebook_spec * spec) {
+    if (weights != NULL) {
+        pqk_quantize_block_weighted(src, weights, dst, spec);
+    } else {
+        pqk_quantize_block_fast(src, dst, spec);
+    }
 }
 
 static void pqk_store_scales(ggml_half * d, uint8_t * scales, const pqk_quantized_block_tmp * src) {
@@ -1041,6 +1216,42 @@ void quantize_row_pq4_K_ref(const float * GGML_RESTRICT x, block_pq4_K * GGML_RE
     }
 }
 
+static void quantize_row_pq2_K_impl(
+        const float * GGML_RESTRICT x, block_pq2_K * GGML_RESTRICT y, int64_t k,
+        const float * GGML_RESTRICT weights) {
+    assert(k % QK_K == 0);
+    const int nb = k / QK_K;
+    for (int block = 0; block < nb; ++block) {
+        pqk_quantized_block_tmp tmp;
+        pqk_quantize_block_generic_weighted(x + block * QK_K, weights ? weights + block * QK_K : NULL, &tmp, &PQK_CODEBOOK_2BIT);
+        pqk_store_block_pq2_K(y + block, &tmp);
+    }
+}
+
+static void quantize_row_pq3_K_impl(
+        const float * GGML_RESTRICT x, block_pq3_K * GGML_RESTRICT y, int64_t k,
+        const float * GGML_RESTRICT weights) {
+    assert(k % QK_K == 0);
+    const int nb = k / QK_K;
+    for (int block = 0; block < nb; ++block) {
+        pqk_quantized_block_tmp tmp;
+        pqk_quantize_block_generic_weighted(x + block * QK_K, weights ? weights + block * QK_K : NULL, &tmp, &PQK_CODEBOOK_3BIT);
+        pqk_store_block_pq3_K(y + block, &tmp);
+    }
+}
+
+static void quantize_row_pq4_K_impl(
+        const float * GGML_RESTRICT x, block_pq4_K * GGML_RESTRICT y, int64_t k,
+        const float * GGML_RESTRICT weights) {
+    assert(k % QK_K == 0);
+    const int nb = k / QK_K;
+    for (int block = 0; block < nb; ++block) {
+        pqk_quantized_block_tmp tmp;
+        pqk_quantize_block_generic_weighted(x + block * QK_K, weights ? weights + block * QK_K : NULL, &tmp, &PQK_CODEBOOK_4BIT);
+        pqk_store_block_pq4_K(y + block, &tmp);
+    }
+}
+
 void dequantize_row_pq2_K(const block_pq2_K * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
@@ -1104,36 +1315,45 @@ void dequantize_row_pq4_K(const block_pq4_K * GGML_RESTRICT x, float * GGML_REST
 
 size_t quantize_pq2_K(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
                          int64_t nrows, int64_t n_per_row, const float * imatrix) {
-    GGML_UNUSED(imatrix);
     assert(n_per_row % QK_K == 0);
 
     const size_t row_size = (n_per_row / QK_K) * sizeof(block_pq2_K);
     for (int64_t row = 0; row < nrows; ++row) {
-        quantize_row_pq2_K_ref(src + row * n_per_row, (block_pq2_K *)((char *)dst + row * row_size), n_per_row);
+        if (imatrix != NULL) {
+            quantize_row_pq2_K_impl(src + row * n_per_row, (block_pq2_K *)((char *)dst + row * row_size), n_per_row, imatrix);
+        } else {
+            quantize_row_pq2_K_ref(src + row * n_per_row, (block_pq2_K *)((char *)dst + row * row_size), n_per_row);
+        }
     }
     return nrows * row_size;
 }
 
 size_t quantize_pq3_K(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
                          int64_t nrows, int64_t n_per_row, const float * imatrix) {
-    GGML_UNUSED(imatrix);
     assert(n_per_row % QK_K == 0);
 
     const size_t row_size = (n_per_row / QK_K) * sizeof(block_pq3_K);
     for (int64_t row = 0; row < nrows; ++row) {
-        quantize_row_pq3_K_ref(src + row * n_per_row, (block_pq3_K *)((char *)dst + row * row_size), n_per_row);
+        if (imatrix != NULL) {
+            quantize_row_pq3_K_impl(src + row * n_per_row, (block_pq3_K *)((char *)dst + row * row_size), n_per_row, imatrix);
+        } else {
+            quantize_row_pq3_K_ref(src + row * n_per_row, (block_pq3_K *)((char *)dst + row * row_size), n_per_row);
+        }
     }
     return nrows * row_size;
 }
 
 size_t quantize_pq4_K(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
                          int64_t nrows, int64_t n_per_row, const float * imatrix) {
-    GGML_UNUSED(imatrix);
     assert(n_per_row % QK_K == 0);
 
     const size_t row_size = (n_per_row / QK_K) * sizeof(block_pq4_K);
     for (int64_t row = 0; row < nrows; ++row) {
-        quantize_row_pq4_K_ref(src + row * n_per_row, (block_pq4_K *)((char *)dst + row * row_size), n_per_row);
+        if (imatrix != NULL) {
+            quantize_row_pq4_K_impl(src + row * n_per_row, (block_pq4_K *)((char *)dst + row * row_size), n_per_row, imatrix);
+        } else {
+            quantize_row_pq4_K_ref(src + row * n_per_row, (block_pq4_K *)((char *)dst + row * row_size), n_per_row);
+        }
     }
     return nrows * row_size;
 }
