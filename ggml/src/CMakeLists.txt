@@ -209,6 +209,10 @@ add_library(ggml-base
             ggml-pq-tq.c
             gguf.cpp)
 
+if (MSVC)
+    set_source_files_properties(ggml-pq-tq.c PROPERTIES COMPILE_OPTIONS "/experimental:c11atomics")
+endif()
+
 set_target_properties(ggml-base PROPERTIES
     VERSION ${GGML_VERSION}
     SOVERSION ${GGML_VERSION_MAJOR}

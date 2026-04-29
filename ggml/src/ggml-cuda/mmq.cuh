@@ -6,6 +6,7 @@
 #include "mma.cuh"
 
 #include <climits>
+#include <cstdlib>
 #include <cstdint>
 
 using namespace ggml_cuda_mma;
@@ -19,6 +20,112 @@ typedef void (*load_tiles_mmq_t)(const char * __restrict__ x, int * x_tile, cons
 typedef void (*vec_dot_mmq_t)(const int * __restrict__ x, const int * __restrict__ y, float * __restrict__ sum, const int k00);
 typedef void (*mmq_write_back_t)(const float * __restrict__ sum, const int32_t * __restrict__ get_rows_to_sorted,
     float * __restrict__ dst, const int stride, const int i_max, const int j_max);
+
+template <ggml_type type>
+static constexpr __host__ __device__ bool mmq_type_has_mma() {
+    return type != GGML_TYPE_PQ2_K;
+}
+
+template <ggml_type type>
+static bool mmq_uses_mma_host(const int cc) {
+    return mmq_type_has_mma<type>() && (turing_mma_available(cc) || amd_mfma_available(cc) || amd_wmma_available(cc));
+}
+
+template <ggml_type type>
+static constexpr __device__ bool mmq_uses_mma_device() {
+#if defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
+    return mmq_type_has_mma<type>();
+#else
+    return false;
+#endif
+}
+
+template <ggml_type type>
+static int get_mmq_x_max_host_for_type(const int cc) {
+    if (mmq_uses_mma_host<type>(cc)) {
+        return 128;
+    }
+
+    return GGML_CUDA_CC_IS_NVIDIA(cc) && ggml_cuda_highest_compiled_arch(cc) >= GGML_CUDA_CC_VOLTA ?
+#ifdef GGML_CUDA_FORCE_MMQ
+            128                     : 64;
+#else
+            MMQ_DP4A_MAX_BATCH_SIZE : 64;
+#endif // GGML_CUDA_FORCE_MMQ
+}
+
+template <ggml_type type>
+static constexpr __device__ int get_mmq_x_max_device_for_type() {
+#if defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
+    if constexpr (mmq_type_has_mma<type>()) {
+        return 128;
+    }
+#endif
+
+#if defined(GGML_USE_HIP)
+    return 64;
+#else // defined(GGML_USE_HIP)
+
+#if __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
+#ifdef GGML_CUDA_FORCE_MMQ
+    return 128;
+#else // GGML_CUDA_FORCE_MMQ
+    return MMQ_DP4A_MAX_BATCH_SIZE;
+#endif // GGML_CUDA_FORCE_MMQ
+#else // __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
+    return 64;
+#endif // __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
+
+#endif // defined(GGML_USE_HIP)
+}
+
+template <ggml_type type>
+static int mmq_get_granularity_host_for_type(const int mmq_x, const int cc) {
+    if (mmq_type_has_mma<type>()) {
+        if (amd_mfma_available(cc) || amd_wmma_available(cc)) {
+            return mmq_x >= 128 ? 32 : 16;
+        }
+
+        if (turing_mma_available(cc) && mmq_x >= 48) {
+            return 16;
+        }
+    }
+
+    return 8;
+}
+
+template <ggml_type type>
+static constexpr __device__ int mmq_get_granularity_device_for_type(const int mmq_x) {
+#if defined(AMD_MFMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
+    if constexpr (mmq_type_has_mma<type>()) {
+        return mmq_x >= 128 ? 32 : 16;
+    }
+#elif defined(TURING_MMA_AVAILABLE)
+    if constexpr (mmq_type_has_mma<type>()) {
+        return mmq_x >= 48 ? 16 : 8;
+    }
+#endif
+
+    return 8;
+}
+
+template <ggml_type type>
+static void mmq_log_selected_path_once(const int cc, const int mmq_x, const int mmq_y) {
+    if constexpr (type != GGML_TYPE_PQ2_K) {
+        return;
+    }
+
+    static const bool enabled = getenv("GGML_CUDA_LOG_PQ2_K_MMQ") != nullptr;
+    static bool logged = false;
+
+    if (!enabled || logged) {
+        return;
+    }
+
+    logged = true;
+    GGML_LOG_INFO("%s: PQ2_K MMQ using %s path (cc=%d, mmq_x=%d, mmq_y=%d)\n",
+            __func__, mmq_uses_mma_host<type>(cc) ? "mma" : "dp4a", cc, mmq_x, mmq_y);
+}
 
 enum mmq_q8_1_ds_layout {
     MMQ_Q8_1_DS_LAYOUT_D4,
@@ -186,6 +293,7 @@ static constexpr __device__ int get_mmq_y_device() {
 #define MMQ_DP4A_TXS_Q4_1    tile_x_sizes{mmq_y*MMQ_TILE_NE_K   + mmq_y, mmq_y*MMQ_TILE_NE_K/QI4_1   + mmq_y/QI4_1,     0}
 #define MMQ_DP4A_TXS_Q8_0    tile_x_sizes{mmq_y*MMQ_TILE_NE_K*2 + mmq_y, mmq_y*MMQ_TILE_NE_K*2/QI8_0 + mmq_y/(QI8_0/2), 0}
 #define MMQ_DP4A_TXS_Q8_0_16 tile_x_sizes{mmq_y*MMQ_TILE_NE_K*2 + mmq_y, mmq_y*MMQ_TILE_NE_K*4/QI8_0 + mmq_y/(QI8_0/4), 0}
+#define MMQ_DP4A_TXS_PQ2_K   tile_x_sizes{mmq_y*MMQ_TILE_NE_K*2 + mmq_y, mmq_y*(MMQ_TILE_NE_K/2 + 1),                0}
 #define MMQ_DP4A_TXS_Q8_1    tile_x_sizes{mmq_y*MMQ_TILE_NE_K*2 + mmq_y, mmq_y*MMQ_TILE_NE_K*2/QI8_1 + mmq_y/(QI8_1/2), 0}
 #define MMQ_DP4A_TXS_Q2_K    tile_x_sizes{mmq_y*MMQ_TILE_NE_K*2 + mmq_y, mmq_y*MMQ_TILE_NE_K         + mmq_y,           0}
 #define MMQ_DP4A_TXS_Q3_K    tile_x_sizes{mmq_y*MMQ_TILE_NE_K*2 + mmq_y, mmq_y,                                         mmq_y*MMQ_TILE_NE_K/8 + mmq_y/8}
@@ -199,7 +307,7 @@ static constexpr __host__ __device__ tile_x_sizes mmq_get_dp4a_tile_x_sizes(ggml
         case GGML_TYPE_PQ2_0:   return MMQ_DP4A_TXS_Q8_0;
         case GGML_TYPE_PQ3_0:   return MMQ_DP4A_TXS_Q8_0;
         case GGML_TYPE_PQ4_0:   return MMQ_DP4A_TXS_Q8_0;
-        case GGML_TYPE_PQ2_K:   return MMQ_DP4A_TXS_Q8_0_16;
+        case GGML_TYPE_PQ2_K:   return MMQ_DP4A_TXS_PQ2_K;
         case GGML_TYPE_PQ3_K:   return MMQ_DP4A_TXS_Q8_0_16;
         case GGML_TYPE_PQ4_K:   return MMQ_DP4A_TXS_Q8_0_16;
         case GGML_TYPE_Q4_0:    return MMQ_DP4A_TXS_Q4_0;
@@ -1276,6 +1384,77 @@ template <ggml_type type, int mmq_y, bool need_check> static __device__ __forcei
 #endif
 }
 
+template <int mmq_y, bool need_check> static __device__ __forceinline__ void load_tiles_pq2_K(
+    const char * __restrict__ x, int * __restrict__ x_tile, const int kbx0, const int i_max, const int stride) {
+    constexpr int nwarps = mmq_get_nwarps_device();
+    constexpr int warp_size = ggml_cuda_get_physical_warp_size();
+
+    // PQ2_K uses the 8D local-scale layout and intentionally disables the MMA
+    // MMQ path for now. Therefore its
+    // tile loader must also use the DP4A shared-memory layout unconditionally.
+    // Using the compile-time MMA macros here is wrong on NVIDIA/AMD builds:
+    // shared memory is allocated for DP4A but this function would write the
+    // larger/different MMA layout, causing out-of-bounds writes and crashes.
+    constexpr tile_x_sizes txs = mmq_get_dp4a_tile_x_sizes(GGML_TYPE_PQ2_K, mmq_y);
+    int   * x_qs = (int   *)  x_tile;
+    half2 * x_d  = (half2 *) (x_qs + txs.qs);
+
+    constexpr int threads_per_row = 32;
+    constexpr int nrows = warp_size / threads_per_row;
+    const int txi = warp_size > threads_per_row ? threadIdx.x % threads_per_row : threadIdx.x;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nrows*nwarps) {
+        int i = i0 + (nrows == 1 ? threadIdx.y : threadIdx.y*nrows + threadIdx.x/threads_per_row);
+
+        if (need_check) {
+            i = min(i, i_max);
+        }
+
+        const block_pq2_K * bxi = (const block_pq2_K *) x + kbx0 + i*stride;
+        const uint8_t qb0 = bxi->qs[txi];
+        const uint8_t qb1 = bxi->qs[MMQ_TILE_NE_K + txi];
+        const int q4_0 = ((qb0 & 0x03u) <<  0)
+                       | ((qb0 & 0x0Cu) <<  2)
+                       | ((qb0 & 0x30u) <<  4)
+                       | ((qb0 & 0xC0u) <<  6);
+        const int q4_1 = ((qb1 & 0x03u) <<  0)
+                       | ((qb1 & 0x0Cu) <<  2)
+                       | ((qb1 & 0x30u) <<  4)
+                       | ((qb1 & 0xC0u) <<  6);
+        const int2 vp = get_int_from_table_16(q4_0 | (q4_1 << 16), PQK_DP4A_VAL_2BIT);
+        const int qs0 = __byte_perm(vp.x, vp.y, 0x5140);
+        const int qs1 = __byte_perm(vp.x, vp.y, 0x7362);
+
+        x_qs[i*(2*MMQ_TILE_NE_K + 1) + 0             + txi] = qs0;
+        x_qs[i*(2*MMQ_TILE_NE_K + 1) + MMQ_TILE_NE_K + txi] = qs1;
+    }
+
+    constexpr int scale_pairs_per_row = GGML_PQ2_K_SUBBLOCK_COUNT / 2;
+    constexpr int scale_rows_per_warp = warp_size / scale_pairs_per_row;
+    const int ksp = threadIdx.x % scale_pairs_per_row;
+
+#pragma unroll
+    for (int i0 = 0; i0 < mmq_y; i0 += nwarps*scale_rows_per_warp) {
+        int i = i0 + threadIdx.y*scale_rows_per_warp + threadIdx.x/scale_pairs_per_row;
+
+        if (need_check) {
+            i = min(i, i_max);
+        }
+
+        const block_pq2_K * bxi = (const block_pq2_K *) x + kbx0 + i*stride;
+        const int sub0 = 2*ksp;
+        const int band = sub0 / GGML_PQ2_K_SUBBLOCKS_PER_BAND;
+        const float dbase = __half2float(bxi->d[band]) * PQK_DP4A_INV_SCALE_2BIT;
+        const uint8_t qscale_pair = bxi->scales[ksp];
+        const half2 d_pair = make_half2(
+            dbase * PQ2_K_LOCAL_SCALE_LUT[qscale_pair & 0x0Fu],
+            dbase * PQ2_K_LOCAL_SCALE_LUT[qscale_pair >> 4]);
+
+        x_d[i*(MMQ_TILE_NE_K/2 + 1) + ksp] = d_pair;
+    }
+}
+
 template <int mmq_y, bool need_check> static __device__ __forceinline__ void load_tiles_mxfp4(
     const char * __restrict__ x, int * __restrict__ x_tile, const int kbx0, const int i_max, const int stride) {
     constexpr int nwarps = mmq_get_nwarps_device();
@@ -1882,6 +2061,40 @@ static __device__ __forceinline__ void vec_dot_q8_0_16_q8_1_dp4a(
     }
 }
 
+template <int mmq_x, int mmq_y>
+static __device__ __forceinline__ void vec_dot_q8_0_8_q8_1_dp4a(
+    const int * __restrict__ x, const int * __restrict__ y, float * __restrict__ sum, const int k00) {
+    constexpr int nwarps = mmq_get_nwarps_device();
+    constexpr int warp_size = ggml_cuda_get_physical_warp_size();
+
+    constexpr tile_x_sizes txs = MMQ_DP4A_TXS_PQ2_K;
+    const int   * x_qs = (const int   *) x;
+    const half2 * x_d  = (const half2 *) x_qs + txs.qs;
+    const int   * y_qs = (const int   *) y + 4;
+    const float * y_df = (const float *) y;
+
+#pragma unroll
+    for (int k01 = 0; k01 < MMQ_TILE_NE_K; k01 += QI8_0) {
+        const int k0 = k00 + k01;
+
+#pragma unroll
+        for (int j0 = 0; j0 < mmq_x; j0 += nwarps) {
+            const int j = j0 + threadIdx.y;
+
+#pragma unroll
+            for (int i0 = 0; i0 < mmq_y; i0 += warp_size) {
+                const int i = i0 + threadIdx.x;
+
+                sum[j0/nwarps*mmq_y/warp_size + i0/warp_size] += vec_dot_q8_0_8_q8_1_impl<QI8_0>(
+                    &x_qs[i*(2*MMQ_TILE_NE_K + 1) + k0],
+                    &y_qs[j*MMQ_TILE_Y_K + k01],
+                    &x_d[i*(MMQ_TILE_NE_K/2 + 1) + k0/4],
+                    y_df[j*MMQ_TILE_Y_K + k01/QI8_1]);
+            }
+        }
+    }
+}
+
 // Used for Q3_K, IQ2_S, and IQ2_XS:
 template <int mmq_x, int mmq_y>
 static __device__ __forceinline__ void vec_dot_q8_0_16_q8_1_mma(
@@ -2015,6 +2228,39 @@ static __device__ __forceinline__ void vec_dot_q8_0_16_q8_1_mma(
     GGML_UNUSED_VARS(x, y, sum, k00);
     NO_DEVICE_CODE;
 #endif // AMD_MFMA_AVAILABLE || AMD_WMMA_AVAILABLE
+}
+
+template <int mmq_x, int mmq_y>
+static __device__ __forceinline__ void vec_dot_q8_0_8_q8_1_mma(
+    const int * __restrict__ x, const int * __restrict__ y, float * __restrict__ sum, const int k00) {
+    constexpr int nwarps = mmq_get_nwarps_device();
+    constexpr int warp_size = ggml_cuda_get_physical_warp_size();
+
+    const int   * x_qs = (const int   *) x;
+    const half2 * x_d  = (const half2 *) x_qs + MMQ_TILE_NE_K*2;
+    const int   * y_qs = (const int   *) y + 4;
+    const float * y_df = (const float *) y;
+
+#pragma unroll
+    for (int k01 = 0; k01 < MMQ_TILE_NE_K; k01 += QI8_0) {
+        const int k0 = k00 + k01;
+
+#pragma unroll
+        for (int j0 = 0; j0 < mmq_x; j0 += nwarps) {
+            const int j = j0 + threadIdx.y;
+
+#pragma unroll
+            for (int i0 = 0; i0 < mmq_y; i0 += warp_size) {
+                const int i = i0 + threadIdx.x;
+
+                sum[j0/nwarps*mmq_y/warp_size + i0/warp_size] += vec_dot_q8_0_8_q8_1_impl<QI8_0>(
+                    &x_qs[i*MMQ_MMA_TILE_X_K_Q3_K + k0],
+                    &y_qs[j*MMQ_TILE_Y_K + k01],
+                    &x_d[i*MMQ_MMA_TILE_X_K_Q3_K + k0/4],
+                    y_df[j*MMQ_TILE_Y_K + k01/QI8_1]);
+            }
+        }
+    }
 }
 
 template <int mmq_y, bool need_check> static __device__ __forceinline__ void load_tiles_q2_K(
@@ -3692,9 +3938,9 @@ struct mmq_type_traits<mmq_x, mmq_y, need_check, GGML_TYPE_PQ4_0> {
 template <int mmq_x, int mmq_y, bool need_check>
 struct mmq_type_traits<mmq_x, mmq_y, need_check, GGML_TYPE_PQ2_K> {
     static constexpr int              vdr          = VDR_Q8_0_Q8_1_MMQ;
-    static constexpr load_tiles_mmq_t load_tiles   = load_tiles_pq_K<GGML_TYPE_PQ2_K, mmq_y, need_check>;
-    static constexpr vec_dot_mmq_t    vec_dot_mma  = vec_dot_q8_0_16_q8_1_mma<mmq_x, mmq_y>;
-    static constexpr vec_dot_mmq_t    vec_dot_dp4a = vec_dot_q8_0_16_q8_1_dp4a<mmq_x, mmq_y>;
+    static constexpr load_tiles_mmq_t load_tiles   = load_tiles_pq2_K<mmq_y, need_check>;
+    static constexpr vec_dot_mmq_t    vec_dot_mma  = vec_dot_q8_0_8_q8_1_mma<mmq_x, mmq_y>;
+    static constexpr vec_dot_mmq_t    vec_dot_dp4a = vec_dot_q8_0_8_q8_1_dp4a<mmq_x, mmq_y>;
 };
 
 template <int mmq_x, int mmq_y, bool need_check>
@@ -3895,14 +4141,6 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
     int * tile_y = data_mul_mat_q + mmq_x;
     int * tile_x = tile_y + GGML_PAD(mmq_x*MMQ_TILE_Y_K, nwarps*warp_size);
 
-#if defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
-    constexpr vec_dot_mmq_t    vec_dot    = mmq_type_traits<mmq_x, mmq_y, need_check, type>::vec_dot_mma;
-    constexpr mmq_write_back_t write_back = mmq_write_back_mma<type, mmq_x, mmq_y, need_check>;
-#else
-    constexpr vec_dot_mmq_t    vec_dot    = mmq_type_traits<mmq_x, mmq_y, need_check, type>::vec_dot_dp4a;
-    constexpr mmq_write_back_t write_back = mmq_write_back_dp4a<mmq_x, mmq_y, need_check>;
-#endif // defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
-
 #if defined(BLACKWELL_MMA_AVAILABLE)
     // FP4 tile stores 8 blocks
     constexpr int ne_block = (type == GGML_TYPE_MXFP4) ? 8 * QK_MXFP4 : 4 * QK8_1;
@@ -3931,7 +4169,15 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
 
         __syncthreads();
 
-        vec_dot(tile_x, tile_y, sum, 0);
+#if defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
+    if constexpr (mmq_uses_mma_device<type>()) {
+        mmq_type_traits<mmq_x, mmq_y, need_check, type>::vec_dot_mma(tile_x, tile_y, sum, 0);
+    } else {
+        mmq_type_traits<mmq_x, mmq_y, need_check, type>::vec_dot_dp4a(tile_x, tile_y, sum, 0);
+    }
+#else
+    mmq_type_traits<mmq_x, mmq_y, need_check, type>::vec_dot_dp4a(tile_x, tile_y, sum, 0);
+#endif
 
         __syncthreads();
 
@@ -3947,15 +4193,39 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
 
         __syncthreads();
 
-        vec_dot(tile_x, tile_y, sum, MMQ_TILE_NE_K);
+#if defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
+        if constexpr (mmq_uses_mma_device<type>()) {
+            mmq_type_traits<mmq_x, mmq_y, need_check, type>::vec_dot_mma(tile_x, tile_y, sum, MMQ_TILE_NE_K);
+        } else {
+            mmq_type_traits<mmq_x, mmq_y, need_check, type>::vec_dot_dp4a(tile_x, tile_y, sum, MMQ_TILE_NE_K);
+        }
+#else
+        mmq_type_traits<mmq_x, mmq_y, need_check, type>::vec_dot_dp4a(tile_x, tile_y, sum, MMQ_TILE_NE_K);
+#endif
 
         __syncthreads();
     }
 
     if (fixup) {
-        write_back(sum, ids_dst, tmp_fixup + blockIdx.x*(mmq_x*mmq_y), mmq_y, mmq_y, mmq_x);
+#if defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
+        if constexpr (mmq_uses_mma_device<type>()) {
+            mmq_write_back_mma<type, mmq_x, mmq_y, need_check>(sum, ids_dst, tmp_fixup + blockIdx.x*(mmq_x*mmq_y), mmq_y, mmq_y, mmq_x);
+        } else {
+            mmq_write_back_dp4a<mmq_x, mmq_y, need_check>(sum, ids_dst, tmp_fixup + blockIdx.x*(mmq_x*mmq_y), mmq_y, mmq_y, mmq_x);
+        }
+#else
+        mmq_write_back_dp4a<mmq_x, mmq_y, need_check>(sum, ids_dst, tmp_fixup + blockIdx.x*(mmq_x*mmq_y), mmq_y, mmq_y, mmq_x);
+#endif
     } else {
-        write_back(sum, ids_dst, dst, stride_col_dst, tile_x_max_i, tile_y_max_j);
+#if defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
+        if constexpr (mmq_uses_mma_device<type>()) {
+            mmq_write_back_mma<type, mmq_x, mmq_y, need_check>(sum, ids_dst, dst, stride_col_dst, tile_x_max_i, tile_y_max_j);
+        } else {
+            mmq_write_back_dp4a<mmq_x, mmq_y, need_check>(sum, ids_dst, dst, stride_col_dst, tile_x_max_i, tile_y_max_j);
+        }
+#else
+        mmq_write_back_dp4a<mmq_x, mmq_y, need_check>(sum, ids_dst, dst, stride_col_dst, tile_x_max_i, tile_y_max_j);
+#endif
     }
 }
 
@@ -3983,7 +4253,7 @@ static __global__ void mul_mat_q(
         const int ncols_max) {
 
     // Skip unused template specializations for faster compilation:
-    if (mmq_x > get_mmq_x_max_device() || mmq_x % mmq_get_granularity_device(mmq_x) != 0) {
+    if (mmq_x > get_mmq_x_max_device_for_type<type>() || mmq_x % mmq_get_granularity_device_for_type<type>(mmq_x) != 0) {
         NO_DEVICE_CODE;
         return;
     }
@@ -4390,7 +4660,7 @@ static size_t mmq_get_nbytes_shared(const int mmq_x, const int mmq_y, const int 
     const tile_x_sizes txs = mmq_get_dp4a_tile_x_sizes(type, mmq_y);
     const int mmq_tile_x_k = mmq_get_mma_tile_x_k(type);
     const size_t nbs_ids = mmq_x*sizeof(int);
-    const size_t nbs_x = (turing_mma_available(cc) || amd_mfma_available(cc) || amd_wmma_available(cc)) ? mmq_y*mmq_tile_x_k*sizeof(int) : txs.qs*sizeof(int) + txs.dm*sizeof(half2) + txs.sc*sizeof(int);
+    const size_t nbs_x = mmq_uses_mma_host<type>(cc) ? mmq_y*mmq_tile_x_k*sizeof(int) : txs.qs*sizeof(int) + txs.dm*sizeof(half2) + txs.sc*sizeof(int);
     const size_t nbs_y = mmq_x * (sizeof(block_q8_1_mmq));
     return nbs_ids + nbs_x + GGML_PAD(nbs_y, nwarps*warp_size*sizeof(int));
 }
@@ -4403,6 +4673,8 @@ static void launch_mul_mat_q(ggml_backend_cuda_context & ctx, const mmq_args & a
     const int warp_size = ggml_cuda_info().devices[id].warp_size;
     const int nwarps = mmq_get_nwarps_host(cc, warp_size);
     const int mmq_y = get_mmq_y_host(cc);
+
+    mmq_log_selected_path_once<type>(cc, mmq_x, mmq_y);
 
     const dim3 block_dims(warp_size, nwarps, 1);
 
@@ -4496,14 +4768,14 @@ void mul_mat_q_case(ggml_backend_cuda_context & ctx, const mmq_args & args, cuda
     const int warp_size = ggml_cuda_info().devices[id].warp_size;
     const int nwarps    = mmq_get_nwarps_host(cc, warp_size);
 
-    const int mmq_x_max = get_mmq_x_max_host(cc);
+    const int mmq_x_max = get_mmq_x_max_host_for_type<type>(cc);
     const int mmq_y = get_mmq_y_host(cc);
 
     int mmq_x_best  = 0;
     int ntiles_x_best = INT_MAX;
 
     for (int mmq_x = 8; mmq_x <= mmq_x_max && ntiles_x_best > 1; mmq_x += 8) {
-        const int granularity = mmq_get_granularity_host(mmq_x, cc);
+        const int granularity = mmq_get_granularity_host_for_type<type>(mmq_x, cc);
 
         if (mmq_x % granularity != 0 || mmq_get_nbytes_shared<type>(mmq_x, mmq_y, cc, warp_size, nwarps) > smpbo) {
             continue;

@@ -67,6 +67,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run bench-bundle phases for an arbitrary model matrix.")
     parser.add_argument("--models-json", required=True, help="Path to a JSON file describing the model matrix.")
     parser.add_argument("--phases", nargs="+", choices=["function", "bench", "ppl", "aime", "needle"], required=True)
+    parser.add_argument("--types", nargs="+", default=None, help="Optional cache-type subset to run, e.g. f16 q8_0 pq4")
+    parser.add_argument("--function-n-predict", type=int, default=None, help="Optional override for function-phase n_predict")
     parser.add_argument("--outdir", required=True)
     parser.add_argument("--cli-mode", choices=["templated", "raw"], default="raw")
 
@@ -111,6 +113,22 @@ def main(argv: list[str] | None = None) -> int:
     build_bin = Path(args.build_bin).resolve() if args.build_bin else (repo_root / "build" / "bin" / "Release").resolve()
     outdir = Path(args.outdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
+
+    if args.types:
+        wanted = {name.lower() for name in args.types}
+        available = {cfg.name.lower() for cfg in base.TYPES}
+        unknown = sorted(wanted - available)
+        if unknown:
+            raise ValueError(f"unknown cache types requested: {', '.join(unknown)}")
+        base.TYPES = [cfg for cfg in base.TYPES if cfg.name.lower() in wanted]
+
+    if args.function_n_predict is not None:
+        override_n_predict = args.function_n_predict
+
+        def function_n_predict_override(model, cli_mode):
+            return override_n_predict
+
+        base.function_n_predict = function_n_predict_override
 
     base.REPO_ROOT = repo_root
     base.BUILD_BIN = build_bin

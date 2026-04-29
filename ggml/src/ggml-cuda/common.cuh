@@ -3,6 +3,7 @@
 #include "ggml.h"
 #include "ggml-impl.h"
 #include "ggml-cuda.h"
+#include "ggml-pqk-common.h"
 
 #include <cstdint>
 #include <memory>
@@ -987,7 +988,7 @@ template<>
 struct ggml_cuda_type_traits<GGML_TYPE_PQ2_K> {
     static constexpr int qk = QK_K;
     static constexpr int qr = 1;
-    static constexpr int qi = 16;
+    static constexpr int qi = GGML_PQ2_K_SUBBLOCK_COUNT;
 };
 
 template<>

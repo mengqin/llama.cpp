@@ -128,6 +128,51 @@ if (CUDAToolkit_FOUND)
                              ${GGML_SOURCES_CUDA}
                             )
 
+    # Heavy CUDA translation units that benefit from nvcc internal parallelism.
+    set(GGML_CUDA_HEAVY_SPLIT_SOURCES
+	    "fattn-vec-instance-q8_0-q8_0.cu"
+        CACHE STRING "CUDA source file names that use nvcc --split-compile"
+    )
+
+    set(GGML_CUDA_HEAVY_SPLIT_THREADS
+        "16"
+        CACHE STRING "nvcc --split-compile value for heavy CUDA sources"
+    )
+
+    set(GGML_CUDA_HEAVY_POOL_JOBS
+        "1"
+        CACHE STRING "Max concurrent heavy CUDA source compilations under Ninja"
+    )
+
+    if (CMAKE_GENERATOR MATCHES "Ninja")
+        set_property(GLOBAL APPEND PROPERTY
+            JOB_POOLS cuda_heavy_compile_pool=${GGML_CUDA_HEAVY_POOL_JOBS}
+        )
+    endif()
+
+    foreach(src IN LISTS GGML_SOURCES_CUDA)
+        get_filename_component(src_name "${src}" NAME)
+
+        if (src_name IN_LIST GGML_CUDA_HEAVY_SPLIT_SOURCES)
+            message(STATUS "CUDA heavy split-compile source: ${src}")
+
+            get_source_file_property(old_opts "${src}" COMPILE_OPTIONS)
+            if (old_opts STREQUAL "NOTFOUND")
+                set(old_opts "")
+            endif()
+
+            set_source_files_properties("${src}" PROPERTIES
+                COMPILE_OPTIONS "${old_opts};--split-compile=${GGML_CUDA_HEAVY_SPLIT_THREADS}"
+            )
+
+            if (CMAKE_GENERATOR MATCHES "Ninja")
+                set_source_files_properties("${src}" PROPERTIES
+                    JOB_POOL_COMPILE cuda_heavy_compile_pool
+                )
+            endif()
+        endif()
+    endforeach()
+
     add_compile_definitions(GGML_CUDA_PEER_MAX_BATCH_SIZE=${GGML_CUDA_PEER_MAX_BATCH_SIZE})
 
     if (GGML_CUDA_GRAPHS)
@@ -193,7 +238,7 @@ if (CUDAToolkit_FOUND)
 
     set(CUDA_CXX_FLAGS "")
 
-    set(CUDA_FLAGS -use_fast_math -extended-lambda)
+    set(CUDA_FLAGS -use_fast_math -extended-lambda --split-compile=16)
 
     if (GGML_CUDA_DEBUG)
         list(APPEND CUDA_FLAGS -lineinfo)

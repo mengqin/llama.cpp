@@ -396,13 +396,13 @@ typedef struct {
 } block_q4_K;
 static_assert(sizeof(block_q4_K) == 2*sizeof(ggml_half) + K_SCALE_SIZE + QK_K/2, "wrong q4_K block size/padding");
 
-// PolarQuant K-family, 16 sub-blocks of 16 elements over a 256-wide rotated super-block.
+// PolarQuant K-family, 32 sub-blocks of 8 elements over a 256-wide rotated super-block.
 typedef struct {
     ggml_half d[2];            // master band scales for two 128-wide bands
-    uint8_t scales[K_SCALE_SIZE];
+    uint8_t scales[QK_K/16];   // 4-bit local scales for each 8D sub-block
     uint8_t qs[QK_K/4];
 } block_pq2_K;
-static_assert(sizeof(block_pq2_K) == 2*sizeof(ggml_half) + K_SCALE_SIZE + QK_K/4, "wrong pq2_K block size/padding");
+static_assert(sizeof(block_pq2_K) == 2*sizeof(ggml_half) + QK_K/16 + QK_K/4, "wrong pq2_K block size/padding");
 
 typedef struct {
     ggml_half d[2];

@@ -325,6 +325,33 @@ template <int vdr> static __device__ __forceinline__ float vec_dot_q8_0_16_q8_1_
     return d8_1*sumf;
 }
 
+template <int vdr> static __device__ __forceinline__ float vec_dot_q8_0_8_q8_1_impl(
+    const int * v, const int * u, const half2 * d8_0, const float & d8_1) {
+
+    float sumf = 0.0f;
+
+#pragma unroll
+    for (int i0 = 0; i0 < vdr; i0 += QI8_0/2) {
+        const float2 d = __half22float2(d8_0[i0/(QI8_0/2)]);
+
+        int sumi0 = 0;
+#pragma unroll
+        for (int i = i0; i < i0 + QI8_0/4; ++i) {
+            sumi0 = ggml_cuda_dp4a(v[i], u[i], sumi0);
+        }
+        sumf += d.x * sumi0;
+
+        int sumi1 = 0;
+#pragma unroll
+        for (int i = i0 + QI8_0/4; i < i0 + QI8_0/2; ++i) {
+            sumi1 = ggml_cuda_dp4a(v[i], u[i], sumi1);
+        }
+        sumf += d.y * sumi1;
+    }
+
+    return d8_1*sumf;
+}
+
 #define VDR_MXFP4_Q8_1_MMVQ 2
 #define VDR_MXFP4_Q8_1_MMQ  4
 
@@ -917,14 +944,14 @@ static __device__ __forceinline__ float vec_dot_pq2_K_q8_1(
     const block_pq2_K * bq = (const block_pq2_K *) vbq + kbx;
 
     const int sub = iqs;
-    const int q8_block = sub >> 1;
-    const int q8_i32 = (sub & 1) * 4;
-    const int band = sub / PQK_MMVQ_SUBBLOCKS_PER_BAND;
+    const int q8_block = sub >> 2;
+    const int q8_i32 = (sub & 3) * 2;
+    const int band = sub / GGML_PQ2_K_SUBBLOCKS_PER_BAND;
 
     int sumi = 0;
 #pragma unroll
-    for (int i = 0; i < 4; ++i) {
-        const uint8_t qb = bq->qs[4*sub + i];
+    for (int i = 0; i < 2; ++i) {
+        const uint8_t qb = bq->qs[2*sub + i];
         const int q4 = ((qb & 0x03u) <<  0)
                      | ((qb & 0x0Cu) <<  2)
                      | ((qb & 0x30u) <<  4)
@@ -935,8 +962,8 @@ static __device__ __forceinline__ float vec_dot_pq2_K_q8_1(
         sumi = ggml_cuda_dp4a(v, u, sumi);
     }
 
-    const uint8_t qscale = pqk_vec_scale_get(bq->scales, sub);
-    const float d = __half2float(bq->d[band]) * PQK_LOCAL_SCALE_LUT[qscale] * PQK_DP4A_INV_SCALE_2BIT;
+    const uint8_t qscale = ggml_pq2_k_scale_get(bq->scales, sub);
+    const float d = __half2float(bq->d[band]) * PQ2_K_LOCAL_SCALE_LUT[qscale] * PQK_DP4A_INV_SCALE_2BIT;
     return d * __low2float(bq8_1[q8_block].ds) * sumi;
 }
 

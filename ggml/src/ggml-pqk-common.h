@@ -18,6 +18,14 @@
 #define GGML_PQK_LOG_SCALE_MAX (0.0f)
 #define GGML_PQK_LOG_SCALE_STEP ((GGML_PQK_LOG_SCALE_MAX - GGML_PQK_LOG_SCALE_MIN) / 62.0f)
 
+#define GGML_PQ2_K_SUBBLOCK_SIZE 8
+#define GGML_PQ2_K_SUBBLOCK_COUNT (QK_K / GGML_PQ2_K_SUBBLOCK_SIZE)
+#define GGML_PQ2_K_SUBBLOCKS_PER_BAND (GGML_PQ2_K_SUBBLOCK_COUNT / GGML_PQK_BAND_COUNT)
+#define GGML_PQ2_K_SCALE_LEVELS 16
+#define GGML_PQ2_K_LOG_SCALE_MIN (-4.0f)
+#define GGML_PQ2_K_LOG_SCALE_MAX (0.0f)
+#define GGML_PQ2_K_LOG_SCALE_STEP ((GGML_PQ2_K_LOG_SCALE_MAX - GGML_PQ2_K_LOG_SCALE_MIN) / 14.0f)
+
 #define GGML_PQ2K_MAX_CENTROID 1.468733483f
 #define GGML_PQ3K_MAX_CENTROID 1.996037246f
 #define GGML_PQ4K_MAX_CENTROID 2.413635748f
@@ -54,11 +62,26 @@ static inline void ggml_pqk_scale_set(uint8_t * scales, int idx, uint8_t value) 
     ggml_pqk_bits_set(scales, idx, 6, value);
 }
 
+static GGML_PQK_HOST_DEVICE inline uint8_t ggml_pq2_k_scale_get(const uint8_t * scales, int idx) {
+    return ggml_pqk_bits_get(scales, idx, 4);
+}
+
+static inline void ggml_pq2_k_scale_set(uint8_t * scales, int idx, uint8_t value) {
+    ggml_pqk_bits_set(scales, idx, 4, value);
+}
+
 static GGML_PQK_HOST_DEVICE inline float ggml_pqk_decode_local_scale(float master, uint8_t q) {
     if (master <= 0.0f || q == 0) {
         return 0.0f;
     }
     return master * exp2f(GGML_PQK_LOG_SCALE_MIN + (float)(q - 1) * GGML_PQK_LOG_SCALE_STEP);
+}
+
+static GGML_PQK_HOST_DEVICE inline float ggml_pq2_k_decode_local_scale(float master, uint8_t q) {
+    if (master <= 0.0f || q == 0) {
+        return 0.0f;
+    }
+    return master * exp2f(GGML_PQ2_K_LOG_SCALE_MIN + (float)(q - 1) * GGML_PQ2_K_LOG_SCALE_STEP);
 }
 
 // Universal PQK codebooks generated from the 16D spherical model used by
