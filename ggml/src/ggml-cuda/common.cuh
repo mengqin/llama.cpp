@@ -995,14 +995,14 @@ template<>
 struct ggml_cuda_type_traits<GGML_TYPE_PQ3_K> {
     static constexpr int qk = QK_K;
     static constexpr int qr = 1;
-    static constexpr int qi = 16;
+    static constexpr int qi = GGML_PQ3_K_SUBBLOCK_COUNT;
 };
 
 template<>
 struct ggml_cuda_type_traits<GGML_TYPE_PQ4_K> {
     static constexpr int qk = QK_K;
     static constexpr int qr = 1;
-    static constexpr int qi = 16;
+    static constexpr int qi = GGML_PQ4_K_SUBBLOCK_COUNT;
 };
 
 template<>

@@ -665,6 +665,18 @@ typedef struct {
     uint8_t qidx[QK_K];
 } pq2_k_quantized_block_tmp;
 
+typedef struct {
+    float band_master[GGML_PQK_BAND_COUNT];
+    uint8_t scale_q[GGML_PQ3_K_SUBBLOCK_COUNT];
+    uint8_t qidx[QK_K];
+} pq3_k_quantized_block_tmp;
+
+typedef struct {
+    float band_master[GGML_PQK_BAND_COUNT];
+    uint8_t scale_q[GGML_PQ4_K_SUBBLOCK_COUNT];
+    uint8_t qidx[QK_K];
+} pq4_k_quantized_block_tmp;
+
 
 /* Optional PQ2_K quantization diagnostics.
  * Enable with GGML_PQ2_K_STATS=1 while running llama-quantize.
@@ -1014,6 +1026,24 @@ static float pq2_k_subblock_error(const float * src, const uint8_t * qidx, float
     return err / GGML_PQ2_K_SUBBLOCK_SIZE;
 }
 
+static float pq3_k_subblock_error(const float * src, const uint8_t * qidx, float scale) {
+    float err = 0.0f;
+    for (int i = 0; i < GGML_PQ3_K_SUBBLOCK_SIZE; ++i) {
+        const float diff = src[i] - scale * ggml_pqk_centroid_3bit(qidx[i]);
+        err += diff * diff;
+    }
+    return err / GGML_PQ3_K_SUBBLOCK_SIZE;
+}
+
+static float pq4_k_subblock_error(const float * src, const uint8_t * qidx, float scale) {
+    float err = 0.0f;
+    for (int i = 0; i < GGML_PQ4_K_SUBBLOCK_SIZE; ++i) {
+        const float diff = src[i] - scale * ggml_pqk_centroid_4bit(qidx[i]);
+        err += diff * diff;
+    }
+    return err / GGML_PQ4_K_SUBBLOCK_SIZE;
+}
+
 static float pqk_fit_subblock_fast(const float * src, uint8_t * qidx, int levels, float max_centroid, pqk_centroid_fn_t centroid_fn, float * err_out) {
     float max_abs = 0.0f;
     for (int i = 0; i < GGML_PQK_SUBBLOCK_SIZE; ++i) {
@@ -1172,6 +1202,164 @@ static float pq2_k_fit_subblock_fast(const float * src, uint8_t * qidx, float * 
     return scale;
 }
 
+static float pq3_k_fit_subblock_fast(const float * src, uint8_t * qidx, float * err_out) {
+    float max_abs = 0.0f;
+    for (int i = 0; i < GGML_PQ3_K_SUBBLOCK_SIZE; ++i) {
+        max_abs = fmaxf(max_abs, fabsf(src[i]));
+    }
+
+    if (max_abs < 1e-12f) {
+        memset(qidx, 0, GGML_PQ3_K_SUBBLOCK_SIZE);
+        if (err_out != NULL) {
+            *err_out = 0.0f;
+        }
+        return 0.0f;
+    }
+
+    float scale = max_abs / GGML_PQ3K_MAX_CENTROID;
+    if (scale < 1e-12f) {
+        memset(qidx, 0, GGML_PQ3_K_SUBBLOCK_SIZE);
+        if (err_out != NULL) {
+            *err_out = 0.0f;
+        }
+        return 0.0f;
+    }
+
+    float numer = 0.0f;
+    float denom = 0.0f;
+    for (int i = 0; i < GGML_PQ3_K_SUBBLOCK_SIZE; ++i) {
+        const uint8_t q = pqk_nearest_centroid_generic(src[i] / scale, 8, pqk_centroid_3bit_host);
+        const float c = ggml_pqk_centroid_3bit(q);
+        qidx[i] = q;
+        numer += src[i] * c;
+        denom += c * c;
+    }
+
+    if (denom < 1e-20f) {
+        memset(qidx, 0, GGML_PQ3_K_SUBBLOCK_SIZE);
+        if (err_out != NULL) {
+            *err_out = 0.0f;
+        }
+        return 0.0f;
+    }
+
+    scale = fmaxf(numer / denom, 0.0f);
+    if (scale < 1e-12f) {
+        memset(qidx, 0, GGML_PQ3_K_SUBBLOCK_SIZE);
+        if (err_out != NULL) {
+            *err_out = 0.0f;
+        }
+        return 0.0f;
+    }
+
+    numer = 0.0f;
+    denom = 0.0f;
+    for (int i = 0; i < GGML_PQ3_K_SUBBLOCK_SIZE; ++i) {
+        const uint8_t q = pqk_nearest_centroid_generic(src[i] / scale, 8, pqk_centroid_3bit_host);
+        const float c = ggml_pqk_centroid_3bit(q);
+        qidx[i] = q;
+        numer += src[i] * c;
+        denom += c * c;
+    }
+
+    if (denom >= 1e-20f) {
+        scale = fmaxf(numer / denom, 0.0f);
+    }
+
+    if (scale < 1e-12f) {
+        memset(qidx, 0, GGML_PQ3_K_SUBBLOCK_SIZE);
+        if (err_out != NULL) {
+            *err_out = 0.0f;
+        }
+        return 0.0f;
+    }
+
+    if (err_out != NULL) {
+        *err_out = pq3_k_subblock_error(src, qidx, scale);
+    }
+
+    return scale;
+}
+
+static float pq4_k_fit_subblock_fast(const float * src, uint8_t * qidx, float * err_out) {
+    float max_abs = 0.0f;
+    for (int i = 0; i < GGML_PQ4_K_SUBBLOCK_SIZE; ++i) {
+        max_abs = fmaxf(max_abs, fabsf(src[i]));
+    }
+
+    if (max_abs < 1e-12f) {
+        memset(qidx, 0, GGML_PQ4_K_SUBBLOCK_SIZE);
+        if (err_out != NULL) {
+            *err_out = 0.0f;
+        }
+        return 0.0f;
+    }
+
+    float scale = max_abs / GGML_PQ4K_MAX_CENTROID;
+    if (scale < 1e-12f) {
+        memset(qidx, 0, GGML_PQ4_K_SUBBLOCK_SIZE);
+        if (err_out != NULL) {
+            *err_out = 0.0f;
+        }
+        return 0.0f;
+    }
+
+    float numer = 0.0f;
+    float denom = 0.0f;
+    for (int i = 0; i < GGML_PQ4_K_SUBBLOCK_SIZE; ++i) {
+        const uint8_t q = pqk_nearest_centroid_generic(src[i] / scale, 16, pqk_centroid_4bit_host);
+        const float c = ggml_pqk_centroid_4bit(q);
+        qidx[i] = q;
+        numer += src[i] * c;
+        denom += c * c;
+    }
+
+    if (denom < 1e-20f) {
+        memset(qidx, 0, GGML_PQ4_K_SUBBLOCK_SIZE);
+        if (err_out != NULL) {
+            *err_out = 0.0f;
+        }
+        return 0.0f;
+    }
+
+    scale = fmaxf(numer / denom, 0.0f);
+    if (scale < 1e-12f) {
+        memset(qidx, 0, GGML_PQ4_K_SUBBLOCK_SIZE);
+        if (err_out != NULL) {
+            *err_out = 0.0f;
+        }
+        return 0.0f;
+    }
+
+    numer = 0.0f;
+    denom = 0.0f;
+    for (int i = 0; i < GGML_PQ4_K_SUBBLOCK_SIZE; ++i) {
+        const uint8_t q = pqk_nearest_centroid_generic(src[i] / scale, 16, pqk_centroid_4bit_host);
+        const float c = ggml_pqk_centroid_4bit(q);
+        qidx[i] = q;
+        numer += src[i] * c;
+        denom += c * c;
+    }
+
+    if (denom >= 1e-20f) {
+        scale = fmaxf(numer / denom, 0.0f);
+    }
+
+    if (scale < 1e-12f) {
+        memset(qidx, 0, GGML_PQ4_K_SUBBLOCK_SIZE);
+        if (err_out != NULL) {
+            *err_out = 0.0f;
+        }
+        return 0.0f;
+    }
+
+    if (err_out != NULL) {
+        *err_out = pq4_k_subblock_error(src, qidx, scale);
+    }
+
+    return scale;
+}
+
 static float pqk_quantize_subblock_with_scale(const float * src, uint8_t * qidx, int levels, float scale, pqk_centroid_fn_t centroid_fn) {
     if (scale < 1e-12f) {
         memset(qidx, 0, GGML_PQK_SUBBLOCK_SIZE);
@@ -1204,6 +1392,40 @@ static float pq2_k_quantize_subblock_with_scale(const float * src, uint8_t * qid
     }
 
     return pq2_k_subblock_error(src, qidx, scale);
+}
+
+static float pq3_k_quantize_subblock_with_scale(const float * src, uint8_t * qidx, float scale) {
+    if (scale < 1e-12f) {
+        memset(qidx, 0, GGML_PQ3_K_SUBBLOCK_SIZE);
+        float err = 0.0f;
+        for (int i = 0; i < GGML_PQ3_K_SUBBLOCK_SIZE; ++i) {
+            err += src[i] * src[i];
+        }
+        return err / GGML_PQ3_K_SUBBLOCK_SIZE;
+    }
+
+    for (int i = 0; i < GGML_PQ3_K_SUBBLOCK_SIZE; ++i) {
+        qidx[i] = pqk_nearest_centroid_generic(src[i] / scale, 8, pqk_centroid_3bit_host);
+    }
+
+    return pq3_k_subblock_error(src, qidx, scale);
+}
+
+static float pq4_k_quantize_subblock_with_scale(const float * src, uint8_t * qidx, float scale) {
+    if (scale < 1e-12f) {
+        memset(qidx, 0, GGML_PQ4_K_SUBBLOCK_SIZE);
+        float err = 0.0f;
+        for (int i = 0; i < GGML_PQ4_K_SUBBLOCK_SIZE; ++i) {
+            err += src[i] * src[i];
+        }
+        return err / GGML_PQ4_K_SUBBLOCK_SIZE;
+    }
+
+    for (int i = 0; i < GGML_PQ4_K_SUBBLOCK_SIZE; ++i) {
+        qidx[i] = pqk_nearest_centroid_generic(src[i] / scale, 16, pqk_centroid_4bit_host);
+    }
+
+    return pq4_k_subblock_error(src, qidx, scale);
 }
 
 static float pqk_geometric_mean(const float * values, int count) {
@@ -1339,9 +1561,29 @@ typedef enum {
     PQ2_K_AW_FULL   = 2,
 } pq2_k_aw_mode_t;
 
+typedef enum {
+    PQ3_K_AW_LEGACY = 0,
+    PQ3_K_AW_GREEDY = 1,
+    PQ3_K_AW_FULL   = 2,
+} pq3_k_aw_mode_t;
+
+typedef enum {
+    PQ4_K_AW_LEGACY = 0,
+    PQ4_K_AW_GREEDY = 1,
+    PQ4_K_AW_FULL   = 2,
+} pq4_k_aw_mode_t;
+
 #define GGML_PQ2_K_AW_MODE   PQ2_K_AW_GREEDY
 #define GGML_PQ2_K_AW_PASSES 1
 #define GGML_PQ2_K_AW_RADIUS 2
+
+#define GGML_PQ3_K_AW_MODE   PQ3_K_AW_GREEDY
+#define GGML_PQ3_K_AW_PASSES 1
+#define GGML_PQ3_K_AW_RADIUS 2
+
+#define GGML_PQ4_K_AW_MODE   PQ4_K_AW_GREEDY
+#define GGML_PQ4_K_AW_PASSES 1
+#define GGML_PQ4_K_AW_RADIUS 2
 
 typedef struct {
     bool initialized;
@@ -1359,8 +1601,48 @@ static pq2_k_aw_config_t g_pq2_k_aw_config = {
     false,
 };
 
+typedef struct {
+    bool initialized;
+    pq3_k_aw_mode_t mode;
+    int passes;
+    int radius;
+    bool printed;
+} pq3_k_aw_config_t;
+
+typedef struct {
+    bool initialized;
+    pq4_k_aw_mode_t mode;
+    int passes;
+    int radius;
+    bool printed;
+} pq4_k_aw_config_t;
+
+static pq3_k_aw_config_t g_pq3_k_aw_config = {
+    true,
+    GGML_PQ3_K_AW_MODE,
+    GGML_PQ3_K_AW_PASSES,
+    GGML_PQ3_K_AW_RADIUS,
+    false,
+};
+
+static pq4_k_aw_config_t g_pq4_k_aw_config = {
+    true,
+    GGML_PQ4_K_AW_MODE,
+    GGML_PQ4_K_AW_PASSES,
+    GGML_PQ4_K_AW_RADIUS,
+    false,
+};
+
 static const pq2_k_aw_config_t * pq2_k_aw_get_config(void) {
     return &g_pq2_k_aw_config;
+}
+
+static const pq3_k_aw_config_t * pq3_k_aw_get_config(void) {
+    return &g_pq3_k_aw_config;
+}
+
+static const pq4_k_aw_config_t * pq4_k_aw_get_config(void) {
+    return &g_pq4_k_aw_config;
 }
 
 static void pq2_k_aw_maybe_print_config(void) {
@@ -1374,6 +1656,32 @@ static void pq2_k_aw_maybe_print_config(void) {
     fprintf(stderr, "[PQ2_K_IMATRIX] legacy uses imatrix to score band-master/qscale candidates in original domain.\n");
     fprintf(stderr, "[PQ2_K_IMATRIX] greedy/full additionally performs activation-aware per-8D qscale refinement during quantization only.\n");
     g_pq2_k_aw_config.printed = true;
+}
+
+static void pq3_k_aw_maybe_print_config(void) {
+    const pq3_k_aw_config_t * cfg = pq3_k_aw_get_config();
+    if (g_pq3_k_aw_config.printed) {
+        return;
+    }
+
+    const char * mode_name = cfg->mode == PQ3_K_AW_FULL ? "full" : (cfg->mode == PQ3_K_AW_GREEDY ? "greedy" : "legacy");
+    fprintf(stderr, "[PQ3_K_IMATRIX] mode=%s passes=%d radius=%d\n", mode_name, cfg->passes, cfg->radius);
+    fprintf(stderr, "[PQ3_K_IMATRIX] legacy uses imatrix to score band-master/qscale candidates in original domain.\n");
+    fprintf(stderr, "[PQ3_K_IMATRIX] greedy/full additionally performs activation-aware per-8D qscale refinement during quantization only.\n");
+    g_pq3_k_aw_config.printed = true;
+}
+
+static void pq4_k_aw_maybe_print_config(void) {
+    const pq4_k_aw_config_t * cfg = pq4_k_aw_get_config();
+    if (g_pq4_k_aw_config.printed) {
+        return;
+    }
+
+    const char * mode_name = cfg->mode == PQ4_K_AW_FULL ? "full" : (cfg->mode == PQ4_K_AW_GREEDY ? "greedy" : "legacy");
+    fprintf(stderr, "[PQ4_K_IMATRIX] mode=%s passes=%d radius=%d\n", mode_name, cfg->passes, cfg->radius);
+    fprintf(stderr, "[PQ4_K_IMATRIX] legacy uses imatrix to score band-master/qscale candidates in original domain.\n");
+    fprintf(stderr, "[PQ4_K_IMATRIX] greedy/full additionally performs activation-aware per-8D qscale refinement during quantization only.\n");
+    g_pq4_k_aw_config.printed = true;
 }
 
 static uint8_t pqk_encode_local_scale(float master, float local) {
@@ -1412,6 +1720,50 @@ static uint8_t pq2_k_encode_local_scale(float master, float local) {
     }
 
     int q = 1 + (int) roundf((log_ratio - GGML_PQ2_K_LOG_SCALE_MIN) / GGML_PQ2_K_LOG_SCALE_STEP);
+    if (q < 1) {
+        q = 1;
+    } else if (q > 15) {
+        q = 15;
+    }
+    return (uint8_t) q;
+}
+
+static uint8_t pq3_k_encode_local_scale(float master, float local) {
+    if (master <= 0.0f || local <= 1e-12f) {
+        return 0;
+    }
+
+    const float log_ratio = log2f(local / master);
+    if (log_ratio <= GGML_PQ3_K_LOG_SCALE_MIN) {
+        return 1;
+    }
+    if (log_ratio >= GGML_PQ3_K_LOG_SCALE_MAX) {
+        return 15;
+    }
+
+    int q = 1 + (int) roundf((log_ratio - GGML_PQ3_K_LOG_SCALE_MIN) / GGML_PQ3_K_LOG_SCALE_STEP);
+    if (q < 1) {
+        q = 1;
+    } else if (q > 15) {
+        q = 15;
+    }
+    return (uint8_t) q;
+}
+
+static uint8_t pq4_k_encode_local_scale(float master, float local) {
+    if (master <= 0.0f || local <= 1e-12f) {
+        return 0;
+    }
+
+    const float log_ratio = log2f(local / master);
+    if (log_ratio <= GGML_PQ4_K_LOG_SCALE_MIN) {
+        return 1;
+    }
+    if (log_ratio >= GGML_PQ4_K_LOG_SCALE_MAX) {
+        return 15;
+    }
+
+    int q = 1 + (int) roundf((log_ratio - GGML_PQ4_K_LOG_SCALE_MIN) / GGML_PQ4_K_LOG_SCALE_STEP);
     if (q < 1) {
         q = 1;
     } else if (q > 15) {
@@ -1522,6 +1874,210 @@ static int pq2_k_collect_band_master_candidates(const float * values, int count,
     return nc;
 }
 
+static float pq3_k_quantized_master_loss(float log2_master, const float * values, int count) {
+    const float master = exp2f(log2_master);
+    const float delta = 2.0f * GGML_PQ3_K_LOG_SCALE_STEP;
+    float loss = 0.0f;
+
+    for (int i = 0; i < count; ++i) {
+        const float local = values[i];
+        if (local <= 1e-12f) {
+            continue;
+        }
+
+        const float decoded = ggml_pq3_k_decode_local_scale(master, pq3_k_encode_local_scale(master, local));
+        if (decoded <= 1e-12f) {
+            continue;
+        }
+
+        const float err = fabsf(log2f(local / decoded));
+        if (err <= delta) {
+            loss += 0.5f * err * err;
+        } else {
+            loss += delta * (err - 0.5f * delta);
+        }
+    }
+
+    return loss;
+}
+
+static float pq3_k_choose_band_master_fast(const float * values, int count) {
+    float log_values[GGML_PQ3_K_SUBBLOCKS_PER_BAND];
+    int n = 0;
+
+    for (int i = 0; i < count; ++i) {
+        if (values[i] > 1e-12f) {
+            log_values[n++] = log2f(values[i]);
+        }
+    }
+
+    if (n == 0) {
+        return 0.0f;
+    }
+
+    qsort(log_values, n, sizeof(float), pqk_compare_float);
+
+    float candidates[3];
+    int nc = 0;
+    candidates[nc++] = log2f(pqk_geometric_mean(values, count));
+
+    if ((n & 1) != 0) {
+        candidates[nc++] = log_values[n / 2];
+    } else {
+        candidates[nc++] = 0.5f * (log_values[n / 2 - 1] + log_values[n / 2]);
+    }
+
+    candidates[nc++] = log2f(pqk_max_value(values, count));
+
+    float best_log2_master = candidates[0];
+    float best_loss = pq3_k_quantized_master_loss(best_log2_master, values, count);
+
+    for (int i = 1; i < nc; ++i) {
+        if (fabsf(candidates[i] - candidates[i - 1]) < 1e-6f) {
+            continue;
+        }
+
+        const float loss = pq3_k_quantized_master_loss(candidates[i], values, count);
+        if (loss < best_loss) {
+            best_loss = loss;
+            best_log2_master = candidates[i];
+        }
+    }
+
+    return exp2f(best_log2_master);
+}
+
+static int pq3_k_collect_band_master_candidates(const float * values, int count, float * candidates) {
+    float log_values[GGML_PQ3_K_SUBBLOCKS_PER_BAND];
+    int n = 0;
+
+    for (int i = 0; i < count; ++i) {
+        if (values[i] > 1e-12f) {
+            log_values[n++] = log2f(values[i]);
+        }
+    }
+
+    if (n == 0) {
+        return 0;
+    }
+
+    qsort(log_values, n, sizeof(float), pqk_compare_float);
+
+    int nc = 0;
+    candidates[nc++] = log2f(pqk_geometric_mean(values, count));
+
+    if ((n & 1) != 0) {
+        candidates[nc++] = log_values[n / 2];
+    } else {
+        candidates[nc++] = 0.5f * (log_values[n / 2 - 1] + log_values[n / 2]);
+    }
+
+    candidates[nc++] = log2f(pqk_max_value(values, count));
+    return nc;
+}
+
+static float pq4_k_quantized_master_loss(float log2_master, const float * values, int count) {
+    const float master = exp2f(log2_master);
+    const float delta = 2.0f * GGML_PQ4_K_LOG_SCALE_STEP;
+    float loss = 0.0f;
+
+    for (int i = 0; i < count; ++i) {
+        const float local = values[i];
+        if (local <= 1e-12f) {
+            continue;
+        }
+
+        const float decoded = ggml_pq4_k_decode_local_scale(master, pq4_k_encode_local_scale(master, local));
+        if (decoded <= 1e-12f) {
+            continue;
+        }
+
+        const float err = fabsf(log2f(local / decoded));
+        if (err <= delta) {
+            loss += 0.5f * err * err;
+        } else {
+            loss += delta * (err - 0.5f * delta);
+        }
+    }
+
+    return loss;
+}
+
+static float pq4_k_choose_band_master_fast(const float * values, int count) {
+    float log_values[GGML_PQ4_K_SUBBLOCKS_PER_BAND];
+    int n = 0;
+
+    for (int i = 0; i < count; ++i) {
+        if (values[i] > 1e-12f) {
+            log_values[n++] = log2f(values[i]);
+        }
+    }
+
+    if (n == 0) {
+        return 0.0f;
+    }
+
+    qsort(log_values, n, sizeof(float), pqk_compare_float);
+
+    float candidates[3];
+    int nc = 0;
+    candidates[nc++] = log2f(pqk_geometric_mean(values, count));
+
+    if ((n & 1) != 0) {
+        candidates[nc++] = log_values[n / 2];
+    } else {
+        candidates[nc++] = 0.5f * (log_values[n / 2 - 1] + log_values[n / 2]);
+    }
+
+    candidates[nc++] = log2f(pqk_max_value(values, count));
+
+    float best_log2_master = candidates[0];
+    float best_loss = pq4_k_quantized_master_loss(best_log2_master, values, count);
+
+    for (int i = 1; i < nc; ++i) {
+        if (fabsf(candidates[i] - candidates[i - 1]) < 1e-6f) {
+            continue;
+        }
+
+        const float loss = pq4_k_quantized_master_loss(candidates[i], values, count);
+        if (loss < best_loss) {
+            best_loss = loss;
+            best_log2_master = candidates[i];
+        }
+    }
+
+    return exp2f(best_log2_master);
+}
+
+static int pq4_k_collect_band_master_candidates(const float * values, int count, float * candidates) {
+    float log_values[GGML_PQ4_K_SUBBLOCKS_PER_BAND];
+    int n = 0;
+
+    for (int i = 0; i < count; ++i) {
+        if (values[i] > 1e-12f) {
+            log_values[n++] = log2f(values[i]);
+        }
+    }
+
+    if (n == 0) {
+        return 0;
+    }
+
+    qsort(log_values, n, sizeof(float), pqk_compare_float);
+
+    int nc = 0;
+    candidates[nc++] = log2f(pqk_geometric_mean(values, count));
+
+    if ((n & 1) != 0) {
+        candidates[nc++] = log_values[n / 2];
+    } else {
+        candidates[nc++] = 0.5f * (log_values[n / 2 - 1] + log_values[n / 2]);
+    }
+
+    candidates[nc++] = log2f(pqk_max_value(values, count));
+    return nc;
+}
+
 static uint8_t pq2_k_clamp_local_scale_q(int q) {
     if (q < 1) {
         return 1;
@@ -1539,7 +2095,7 @@ static void pq2_k_quantize_block_with_masters(
     dst->band_master[1] = band_master[1];
 
     for (int sb = 0; sb < GGML_PQ2_K_SUBBLOCK_COUNT; ++sb) {
-        const int band = sb / GGML_PQ2_K_SUBBLOCKS_PER_BAND;        
+        const int band = sb / GGML_PQ2_K_SUBBLOCKS_PER_BAND;
         uint8_t qscale = pq2_k_encode_local_scale(dst->band_master[band], local_exact[sb]);
         if (qscale != 0 && local_q_delta != 0) {
             qscale = pq2_k_clamp_local_scale_q((int) qscale + local_q_delta);
@@ -1751,6 +2307,460 @@ static void pq2_k_quantize_block_weighted(const float * src, const float * weigh
     GGML_UNUSED(best_loss);
 
     pq2_k_stats_accumulate(rotated, local_exact, dst);
+}
+
+static uint8_t pq3_k_clamp_local_scale_q(int q) {
+    if (q < 1) {
+        return 1;
+    }
+    if (q > 15) {
+        return 15;
+    }
+    return (uint8_t) q;
+}
+
+static void pq3_k_quantize_block_with_masters(
+        const float * rotated, const float * local_exact, const float * band_master,
+        pq3_k_quantized_block_tmp * dst, int local_q_delta) {
+    dst->band_master[0] = band_master[0];
+    dst->band_master[1] = band_master[1];
+
+    for (int sb = 0; sb < GGML_PQ3_K_SUBBLOCK_COUNT; ++sb) {
+        const int band = sb / GGML_PQ3_K_SUBBLOCKS_PER_BAND;
+        uint8_t qscale = pq3_k_encode_local_scale(dst->band_master[band], local_exact[sb]);
+        if (qscale != 0 && local_q_delta != 0) {
+            qscale = pq3_k_clamp_local_scale_q((int) qscale + local_q_delta);
+        }
+
+        dst->scale_q[sb] = qscale;
+        const float scale = ggml_pq3_k_decode_local_scale(dst->band_master[band], qscale);
+        pq3_k_quantize_subblock_with_scale(
+                rotated + sb * GGML_PQ3_K_SUBBLOCK_SIZE,
+                dst->qidx + sb * GGML_PQ3_K_SUBBLOCK_SIZE,
+                scale);
+    }
+}
+
+static float pq3_k_weighted_loss_original_domain(
+        const float * rotated, const pq3_k_quantized_block_tmp * q, const float * weights) {
+    float residual[QK_K];
+
+    for (int sb = 0; sb < GGML_PQ3_K_SUBBLOCK_COUNT; ++sb) {
+        const int band = sb / GGML_PQ3_K_SUBBLOCKS_PER_BAND;
+        const float scale = ggml_pq3_k_decode_local_scale(q->band_master[band], q->scale_q[sb]);
+        for (int i = 0; i < GGML_PQ3_K_SUBBLOCK_SIZE; ++i) {
+            const int idx = sb * GGML_PQ3_K_SUBBLOCK_SIZE + i;
+            residual[idx] = rotated[idx] - scale * ggml_pqk_centroid_3bit(q->qidx[idx]);
+        }
+    }
+
+    pqk_rotate_inverse_256(residual);
+
+    float loss = 0.0f;
+    for (int i = 0; i < QK_K; ++i) {
+        loss += weights[i] * residual[i] * residual[i];
+    }
+    return loss;
+}
+
+static void pq3_k_requantize_subblock_with_qscale(
+        const float * rotated, pq3_k_quantized_block_tmp * q, int sb, uint8_t qscale) {
+    const int band = sb / GGML_PQ3_K_SUBBLOCKS_PER_BAND;
+    q->scale_q[sb] = qscale;
+    const float scale = ggml_pq3_k_decode_local_scale(q->band_master[band], qscale);
+    pq3_k_quantize_subblock_with_scale(
+            rotated + sb * GGML_PQ3_K_SUBBLOCK_SIZE,
+            q->qidx + sb * GGML_PQ3_K_SUBBLOCK_SIZE,
+            scale);
+}
+
+static float pq3_k_activation_aware_refine_qscale(
+        const float * rotated, const float * weights, pq3_k_quantized_block_tmp * dst, float best_loss) {
+    const pq3_k_aw_config_t * cfg = pq3_k_aw_get_config();
+    if (cfg->mode == PQ3_K_AW_LEGACY || weights == NULL) {
+        return best_loss;
+    }
+
+    for (int pass = 0; pass < cfg->passes; ++pass) {
+        bool improved_any = false;
+
+        for (int sb = 0; sb < GGML_PQ3_K_SUBBLOCK_COUNT; ++sb) {
+            const int cur = dst->scale_q[sb];
+            int qmin = 0;
+            int qmax = GGML_PQ3_K_SCALE_LEVELS - 1;
+            if (cfg->mode == PQ3_K_AW_GREEDY) {
+                qmin = cur - cfg->radius;
+                qmax = cur + cfg->radius;
+                if (qmin < 0) {
+                    qmin = 0;
+                }
+                if (qmax >= GGML_PQ3_K_SCALE_LEVELS) {
+                    qmax = GGML_PQ3_K_SCALE_LEVELS - 1;
+                }
+            }
+
+            pq3_k_quantized_block_tmp best_trial = *dst;
+            float best_local_loss = best_loss;
+            bool improved_local = false;
+
+            for (int q = qmin; q <= qmax; ++q) {
+                if (q == cur) {
+                    continue;
+                }
+
+                pq3_k_quantized_block_tmp trial = *dst;
+                pq3_k_requantize_subblock_with_qscale(rotated, &trial, sb, (uint8_t) q);
+                const float loss = pq3_k_weighted_loss_original_domain(rotated, &trial, weights);
+                if (loss < best_local_loss) {
+                    best_local_loss = loss;
+                    best_trial = trial;
+                    improved_local = true;
+                }
+            }
+
+            if (improved_local) {
+                *dst = best_trial;
+                best_loss = best_local_loss;
+                improved_any = true;
+            }
+        }
+
+        if (!improved_any) {
+            break;
+        }
+    }
+
+    return best_loss;
+}
+
+static void pq3_k_quantize_block_fast(const float * src, pq3_k_quantized_block_tmp * dst) {
+    float rotated[QK_K];
+    float local_exact[GGML_PQ3_K_SUBBLOCK_COUNT];
+
+    memcpy(rotated, src, sizeof(rotated));
+    pqk_rotate_forward_256(rotated);
+
+    for (int sb = 0; sb < GGML_PQ3_K_SUBBLOCK_COUNT; ++sb) {
+        uint8_t qidx[GGML_PQ3_K_SUBBLOCK_SIZE];
+        float err = 0.0f;
+        local_exact[sb] = pq3_k_fit_subblock_fast(
+                rotated + sb * GGML_PQ3_K_SUBBLOCK_SIZE,
+                qidx,
+                &err);
+    }
+
+    for (int band = 0; band < GGML_PQK_BAND_COUNT; ++band) {
+        float band_locals[GGML_PQ3_K_SUBBLOCKS_PER_BAND];
+        for (int i = 0; i < GGML_PQ3_K_SUBBLOCKS_PER_BAND; ++i) {
+            const int sb = band * GGML_PQ3_K_SUBBLOCKS_PER_BAND + i;
+            band_locals[i] = local_exact[sb];
+        }
+        dst->band_master[band] = pq3_k_choose_band_master_fast(band_locals, GGML_PQ3_K_SUBBLOCKS_PER_BAND);
+    }
+
+    pq3_k_quantize_block_with_masters(rotated, local_exact, dst->band_master, dst, 0);
+}
+
+static void pq3_k_quantize_block_weighted(const float * src, const float * weights, pq3_k_quantized_block_tmp * dst) {
+    float rotated[QK_K];
+    float local_exact[GGML_PQ3_K_SUBBLOCK_COUNT];
+    float band_master[GGML_PQK_BAND_COUNT];
+
+    pq3_k_aw_maybe_print_config();
+
+    memcpy(rotated, src, sizeof(rotated));
+    pqk_rotate_forward_256(rotated);
+
+    for (int sb = 0; sb < GGML_PQ3_K_SUBBLOCK_COUNT; ++sb) {
+        uint8_t qidx[GGML_PQ3_K_SUBBLOCK_SIZE];
+        float err = 0.0f;
+        local_exact[sb] = pq3_k_fit_subblock_fast(
+                rotated + sb * GGML_PQ3_K_SUBBLOCK_SIZE,
+                qidx,
+                &err);
+    }
+
+    for (int band = 0; band < GGML_PQK_BAND_COUNT; ++band) {
+        float band_locals[GGML_PQ3_K_SUBBLOCKS_PER_BAND];
+        for (int i = 0; i < GGML_PQ3_K_SUBBLOCKS_PER_BAND; ++i) {
+            const int sb = band * GGML_PQ3_K_SUBBLOCKS_PER_BAND + i;
+            band_locals[i] = local_exact[sb];
+        }
+        band_master[band] = pq3_k_choose_band_master_fast(band_locals, GGML_PQ3_K_SUBBLOCKS_PER_BAND);
+    }
+
+    pq3_k_quantize_block_with_masters(rotated, local_exact, band_master, dst, 0);
+    float best_loss = pq3_k_weighted_loss_original_domain(rotated, dst, weights);
+
+    for (int band = 0; band < GGML_PQK_BAND_COUNT; ++band) {
+        float band_locals[GGML_PQ3_K_SUBBLOCKS_PER_BAND];
+        for (int i = 0; i < GGML_PQ3_K_SUBBLOCKS_PER_BAND; ++i) {
+            const int sb = band * GGML_PQ3_K_SUBBLOCKS_PER_BAND + i;
+            band_locals[i] = local_exact[sb];
+        }
+
+        float candidates[3];
+        const int nc = pq3_k_collect_band_master_candidates(band_locals, GGML_PQ3_K_SUBBLOCKS_PER_BAND, candidates);
+        for (int i = 0; i < nc; ++i) {
+            const float candidate_master = exp2f(candidates[i]);
+            if (fabsf(candidate_master - band_master[band]) <= 1e-12f * fmaxf(1.0f, band_master[band])) {
+                continue;
+            }
+
+            float trial_master[GGML_PQK_BAND_COUNT] = { band_master[0], band_master[1] };
+            pq3_k_quantized_block_tmp trial;
+            trial_master[band] = candidate_master;
+            pq3_k_quantize_block_with_masters(rotated, local_exact, trial_master, &trial, 0);
+
+            const float loss = pq3_k_weighted_loss_original_domain(rotated, &trial, weights);
+            if (loss < best_loss) {
+                best_loss = loss;
+                *dst = trial;
+                band_master[0] = dst->band_master[0];
+                band_master[1] = dst->band_master[1];
+            }
+        }
+    }
+
+    for (int delta = -1; delta <= 1; delta += 2) {
+        pq3_k_quantized_block_tmp trial;
+        pq3_k_quantize_block_with_masters(rotated, local_exact, band_master, &trial, delta);
+        const float loss = pq3_k_weighted_loss_original_domain(rotated, &trial, weights);
+        if (loss < best_loss) {
+            best_loss = loss;
+            *dst = trial;
+        }
+    }
+
+    best_loss = pq3_k_activation_aware_refine_qscale(rotated, weights, dst, best_loss);
+    GGML_UNUSED(best_loss);
+}
+
+static uint8_t pq4_k_clamp_local_scale_q(int q) {
+    if (q < 1) {
+        return 1;
+    }
+    if (q > 15) {
+        return 15;
+    }
+    return (uint8_t) q;
+}
+
+static void pq4_k_quantize_block_with_masters(
+        const float * rotated, const float * local_exact, const float * band_master,
+        pq4_k_quantized_block_tmp * dst, int local_q_delta) {
+    dst->band_master[0] = band_master[0];
+    dst->band_master[1] = band_master[1];
+
+    for (int sb = 0; sb < GGML_PQ4_K_SUBBLOCK_COUNT; ++sb) {
+        const int band = sb / GGML_PQ4_K_SUBBLOCKS_PER_BAND;
+        uint8_t qscale = pq4_k_encode_local_scale(dst->band_master[band], local_exact[sb]);
+        if (qscale != 0 && local_q_delta != 0) {
+            qscale = pq4_k_clamp_local_scale_q((int) qscale + local_q_delta);
+        }
+
+        dst->scale_q[sb] = qscale;
+        const float scale = ggml_pq4_k_decode_local_scale(dst->band_master[band], qscale);
+        pq4_k_quantize_subblock_with_scale(
+                rotated + sb * GGML_PQ4_K_SUBBLOCK_SIZE,
+                dst->qidx + sb * GGML_PQ4_K_SUBBLOCK_SIZE,
+                scale);
+    }
+}
+
+static float pq4_k_weighted_loss_original_domain(
+        const float * rotated, const pq4_k_quantized_block_tmp * q, const float * weights) {
+    float residual[QK_K];
+
+    for (int sb = 0; sb < GGML_PQ4_K_SUBBLOCK_COUNT; ++sb) {
+        const int band = sb / GGML_PQ4_K_SUBBLOCKS_PER_BAND;
+        const float scale = ggml_pq4_k_decode_local_scale(q->band_master[band], q->scale_q[sb]);
+        for (int i = 0; i < GGML_PQ4_K_SUBBLOCK_SIZE; ++i) {
+            const int idx = sb * GGML_PQ4_K_SUBBLOCK_SIZE + i;
+            residual[idx] = rotated[idx] - scale * ggml_pqk_centroid_4bit(q->qidx[idx]);
+        }
+    }
+
+    pqk_rotate_inverse_256(residual);
+
+    float loss = 0.0f;
+    for (int i = 0; i < QK_K; ++i) {
+        loss += weights[i] * residual[i] * residual[i];
+    }
+    return loss;
+}
+
+static void pq4_k_requantize_subblock_with_qscale(
+        const float * rotated, pq4_k_quantized_block_tmp * q, int sb, uint8_t qscale) {
+    const int band = sb / GGML_PQ4_K_SUBBLOCKS_PER_BAND;
+    q->scale_q[sb] = qscale;
+    const float scale = ggml_pq4_k_decode_local_scale(q->band_master[band], qscale);
+    pq4_k_quantize_subblock_with_scale(
+            rotated + sb * GGML_PQ4_K_SUBBLOCK_SIZE,
+            q->qidx + sb * GGML_PQ4_K_SUBBLOCK_SIZE,
+            scale);
+}
+
+static float pq4_k_activation_aware_refine_qscale(
+        const float * rotated, const float * weights, pq4_k_quantized_block_tmp * dst, float best_loss) {
+    const pq4_k_aw_config_t * cfg = pq4_k_aw_get_config();
+    if (cfg->mode == PQ4_K_AW_LEGACY || weights == NULL) {
+        return best_loss;
+    }
+
+    for (int pass = 0; pass < cfg->passes; ++pass) {
+        bool improved_any = false;
+
+        for (int sb = 0; sb < GGML_PQ4_K_SUBBLOCK_COUNT; ++sb) {
+            const int cur = dst->scale_q[sb];
+            int qmin = 0;
+            int qmax = GGML_PQ4_K_SCALE_LEVELS - 1;
+            if (cfg->mode == PQ4_K_AW_GREEDY) {
+                qmin = cur - cfg->radius;
+                qmax = cur + cfg->radius;
+                if (qmin < 0) {
+                    qmin = 0;
+                }
+                if (qmax >= GGML_PQ4_K_SCALE_LEVELS) {
+                    qmax = GGML_PQ4_K_SCALE_LEVELS - 1;
+                }
+            }
+
+            pq4_k_quantized_block_tmp best_trial = *dst;
+            float best_local_loss = best_loss;
+            bool improved_local = false;
+
+            for (int q = qmin; q <= qmax; ++q) {
+                if (q == cur) {
+                    continue;
+                }
+
+                pq4_k_quantized_block_tmp trial = *dst;
+                pq4_k_requantize_subblock_with_qscale(rotated, &trial, sb, (uint8_t) q);
+                const float loss = pq4_k_weighted_loss_original_domain(rotated, &trial, weights);
+                if (loss < best_local_loss) {
+                    best_local_loss = loss;
+                    best_trial = trial;
+                    improved_local = true;
+                }
+            }
+
+            if (improved_local) {
+                *dst = best_trial;
+                best_loss = best_local_loss;
+                improved_any = true;
+            }
+        }
+
+        if (!improved_any) {
+            break;
+        }
+    }
+
+    return best_loss;
+}
+
+static void pq4_k_quantize_block_fast(const float * src, pq4_k_quantized_block_tmp * dst) {
+    float rotated[QK_K];
+    float local_exact[GGML_PQ4_K_SUBBLOCK_COUNT];
+
+    memcpy(rotated, src, sizeof(rotated));
+    pqk_rotate_forward_256(rotated);
+
+    for (int sb = 0; sb < GGML_PQ4_K_SUBBLOCK_COUNT; ++sb) {
+        uint8_t qidx[GGML_PQ4_K_SUBBLOCK_SIZE];
+        float err = 0.0f;
+        local_exact[sb] = pq4_k_fit_subblock_fast(
+                rotated + sb * GGML_PQ4_K_SUBBLOCK_SIZE,
+                qidx,
+                &err);
+    }
+
+    for (int band = 0; band < GGML_PQK_BAND_COUNT; ++band) {
+        float band_locals[GGML_PQ4_K_SUBBLOCKS_PER_BAND];
+        for (int i = 0; i < GGML_PQ4_K_SUBBLOCKS_PER_BAND; ++i) {
+            const int sb = band * GGML_PQ4_K_SUBBLOCKS_PER_BAND + i;
+            band_locals[i] = local_exact[sb];
+        }
+        dst->band_master[band] = pq4_k_choose_band_master_fast(band_locals, GGML_PQ4_K_SUBBLOCKS_PER_BAND);
+    }
+
+    pq4_k_quantize_block_with_masters(rotated, local_exact, dst->band_master, dst, 0);
+}
+
+static void pq4_k_quantize_block_weighted(const float * src, const float * weights, pq4_k_quantized_block_tmp * dst) {
+    float rotated[QK_K];
+    float local_exact[GGML_PQ4_K_SUBBLOCK_COUNT];
+    float band_master[GGML_PQK_BAND_COUNT];
+
+    pq4_k_aw_maybe_print_config();
+
+    memcpy(rotated, src, sizeof(rotated));
+    pqk_rotate_forward_256(rotated);
+
+    for (int sb = 0; sb < GGML_PQ4_K_SUBBLOCK_COUNT; ++sb) {
+        uint8_t qidx[GGML_PQ4_K_SUBBLOCK_SIZE];
+        float err = 0.0f;
+        local_exact[sb] = pq4_k_fit_subblock_fast(
+                rotated + sb * GGML_PQ4_K_SUBBLOCK_SIZE,
+                qidx,
+                &err);
+    }
+
+    for (int band = 0; band < GGML_PQK_BAND_COUNT; ++band) {
+        float band_locals[GGML_PQ4_K_SUBBLOCKS_PER_BAND];
+        for (int i = 0; i < GGML_PQ4_K_SUBBLOCKS_PER_BAND; ++i) {
+            const int sb = band * GGML_PQ4_K_SUBBLOCKS_PER_BAND + i;
+            band_locals[i] = local_exact[sb];
+        }
+        band_master[band] = pq4_k_choose_band_master_fast(band_locals, GGML_PQ4_K_SUBBLOCKS_PER_BAND);
+    }
+
+    pq4_k_quantize_block_with_masters(rotated, local_exact, band_master, dst, 0);
+    float best_loss = pq4_k_weighted_loss_original_domain(rotated, dst, weights);
+
+    for (int band = 0; band < GGML_PQK_BAND_COUNT; ++band) {
+        float band_locals[GGML_PQ4_K_SUBBLOCKS_PER_BAND];
+        for (int i = 0; i < GGML_PQ4_K_SUBBLOCKS_PER_BAND; ++i) {
+            const int sb = band * GGML_PQ4_K_SUBBLOCKS_PER_BAND + i;
+            band_locals[i] = local_exact[sb];
+        }
+
+        float candidates[3];
+        const int nc = pq4_k_collect_band_master_candidates(band_locals, GGML_PQ4_K_SUBBLOCKS_PER_BAND, candidates);
+        for (int i = 0; i < nc; ++i) {
+            const float candidate_master = exp2f(candidates[i]);
+            if (fabsf(candidate_master - band_master[band]) <= 1e-12f * fmaxf(1.0f, band_master[band])) {
+                continue;
+            }
+
+            float trial_master[GGML_PQK_BAND_COUNT] = { band_master[0], band_master[1] };
+            pq4_k_quantized_block_tmp trial;
+            trial_master[band] = candidate_master;
+            pq4_k_quantize_block_with_masters(rotated, local_exact, trial_master, &trial, 0);
+
+            const float loss = pq4_k_weighted_loss_original_domain(rotated, &trial, weights);
+            if (loss < best_loss) {
+                best_loss = loss;
+                *dst = trial;
+                band_master[0] = dst->band_master[0];
+                band_master[1] = dst->band_master[1];
+            }
+        }
+    }
+
+    for (int delta = -1; delta <= 1; delta += 2) {
+        pq4_k_quantized_block_tmp trial;
+        pq4_k_quantize_block_with_masters(rotated, local_exact, band_master, &trial, delta);
+        const float loss = pq4_k_weighted_loss_original_domain(rotated, &trial, weights);
+        if (loss < best_loss) {
+            best_loss = loss;
+            *dst = trial;
+        }
+    }
+
+    best_loss = pq4_k_activation_aware_refine_qscale(rotated, weights, dst, best_loss);
+    GGML_UNUSED(best_loss);
 }
 
 static void pq2_k_store_block(block_pq2_K * dst, const pq2_k_quantized_block_tmp * src) {
@@ -1977,8 +2987,15 @@ static void pqk_store_block_pq2_K(block_pq2_K * dst, const pqk_quantized_block_t
     }
 }
 
-static void pqk_store_block_pq3_K(block_pq3_K * dst, const pqk_quantized_block_tmp * src) {
-    pqk_store_scales(dst->d, dst->scales, src);
+static void pq3_k_store_block(block_pq3_K * dst, const pq3_k_quantized_block_tmp * src) {
+    dst->d[0] = GGML_FP32_TO_FP16(src->band_master[0]);
+    dst->d[1] = GGML_FP32_TO_FP16(src->band_master[1]);
+
+    memset(dst->scales, 0, sizeof(dst->scales));
+    for (int sb = 0; sb < GGML_PQ3_K_SUBBLOCK_COUNT; ++sb) {
+        ggml_pq3_k_scale_set(dst->scales, sb, src->scale_q[sb]);
+    }
+
     memset(dst->qs, 0, sizeof(dst->qs));
     memset(dst->hmask, 0, sizeof(dst->hmask));
     for (int i = 0; i < QK_K; ++i) {
@@ -1988,8 +3005,15 @@ static void pqk_store_block_pq3_K(block_pq3_K * dst, const pqk_quantized_block_t
     }
 }
 
-static void pqk_store_block_pq4_K(block_pq4_K * dst, const pqk_quantized_block_tmp * src) {
-    pqk_store_scales(dst->d, dst->scales, src);
+static void pq4_k_store_block(block_pq4_K * dst, const pq4_k_quantized_block_tmp * src) {
+    dst->d[0] = GGML_FP32_TO_FP16(src->band_master[0]);
+    dst->d[1] = GGML_FP32_TO_FP16(src->band_master[1]);
+
+    memset(dst->scales, 0, sizeof(dst->scales));
+    for (int sb = 0; sb < GGML_PQ4_K_SUBBLOCK_COUNT; ++sb) {
+        ggml_pq4_k_scale_set(dst->scales, sb, src->scale_q[sb]);
+    }
+
     memset(dst->qs, 0, sizeof(dst->qs));
     for (int i = 0; i < QK_K; ++i) {
         dst->qs[i / 2] |= (uint8_t)((src->qidx[i] & 0xFu) << (4 * (i & 1)));
@@ -2010,9 +3034,9 @@ void quantize_row_pq3_K_ref(const float * GGML_RESTRICT x, block_pq3_K * GGML_RE
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
     for (int block = 0; block < nb; ++block) {
-        pqk_quantized_block_tmp tmp;
-        pqk_quantize_block_generic(x + block * QK_K, &tmp, &PQK_CODEBOOK_3BIT);
-        pqk_store_block_pq3_K(y + block, &tmp);
+        pq3_k_quantized_block_tmp tmp;
+        pq3_k_quantize_block_fast(x + block * QK_K, &tmp);
+        pq3_k_store_block(y + block, &tmp);
     }
 }
 
@@ -2020,9 +3044,9 @@ void quantize_row_pq4_K_ref(const float * GGML_RESTRICT x, block_pq4_K * GGML_RE
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
     for (int block = 0; block < nb; ++block) {
-        pqk_quantized_block_tmp tmp;
-        pqk_quantize_block_generic(x + block * QK_K, &tmp, &PQK_CODEBOOK_4BIT);
-        pqk_store_block_pq4_K(y + block, &tmp);
+        pq4_k_quantized_block_tmp tmp;
+        pq4_k_quantize_block_fast(x + block * QK_K, &tmp);
+        pq4_k_store_block(y + block, &tmp);
     }
 }
 
@@ -2048,9 +3072,13 @@ static void quantize_row_pq3_K_impl(
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
     for (int block = 0; block < nb; ++block) {
-        pqk_quantized_block_tmp tmp;
-        pqk_quantize_block_generic_weighted(x + block * QK_K, weights ? weights + block * QK_K : NULL, &tmp, &PQK_CODEBOOK_3BIT);
-        pqk_store_block_pq3_K(y + block, &tmp);
+        pq3_k_quantized_block_tmp tmp;
+        if (weights != NULL) {
+            pq3_k_quantize_block_weighted(x + block * QK_K, weights + block * QK_K, &tmp);
+        } else {
+            pq3_k_quantize_block_fast(x + block * QK_K, &tmp);
+        }
+        pq3_k_store_block(y + block, &tmp);
     }
 }
 
@@ -2060,9 +3088,13 @@ static void quantize_row_pq4_K_impl(
     assert(k % QK_K == 0);
     const int nb = k / QK_K;
     for (int block = 0; block < nb; ++block) {
-        pqk_quantized_block_tmp tmp;
-        pqk_quantize_block_generic_weighted(x + block * QK_K, weights ? weights + block * QK_K : NULL, &tmp, &PQK_CODEBOOK_4BIT);
-        pqk_store_block_pq4_K(y + block, &tmp);
+        pq4_k_quantized_block_tmp tmp;
+        if (weights != NULL) {
+            pq4_k_quantize_block_weighted(x + block * QK_K, weights + block * QK_K, &tmp);
+        } else {
+            pq4_k_quantize_block_fast(x + block * QK_K, &tmp);
+        }
+        pq4_k_store_block(y + block, &tmp);
     }
 }
 
@@ -2091,12 +3123,12 @@ void dequantize_row_pq3_K(const block_pq3_K * GGML_RESTRICT x, float * GGML_REST
     const int nb = k / QK_K;
     for (int block = 0; block < nb; ++block) {
         float rotated[QK_K];
-        for (int sb = 0; sb < GGML_PQK_SUBBLOCK_COUNT; ++sb) {
-            const int band = sb / GGML_PQK_SUBBLOCKS_PER_BAND;
+        for (int sb = 0; sb < GGML_PQ3_K_SUBBLOCK_COUNT; ++sb) {
+            const int band = sb / GGML_PQ3_K_SUBBLOCKS_PER_BAND;
             const float master = GGML_FP16_TO_FP32(x[block].d[band]);
-            const float scale = ggml_pqk_decode_local_scale(master, ggml_pqk_scale_get(x[block].scales, sb));
-            for (int i = 0; i < GGML_PQK_SUBBLOCK_SIZE; ++i) {
-                const int idx = sb * GGML_PQK_SUBBLOCK_SIZE + i;
+            const float scale = ggml_pq3_k_decode_local_scale(master, ggml_pq3_k_scale_get(x[block].scales, sb));
+            for (int i = 0; i < GGML_PQ3_K_SUBBLOCK_SIZE; ++i) {
+                const int idx = sb * GGML_PQ3_K_SUBBLOCK_SIZE + i;
                 const uint8_t ql = (x[block].qs[idx / 4] >> (2 * (idx & 3))) & 0x3u;
                 const uint8_t qh = (x[block].hmask[idx / 8] >> (idx & 7)) & 0x1u;
                 rotated[idx] = scale * ggml_pqk_centroid_3bit((uint8_t)(ql | (qh << 2)));
@@ -2112,12 +3144,12 @@ void dequantize_row_pq4_K(const block_pq4_K * GGML_RESTRICT x, float * GGML_REST
     const int nb = k / QK_K;
     for (int block = 0; block < nb; ++block) {
         float rotated[QK_K];
-        for (int sb = 0; sb < GGML_PQK_SUBBLOCK_COUNT; ++sb) {
-            const int band = sb / GGML_PQK_SUBBLOCKS_PER_BAND;
+        for (int sb = 0; sb < GGML_PQ4_K_SUBBLOCK_COUNT; ++sb) {
+            const int band = sb / GGML_PQ4_K_SUBBLOCKS_PER_BAND;
             const float master = GGML_FP16_TO_FP32(x[block].d[band]);
-            const float scale = ggml_pqk_decode_local_scale(master, ggml_pqk_scale_get(x[block].scales, sb));
-            for (int i = 0; i < GGML_PQK_SUBBLOCK_SIZE; ++i) {
-                const int idx = sb * GGML_PQK_SUBBLOCK_SIZE + i;
+            const float scale = ggml_pq4_k_decode_local_scale(master, ggml_pq4_k_scale_get(x[block].scales, sb));
+            for (int i = 0; i < GGML_PQ4_K_SUBBLOCK_SIZE; ++i) {
+                const int idx = sb * GGML_PQ4_K_SUBBLOCK_SIZE + i;
                 const uint8_t q = (x[block].qs[idx / 2] >> (4 * (idx & 1))) & 0xFu;
                 rotated[idx] = scale * ggml_pqk_centroid_4bit(q);
             }

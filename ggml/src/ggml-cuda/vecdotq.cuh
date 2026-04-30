@@ -973,17 +973,17 @@ static __device__ __forceinline__ float vec_dot_pq3_K_q8_1(
     const block_pq3_K * bq = (const block_pq3_K *) vbq + kbx;
 
     const int sub = iqs;
-    const int q8_block = sub >> 1;
-    const int q8_i32 = (sub & 1) * 4;
-    const int band = sub / PQK_MMVQ_SUBBLOCKS_PER_BAND;
-    const int elem_base = sub * PQK_MMVQ_SUBBLOCK_SIZE;
+    const int q8_block = sub >> 2;
+    const int q8_i32 = (sub & 3) * 2;
+    const int band = sub / GGML_PQ3_K_SUBBLOCKS_PER_BAND;
+    const int elem_base = sub * GGML_PQ3_K_SUBBLOCK_SIZE;
 
     int sumi = 0;
 #pragma unroll
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 2; ++i) {
         const int elem = elem_base + 4*i;
         const uint8_t high = (bq->hmask[elem >> 3] >> (elem & 7)) & 0x0Fu;
-        const uint8_t qb = bq->qs[4*sub + i];
+        const uint8_t qb = bq->qs[2*sub + i];
         const int q4 = ((((qb >> 0) & 0x03u) | ((high & 0x01u) << 2)) <<  0)
                      | ((((qb >> 2) & 0x03u) | ((high & 0x02u) << 1)) <<  4)
                      | ((((qb >> 4) & 0x03u) |  (high & 0x04u))       <<  8)
@@ -994,8 +994,8 @@ static __device__ __forceinline__ float vec_dot_pq3_K_q8_1(
         sumi = ggml_cuda_dp4a(v, u, sumi);
     }
 
-    const uint8_t qscale = pqk_vec_scale_get(bq->scales, sub);
-    const float d = __half2float(bq->d[band]) * PQK_LOCAL_SCALE_LUT[qscale] * PQK_DP4A_INV_SCALE_3BIT;
+    const uint8_t qscale = ggml_pq3_k_scale_get(bq->scales, sub);
+    const float d = __half2float(bq->d[band]) * PQ3_K_LOCAL_SCALE_LUT[qscale] * PQK_DP4A_INV_SCALE_3BIT;
     return d * __low2float(bq8_1[q8_block].ds) * sumi;
 }
 
@@ -1005,22 +1005,22 @@ static __device__ __forceinline__ float vec_dot_pq4_K_q8_1(
     const block_pq4_K * bq = (const block_pq4_K *) vbq + kbx;
 
     const int sub = iqs;
-    const int q8_block = sub >> 1;
-    const int q8_i32 = (sub & 1) * 4;
-    const int band = sub / PQK_MMVQ_SUBBLOCKS_PER_BAND;
+    const int q8_block = sub >> 2;
+    const int q8_i32 = (sub & 3) * 2;
+    const int band = sub / GGML_PQ4_K_SUBBLOCKS_PER_BAND;
     const uint16_t * q16 = (const uint16_t *) bq->qs;
 
     int sumi = 0;
 #pragma unroll
-    for (int i = 0; i < 4; ++i) {
-        const int2 vp = get_int_from_table_16((int) q16[4*sub + i], PQK_DP4A_VAL_4BIT);
+    for (int i = 0; i < 2; ++i) {
+        const int2 vp = get_int_from_table_16((int) q16[2*sub + i], PQK_DP4A_VAL_4BIT);
         const int v = __byte_perm(vp.x, vp.y, 0x5140);
         const int u = get_int_b4(bq8_1[q8_block].qs, q8_i32 + i);
         sumi = ggml_cuda_dp4a(v, u, sumi);
     }
 
-    const uint8_t qscale = pqk_vec_scale_get(bq->scales, sub);
-    const float d = __half2float(bq->d[band]) * PQK_LOCAL_SCALE_LUT[qscale] * PQK_DP4A_INV_SCALE_4BIT;
+    const uint8_t qscale = ggml_pq4_k_scale_get(bq->scales, sub);
+    const float d = __half2float(bq->d[band]) * PQ4_K_LOCAL_SCALE_LUT[qscale] * PQK_DP4A_INV_SCALE_4BIT;
     return d * __low2float(bq8_1[q8_block].ds) * sumi;
 }
 

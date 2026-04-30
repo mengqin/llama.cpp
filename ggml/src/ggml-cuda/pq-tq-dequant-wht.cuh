@@ -77,6 +77,18 @@ static __device__ __forceinline__ float pq2_k_dequant_scale(const block_pq2_K * 
     return ggml_pq2_k_decode_local_scale(master, ggml_pq2_k_scale_get(x[ib].scales, subblock));
 }
 
+static __device__ __forceinline__ float pq3_k_dequant_scale(const block_pq3_K * x, const int ib, const int subblock) {
+    const int band = subblock / GGML_PQ3_K_SUBBLOCKS_PER_BAND;
+    const float master = __half2float(x[ib].d[band]);
+    return ggml_pq3_k_decode_local_scale(master, ggml_pq3_k_scale_get(x[ib].scales, subblock));
+}
+
+static __device__ __forceinline__ float pq4_k_dequant_scale(const block_pq4_K * x, const int ib, const int subblock) {
+    const int band = subblock / GGML_PQ4_K_SUBBLOCKS_PER_BAND;
+    const float master = __half2float(x[ib].d[band]);
+    return ggml_pq4_k_decode_local_scale(master, ggml_pq4_k_scale_get(x[ib].scales, subblock));
+}
+
 static __device__ __forceinline__ float pq_dequant_elem_2_k(const void * vx, int64_t global_elem) {
     const block_pq2_K * x = (const block_pq2_K *) vx;
     const int ib = global_elem / QK_K;
@@ -91,8 +103,8 @@ static __device__ __forceinline__ float pq_dequant_elem_3_k(const void * vx, int
     const block_pq3_K * x = (const block_pq3_K *) vx;
     const int ib = global_elem / QK_K;
     const int il = global_elem % QK_K;
-    const int subblock = il / GGML_PQK_SUBBLOCK_SIZE;
-    const float scale = pqk_dequant_scale(x, ib, subblock);
+    const int subblock = il / GGML_PQ3_K_SUBBLOCK_SIZE;
+    const float scale = pq3_k_dequant_scale(x, ib, subblock);
     const uint8_t ql = (x[ib].qs[il / 4] >> (2 * (il & 3))) & 0x3u;
     const uint8_t qh = (x[ib].hmask[il / 8] >> (il & 7)) & 0x1u;
     return ggml_pqk_centroid_3bit((uint8_t)(ql | (qh << 2))) * scale;
@@ -102,7 +114,7 @@ static __device__ __forceinline__ float pq_dequant_elem_4_k(const void * vx, int
     const block_pq4_K * x = (const block_pq4_K *) vx;
     const int ib = global_elem / QK_K;
     const int il = global_elem % QK_K;
-    const float scale = pqk_dequant_scale(x, ib, il / GGML_PQK_SUBBLOCK_SIZE);
+    const float scale = pq4_k_dequant_scale(x, ib, il / GGML_PQ4_K_SUBBLOCK_SIZE);
     const uint8_t q = (x[ib].qs[il / 2] >> (4 * (il & 1))) & 0xFu;
     return ggml_pqk_centroid_4bit(q) * scale;
 }
@@ -306,8 +318,8 @@ __device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::P3_K>(const vo
     const int ib = global_pair / pairs_per_block;
     const int ip = global_pair % pairs_per_block;
     const int il = 2 * ip;
-    const int subblock = il / GGML_PQK_SUBBLOCK_SIZE;
-    const float scale = pqk_dequant_scale(x, ib, subblock);
+    const int subblock = il / GGML_PQ3_K_SUBBLOCK_SIZE;
+    const float scale = pq3_k_dequant_scale(x, ib, subblock);
     const uint8_t qb = x[ib].qs[il / 4];
     const int shift = 2 * (il & 3);
     const uint8_t q0 = ((qb >> shift) & 0x3u) | (((x[ib].hmask[il / 8] >> (il & 7)) & 0x1u) << 2);
@@ -323,7 +335,7 @@ __device__ __forceinline__ float2 pq_tq_dequant_pair<PqTqTypeTag::P4_K>(const vo
     const int ib = global_pair / pairs_per_block;
     const int ip = global_pair % pairs_per_block;
     const int il = 2 * ip;
-    const float scale = pqk_dequant_scale(x, ib, il / GGML_PQK_SUBBLOCK_SIZE);
+    const float scale = pq4_k_dequant_scale(x, ib, il / GGML_PQ4_K_SUBBLOCK_SIZE);
     const uint8_t qb = x[ib].qs[ip];
     return make_float2(ggml_pqk_centroid_4bit(qb & 0xFu) * scale, ggml_pqk_centroid_4bit(qb >> 4) * scale);
 }
