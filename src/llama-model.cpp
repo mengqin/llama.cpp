@@ -719,6 +719,27 @@ void llama_model::load_hparams(llama_model_loader & ml) {
 
     // get general kv
     ml.get_key(LLM_KV_GENERAL_NAME, name, false);
+    ml.get_key("general.quant_wht.enabled", quant_wht_enabled, false);
+    hparams.quant_wht_enabled = quant_wht_enabled;
+    if (quant_wht_enabled) {
+        if (!ml.get_key("general.quant_wht.dim", quant_wht_dim, false)) {
+            throw std::runtime_error("general.quant_wht.enabled=true but general.quant_wht.dim is missing");
+        }
+        if (!ml.get_key("general.quant_wht.scheme", quant_wht_scheme, false)) {
+            throw std::runtime_error("general.quant_wht.enabled=true but general.quant_wht.scheme is missing");
+        }
+        if (!ml.get_key("general.quant_wht.version", quant_wht_version, false)) {
+            throw std::runtime_error("general.quant_wht.enabled=true but general.quant_wht.version is missing");
+        }
+        if (quant_wht_dim != 256 || quant_wht_scheme != "pqk_rht_v1" || quant_wht_version != 1) {
+            throw std::runtime_error(format("unsupported general.quant_wht metadata: dim=%u scheme=%s version=%u",
+                        quant_wht_dim, quant_wht_scheme.c_str(), quant_wht_version));
+        }
+        hparams.quant_wht_dim = quant_wht_dim;
+        hparams.quant_wht_version = quant_wht_version;
+        LLAMA_LOG_WARN("%s: WARNING: experimental WHT-rotated Q_K GGUF detected (dim=%u, scheme=%s, version=%u)\n",
+                __func__, quant_wht_dim, quant_wht_scheme.c_str(), quant_wht_version);
+    }
 
     // everything past this point is not vocab-related
     // for CLIP models, we only need to load tensors, no hparams
@@ -8160,6 +8181,11 @@ void llama_model::print_info() const {
     LLAMA_LOG_INFO("%s: arch                  = %s\n",     __func__, arch_name().c_str());
     LLAMA_LOG_INFO("%s: vocab_only            = %d\n",     __func__, hparams.vocab_only);
     LLAMA_LOG_INFO("%s: no_alloc              = %d\n",     __func__, hparams.no_alloc);
+    LLAMA_LOG_INFO("%s: quant_wht             = %d\n",     __func__, quant_wht_enabled);
+    if (quant_wht_enabled) {
+        LLAMA_LOG_INFO("%s: quant_wht_dim         = %u\n",     __func__, quant_wht_dim);
+        LLAMA_LOG_INFO("%s: quant_wht_scheme      = %s\n",     __func__, quant_wht_scheme.c_str());
+    }
 
     if (!hparams.vocab_only) {
         LLAMA_LOG_INFO("%s: n_ctx_train           = %u\n",     __func__, hparams.n_ctx_train);

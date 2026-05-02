@@ -9,6 +9,7 @@
 #include <array>
 #include <cinttypes>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <future>
 #include <regex>
@@ -1054,6 +1055,42 @@ static ggml_backend_buffer_type_t select_weight_buft(const llama_hparams & hpara
     return nullptr;
 }
 
+static bool llama_model_quant_wht_type_supported(ggml_type type) {
+    return type == GGML_TYPE_Q2_K ||
+           type == GGML_TYPE_Q3_K ||
+           type == GGML_TYPE_Q4_K ||
+           type == GGML_TYPE_Q5_K ||
+           type == GGML_TYPE_Q6_K ||
+           type == GGML_TYPE_Q8_0;
+}
+
+static bool llama_model_quant_wht_backend_supported(ggml_backend_dev_t dev) {
+    if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU) {
+        return true;
+    }
+
+    const char * name = ggml_backend_dev_name(dev);
+    return name != nullptr && strstr(name, "CUDA") != nullptr;
+}
+
+static bool llama_model_quant_wht_name_supported(const LLM_TN_IMPL & tn) {
+    if (tn.suffix == nullptr || strcmp(tn.suffix, "weight") != 0) {
+        return false;
+    }
+    if (tn.tensor == LLM_TENSOR_TOKEN_EMBD ||
+        tn.tensor == LLM_TENSOR_SSM_ALPHA ||
+        tn.tensor == LLM_TENSOR_SSM_BETA ||
+        tn.tensor == LLM_TENSOR_SSM_BETA_ALPHA ||
+        tn.tensor == LLM_TENSOR_SSM_DT ||
+        tn.tensor == LLM_TENSOR_SSM_CONV1D) {
+        return false;
+    }
+    const std::string name = tn.str();
+    return name.find("norm") == std::string::npos &&
+           name.find("rope") == std::string::npos &&
+           name.find("conv") == std::string::npos;
+}
+
 struct ggml_tensor * llama_model_loader::create_tensor(
         const llama_hparams & hparams, const buft_list_t * buft_list_cpu, const buft_list_t * buft_list_input, const buft_list_t * buft_list_output,
         const buft_list_t * buft_list_layer, const LLM_TN_IMPL & tn, const std::initializer_list<int64_t> & ne, int flags) {
@@ -1134,6 +1171,35 @@ struct ggml_tensor * llama_model_loader::create_tensor(
             op = info.op;
         }
 
+        const bool quant_wht_tensor =
+            hparams.quant_wht_enabled &&
+            (op == GGML_OP_MUL_MAT || op == GGML_OP_MUL_MAT_ID) &&
+            llama_model_quant_wht_type_supported(t_meta->type) &&
+            llama_model_quant_wht_name_supported(tn);
+
+        if (hparams.quant_wht_enabled &&
+                (op == GGML_OP_MUL_MAT || op == GGML_OP_MUL_MAT_ID) &&
+                llama_model_quant_wht_type_supported(t_meta->type) &&
+                llama_model_quant_wht_name_supported(tn) &&
+                t_meta->ne[0] % 256 != 0) {
+            throw std::runtime_error(format("general.quant_wht tensor %s has unsupported reduction dimension %" PRId64,
+                        tn.str().c_str(), t_meta->ne[0]));
+        }
+
+        if (quant_wht_tensor) {
+            t_meta->flags |= GGML_TENSOR_FLAG_QUANT_WHT;
+            if (getenv("GGML_CUDA_LOG_QUANT_WHT") != nullptr) {
+                static int n_logged = 0;
+                if (n_logged < 8) {
+                    LLAMA_LOG_INFO("%s: quant_wht tensor flagged: %s type=%s dim=%" PRId64 "\n",
+                            __func__, tn.str().c_str(), ggml_type_name(t_meta->type), t_meta->ne[0]);
+                    ++n_logged;
+                }
+            }
+        } else {
+            t_meta->flags &= ~GGML_TENSOR_FLAG_QUANT_WHT;
+        }
+
         // sanity checks
         if (info.layer == LLM_TENSOR_LAYER_INPUT || info.layer == LLM_TENSOR_LAYER_OUTPUT) {
             if (tn.bid != -1) {
@@ -1199,6 +1265,15 @@ struct ggml_tensor * llama_model_loader::create_tensor(
             }
         }
 
+        if (quant_wht_tensor) {
+            ggml_backend_dev_t dev = ggml_backend_buft_get_device(buft);
+            if (dev == nullptr || !llama_model_quant_wht_backend_supported(dev)) {
+                throw std::runtime_error(format(
+                            "general.quant_wht tensor %s selected unsupported backend buffer %s; supported backends are CUDA and CPU",
+                            tn.str().c_str(), ggml_backend_buft_name(buft)));
+            }
+        }
+
         // avoid using a host buffer when using mmap
         auto * buft_dev = ggml_backend_buft_get_device(buft);
         if (use_mmap && buft_dev && buft == ggml_backend_dev_host_buffer_type(buft_dev)) {
@@ -1257,6 +1332,7 @@ struct ggml_tensor * llama_model_loader::create_tensor(
         ggml_context * ctx = ctx_for_buft(buft);
         ggml_tensor * ret = ggml_dup_tensor(ctx, &t_meta);
         ggml_set_name(ret, tn.str().c_str());
+        ret->flags |= t_meta.flags & GGML_TENSOR_FLAG_QUANT_WHT;
         return ret;
     }
 
@@ -1286,6 +1362,7 @@ struct ggml_tensor * llama_model_loader::create_tensor(
 
     struct ggml_tensor * tensor = ggml_dup_tensor(ctx, cur);
     ggml_set_name(tensor, ggml_get_name(cur));
+    tensor->flags |= cur->flags & GGML_TENSOR_FLAG_QUANT_WHT;
 
     if (duplicated) {
         size_data += ggml_nbytes(cur);

@@ -1,6 +1,8 @@
 #include "quantize.cuh"
 #include "pq-tq-fwht.cuh"
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 
 static __device__ __forceinline__ float pqk_wht_apply_sign_256(const float x, const uint32_t * signs, const int idx) {
     const uint32_t sign = ((signs[idx >> 5] >> (idx & 31)) & 1u) << 31;
@@ -46,6 +48,34 @@ static __device__ __forceinline__ void pqk_coop_wht_forward_256_fast(float * sh,
     xr0 = sh[tid];
     xr1 = sh[tid + 128];
 #endif
+}
+
+static bool ggml_cuda_quant_wht_type_supported(const ggml_type type) {
+    return type == GGML_TYPE_Q2_K ||
+           type == GGML_TYPE_Q3_K ||
+           type == GGML_TYPE_Q4_K ||
+           type == GGML_TYPE_Q5_K ||
+           type == GGML_TYPE_Q6_K ||
+           type == GGML_TYPE_Q8_0;
+}
+
+static void ggml_cuda_quant_wht_log_once(const ggml_type type, const char * path) {
+    if (getenv("GGML_CUDA_LOG_QUANT_WHT") == nullptr) {
+        return;
+    }
+    static bool logged_mmvq[GGML_TYPE_COUNT] = {};
+    static bool logged_mmq[GGML_TYPE_COUNT]  = {};
+    const int type_idx = (int) type;
+    if (type_idx < 0 || type_idx >= GGML_TYPE_COUNT) {
+        return;
+    }
+    bool * logged = strcmp(path, "MMQ") == 0 ? logged_mmq : logged_mmvq;
+    if (logged[type_idx]) {
+        return;
+    }
+    logged[type_idx] = true;
+    GGML_LOG_INFO("%s: quant_wht enabled, dim=256, type=%s, activation WHT preprocess=yes, path=%s\n",
+            __func__, ggml_type_name(type), path);
 }
 
 __launch_bounds__(CUDA_QUANTIZE_BLOCK_SIZE, 1)
@@ -462,6 +492,7 @@ static __global__ void quantize_mmq_q8_1_pq_wht(
     }
 }
 
+template <mmq_q8_1_ds_layout ds_layout>
 __launch_bounds__(128, 1)
 static __global__ void quantize_mmq_q8_1_pqk_wht(
         const float * __restrict__ x, const int32_t * __restrict__ ids, void * __restrict__ vy,
@@ -482,6 +513,7 @@ static __global__ void quantize_mmq_q8_1_pqk_wht(
     const int64_t i01 = ids ? ids[i1] : i1;
 
     __shared__ float sh[D];
+    __shared__ float amax32[8];
 
     const int64_t i0 = base_i0 + tid;
     sh[tid]       = i0       < ne00 ? x[i3*s03 + i2*s02 + i01*s01 + i0]       : 0.0f;
@@ -502,27 +534,69 @@ static __global__ void quantize_mmq_q8_1_pqk_wht(
 
     float amax0 = fabsf(xr0);
     float amax1 = fabsf(xr1);
+    float sum0  = xr0;
+    float sum1  = xr1;
     amax0 = warp_reduce_max<QK8_1>(amax0);
     amax1 = warp_reduce_max<QK8_1>(amax1);
+    sum0  = warp_reduce_sum<QK8_1>(sum0);
+    sum1  = warp_reduce_sum<QK8_1>(sum1);
 
-    const float d0 = amax0 / 127.0f;
-    const float d1 = amax1 / 127.0f;
+    float d0 = amax0 / 127.0f;
+    float d1 = amax1 / 127.0f;
+
+    if constexpr (ds_layout == MMQ_Q8_1_DS_LAYOUT_D2S6) {
+        if (lane_id == 0) {
+            amax32[warp_id]     = amax0;
+            amax32[warp_id + 4] = amax1;
+        }
+        __syncthreads();
+
+        const int scale_group = warp_id / 2;
+        d0 = fmaxf(amax32[2*scale_group],     amax32[2*scale_group + 1]) / 127.0f;
+        d1 = fmaxf(amax32[2*scale_group + 4], amax32[2*scale_group + 5]) / 127.0f;
+    }
+
     const int8_t q0 = amax0 == 0.0f ? 0 : roundf(xr0 / d0);
     const int8_t q1 = amax1 == 0.0f ? 0 : roundf(xr1 / d1);
 
     y[ib0].qs[warp_id * QK8_1 + lane_id] = q0;
     y[ib1].qs[warp_id * QK8_1 + lane_id] = q1;
 
-    if (lane_id == 0) {
-        y[ib0].d4[warp_id] = d0;
-        y[ib1].d4[warp_id] = d1;
+    if constexpr (ds_layout == MMQ_Q8_1_DS_LAYOUT_D2S6) {
+        float sum16_0 = xr0;
+        float sum16_1 = xr1;
+#pragma unroll
+        for (int offset = 8; offset > 0; offset >>= 1) {
+            sum16_0 += __shfl_xor_sync(0xFFFFFFFF, sum16_0, offset, 16);
+            sum16_1 += __shfl_xor_sync(0xFFFFFFFF, sum16_1, offset, 16);
+        }
+
+        if (lane_id == 0 && (warp_id & 1) == 0) {
+            y[ib0].d2s6[warp_id / 2] = d0;
+            y[ib1].d2s6[warp_id / 2] = d1;
+        }
+        const int sum_group = warp_id * 2 + lane_id / 16;
+        if ((lane_id & 15) == 0 && sum_group < 6) {
+            y[ib0].d2s6[2 + sum_group] = sum16_0;
+            y[ib1].d2s6[2 + sum_group] = sum16_1;
+        }
+    } else if constexpr (ds_layout == MMQ_Q8_1_DS_LAYOUT_DS4) {
+        if (lane_id == 0) {
+            y[ib0].ds4[warp_id] = make_half2(d0, sum0);
+            y[ib1].ds4[warp_id] = make_half2(d1, sum1);
+        }
+    } else {
+        if (lane_id == 0) {
+            y[ib0].d4[warp_id] = d0;
+            y[ib1].d4[warp_id] = d1;
+        }
     }
 }
 
 void quantize_row_q8_1_cuda(
         const float * x, const int32_t * ids, void * vy, const ggml_type type_src0,
         const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
-        const int64_t ne0, const int64_t ne1, const int64_t ne2, const int64_t ne3, cudaStream_t stream) {
+        const int64_t ne0, const int64_t ne1, const int64_t ne2, const int64_t ne3, const bool quant_wht, cudaStream_t stream) {
     GGML_ASSERT(!ids);
     GGML_ASSERT(ne0 % QK8_1 == 0);
 
@@ -538,10 +612,14 @@ void quantize_row_q8_1_cuda(
         return;
     }
 
-    if (type_src0 == GGML_TYPE_PQ2_K || type_src0 == GGML_TYPE_PQ3_K || type_src0 == GGML_TYPE_PQ4_K) {
+    if (type_src0 == GGML_TYPE_PQ2_K || type_src0 == GGML_TYPE_PQ3_K || type_src0 == GGML_TYPE_PQ4_K ||
+            (quant_wht && ggml_cuda_quant_wht_type_supported(type_src0))) {
         GGML_ASSERT(ne00 % QK_K == 0);
         GGML_ASSERT(ne0  % QK_K == 0);
 
+        if (quant_wht && ggml_cuda_quant_wht_type_supported(type_src0)) {
+            ggml_cuda_quant_wht_log_once(type_src0, "MMVQ");
+        }
         const dim3 num_blocks(ne0 / QK_K, ne1, ne2*ne3);
         const dim3 block_size(128, 1, 1);
         quantize_q8_1_pqk_wht<<<num_blocks, block_size, 0, stream>>>(x, vy, ne00, s01, s02, s03, ne0, ne1, ne2_fastdiv);
@@ -558,7 +636,7 @@ void quantize_row_q8_1_cuda(
 void quantize_mmq_q8_1_cuda(
         const float * x, const int32_t * ids, void * vy, const ggml_type type_src0,
         const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
-        const int64_t ne0, const int64_t ne1, const int64_t ne2, const int64_t ne3, cudaStream_t stream) {
+        const int64_t ne0, const int64_t ne1, const int64_t ne2, const int64_t ne3, const bool quant_wht, cudaStream_t stream) {
     if (type_src0 == GGML_TYPE_PQ2_0 || type_src0 == GGML_TYPE_PQ3_0 || type_src0 == GGML_TYPE_PQ4_0) {
         GGML_ASSERT(ne00 % QK_PQ_TQ_2_GROUP == 0);
         GGML_ASSERT(ne0  % QK_PQ_TQ_2_GROUP == 0);
@@ -570,14 +648,33 @@ void quantize_mmq_q8_1_cuda(
         return;
     }
 
-    if (type_src0 == GGML_TYPE_PQ2_K || type_src0 == GGML_TYPE_PQ3_K || type_src0 == GGML_TYPE_PQ4_K) {
+    if (type_src0 == GGML_TYPE_PQ2_K || type_src0 == GGML_TYPE_PQ3_K || type_src0 == GGML_TYPE_PQ4_K ||
+            (quant_wht && ggml_cuda_quant_wht_type_supported(type_src0))) {
         GGML_ASSERT(ne00 % QK_K == 0);
         GGML_ASSERT(ne0  % QK_K == 0);
 
+        if (quant_wht && ggml_cuda_quant_wht_type_supported(type_src0)) {
+            ggml_cuda_quant_wht_log_once(type_src0, "MMQ");
+        }
         const dim3 num_blocks(ne1, ne0 / QK_K, ne2*ne3);
         const dim3 block_size(128, 1, 1);
-        quantize_mmq_q8_1_pqk_wht
-            <<<num_blocks, block_size, 0, stream>>>(x, ids, vy, ne00, s01, s02, s03, ne0, ne1, ne2);
+        switch (mmq_get_q8_1_ds_layout(type_src0)) {
+            case MMQ_Q8_1_DS_LAYOUT_D4:
+                quantize_mmq_q8_1_pqk_wht<MMQ_Q8_1_DS_LAYOUT_D4>
+                    <<<num_blocks, block_size, 0, stream>>>(x, ids, vy, ne00, s01, s02, s03, ne0, ne1, ne2);
+                break;
+            case MMQ_Q8_1_DS_LAYOUT_DS4:
+                quantize_mmq_q8_1_pqk_wht<MMQ_Q8_1_DS_LAYOUT_DS4>
+                    <<<num_blocks, block_size, 0, stream>>>(x, ids, vy, ne00, s01, s02, s03, ne0, ne1, ne2);
+                break;
+            case MMQ_Q8_1_DS_LAYOUT_D2S6:
+                quantize_mmq_q8_1_pqk_wht<MMQ_Q8_1_DS_LAYOUT_D2S6>
+                    <<<num_blocks, block_size, 0, stream>>>(x, ids, vy, ne00, s01, s02, s03, ne0, ne1, ne2);
+                break;
+            default:
+                GGML_ABORT("fatal error");
+                break;
+        }
         return;
     }
 
@@ -619,6 +716,7 @@ void quantize_mmq_mxfp4_cuda(const float *                    x,
                              const int64_t                    ne1,
                              const int64_t                    ne2,
                              const int64_t                    ne3,
+                             [[maybe_unused]] const bool       quant_wht,
                              cudaStream_t                     stream) {
     GGML_ASSERT(ne0 % (2 * QK_MXFP4) == 0);
 

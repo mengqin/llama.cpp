@@ -154,11 +154,11 @@ void ggml_cuda_mul_mat_q(
             if (use_native_mxfp4) {
                 static_assert(sizeof(block_fp4_mmq) == 4 * sizeof(block_q8_1));
                 quantize_mmq_mxfp4_cuda(src1_d, nullptr, src1_q8_1.get(), src0->type, ne10, s11, s12, s13, ne10_padded,
-                                        ne11, ne12, ne13, stream);
+                                        ne11, ne12, ne13, false, stream);
 
             } else {
                 quantize_mmq_q8_1_cuda(src1_d, nullptr, src1_q8_1.get(), src0->type, ne10, s11, s12, s13, ne10_padded,
-                                       ne11, ne12, ne13, stream);
+                                       ne11, ne12, ne13, (src0->flags & GGML_TENSOR_FLAG_QUANT_WHT) != 0, stream);
             }
             CUDA_CHECK(cudaGetLastError());
         }
@@ -218,10 +218,10 @@ void ggml_cuda_mul_mat_q(
 
         if (use_native_mxfp4) {
             quantize_mmq_mxfp4_cuda(src1_d, ids_src1.get(), src1_q8_1.get(), src0->type, ne10, s11, s12, s13,
-                                    ne10_padded, ne11_flat, ne12_flat, ne13_flat, stream);
+                                    ne10_padded, ne11_flat, ne12_flat, ne13_flat, false, stream);
         } else {
             quantize_mmq_q8_1_cuda(src1_d, ids_src1.get(), src1_q8_1.get(), src0->type, ne10, s11, s12, s13,
-                                   ne10_padded, ne11_flat, ne12_flat, ne13_flat, stream);
+                                   ne10_padded, ne11_flat, ne12_flat, ne13_flat, (src0->flags & GGML_TENSOR_FLAG_QUANT_WHT) != 0, stream);
         }
         CUDA_CHECK(cudaGetLastError());
     }

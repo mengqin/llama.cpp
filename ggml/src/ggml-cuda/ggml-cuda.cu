@@ -1809,7 +1809,7 @@ static void ggml_cuda_op_mul_mat(
                 quantize_src1(
                     dev[id].src1_ddf, nullptr, dev[id].src1_ddq, src0->type, ne10,
                     nb11/sizeof(float), nb12/sizeof(float), nb13/sizeof(float),
-                    src1_padded_col_size, ne11, ne12, ne13, stream);
+                    src1_padded_col_size, ne11, ne12, ne13, (src0->flags & GGML_TENSOR_FLAG_QUANT_WHT) != 0, stream);
                 CUDA_CHECK(cudaGetLastError());
             }
         }
@@ -1906,7 +1906,7 @@ static void ggml_cuda_op_mul_mat(
                 if (quantize_src1 && !src1_is_contiguous) {
                     quantize_src1(
                         src1_ddf_i, nullptr, src1_ddq_i, src0->type, ne10, ne10, ne11*ne10, ne12*ne11*ne10,
-                        src1_padded_col_size, src1_ncols, 1, 1, stream);
+                        src1_padded_col_size, src1_ncols, 1, 1, (src0->flags & GGML_TENSOR_FLAG_QUANT_WHT) != 0, stream);
                     CUDA_CHECK(cudaGetLastError());
                 }
 
@@ -2351,6 +2351,7 @@ static bool ggml_cuda_should_fuse_mul_mat_vec_q(const ggml_tensor * tensor) {
     const ggml_tensor * dst  = tensor;
     const bool pq_weight_type = src0->type == GGML_TYPE_PQ2_0 || src0->type == GGML_TYPE_PQ3_0 || src0->type == GGML_TYPE_PQ4_0 ||
                                 src0->type == GGML_TYPE_PQ2_K || src0->type == GGML_TYPE_PQ3_K || src0->type == GGML_TYPE_PQ4_K;
+    const bool quant_wht_weight = (src0->flags & GGML_TENSOR_FLAG_QUANT_WHT) != 0;
 
     const bool bad_padding_clear = ggml_backend_buffer_get_usage(src0->buffer) == GGML_BACKEND_BUFFER_USAGE_COMPUTE &&
                                    ggml_nbytes(src0) != ggml_backend_buffer_get_alloc_size(src0->buffer, src0) &&
@@ -2359,7 +2360,7 @@ static bool ggml_cuda_should_fuse_mul_mat_vec_q(const ggml_tensor * tensor) {
     bool use_mul_mat_vec_q = ggml_is_quantized(src0->type) && !bad_padding_clear && src1->type == GGML_TYPE_F32 &&
                              dst->type == GGML_TYPE_F32 && src1->ne[1] <= MMVQ_MAX_BATCH_SIZE;
 
-    if (pq_weight_type) {
+    if (pq_weight_type || quant_wht_weight) {
         return false;
     }
 

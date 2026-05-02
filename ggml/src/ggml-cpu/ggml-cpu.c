@@ -1214,6 +1214,46 @@ void ggml_set_f32_nd(const struct ggml_tensor * tensor, int i0, int i1, int i2, 
 
 // ggml_compute_forward_mul_mat
 
+static const uint32_t ggml_cpu_quant_wht_signs1_256_bits[8] = {
+    0x6c9a58b4u, 0xe4a1d7c3u, 0x3f2b8e15u, 0x91d0c6e7u,
+    0x5ab36f29u, 0xc7e814adu, 0x284fdb91u, 0xb1d27a6cu,
+};
+
+static const uint32_t ggml_cpu_quant_wht_signs2_256_bits[8] = {
+    0x9e3779b9u, 0x7f4a7c15u, 0x94d049bbu, 0x4f1bbcdcu,
+    0x2c6f5a3du, 0xd1b54a35u, 0x8a5cd789u, 0x13579bdfu,
+};
+
+static inline float ggml_cpu_quant_wht_apply_sign_256(float x, const uint32_t * signs, int idx) {
+    union {
+        float f;
+        uint32_t u;
+    } v = { x };
+    v.u ^= (((signs[idx >> 5] >> (idx & 31)) & 1u) << 31);
+    return v.f;
+}
+
+static void ggml_cpu_quant_wht_forward_256(float * data) {
+    for (int i = 0; i < 256; ++i) {
+        data[i] = ggml_cpu_quant_wht_apply_sign_256(data[i], ggml_cpu_quant_wht_signs1_256_bits, i);
+    }
+
+    for (int len = 1; len < 256; len <<= 1) {
+        for (int base = 0; base < 256; base += 2 * len) {
+            for (int i = 0; i < len; ++i) {
+                const float a = data[base + i];
+                const float b = data[base + len + i];
+                data[base + i]       = a + b;
+                data[base + len + i] = a - b;
+            }
+        }
+    }
+
+    for (int i = 0; i < 256; ++i) {
+        data[i] = ggml_cpu_quant_wht_apply_sign_256(data[i] * 0.0625f, ggml_cpu_quant_wht_signs2_256_bits, i);
+    }
+}
+
 static void ggml_compute_forward_mul_mat_one_chunk(
     const struct ggml_compute_params * params,
     struct ggml_tensor * dst,
@@ -1319,11 +1359,13 @@ void ggml_compute_forward_mul_mat(
     enum ggml_type           const vec_dot_type         = type_traits_cpu[src0->type].vec_dot_type;
     ggml_from_float_t        const from_float           = type_traits_cpu[vec_dot_type].from_float;
     int64_t                  const vec_dot_num_rows     = type_traits_cpu[src0->type].nrows;
+    bool                     const quant_wht            = (src0->flags & GGML_TENSOR_FLAG_QUANT_WHT) != 0;
 
     GGML_ASSERT(ne0 == ne01);
     GGML_ASSERT(ne1 == ne11);
     GGML_ASSERT(ne2 == ne12);
     GGML_ASSERT(ne3 == ne13);
+    GGML_ASSERT(!quant_wht || (src1->type == GGML_TYPE_F32 && src1->type != vec_dot_type && ne10 % 256 == 0));
 
     // we don't support permuted src0 or src1
     GGML_ASSERT(nb00 == ggml_type_size(src0->type));
@@ -1346,7 +1388,7 @@ void ggml_compute_forward_mul_mat(
 
     const bool src1_cont = ggml_is_contiguous(src1);
 
-    if (src1_cont) {
+    if (!quant_wht && src1_cont) {
         for (int64_t i13 = 0; i13 < ne13; i13++)
             for (int64_t i12 = 0; i12 < ne12; i12++)
                 if (!llamafile_sgemm(params,
@@ -1367,14 +1409,21 @@ UseGgmlGemm1:;
 #endif
 
     if (src1->type != vec_dot_type) {
-        char * wdata = params->wdata;
+        char * wdata = (char *) params->wdata;
 
         const size_t nbw0 = ggml_type_size(vec_dot_type);
         const size_t nbw1 = ggml_row_size(vec_dot_type, ne10);
         const size_t nbw2 = nbw1*ne11;
         const size_t nbw3 = nbw2*ne12;
 
-        assert(params->wsize >= ne13*nbw3);
+        const size_t wdata_q_size = ne13*nbw3;
+        float * wdata_rot = NULL;
+        if (quant_wht) {
+            wdata_rot = (float *) (wdata + GGML_PAD(wdata_q_size, sizeof(float)));
+            assert(params->wsize >= GGML_PAD(wdata_q_size, sizeof(float)) + ggml_nelements(src1)*sizeof(float));
+        } else {
+            assert(params->wsize >= wdata_q_size);
+        }
         GGML_ASSERT(src1->type == GGML_TYPE_F32);
 
     #if 0
@@ -1388,15 +1437,35 @@ UseGgmlGemm1:;
             }
         }
     #else
-        for (int64_t i13 = 0; i13 < ne13; ++i13) {
-            for (int64_t i12 = 0; i12 < ne12; ++i12) {
-                for (int64_t i11 = 0; i11 < ne11; ++i11) {
-                    size_t bs = ggml_blck_size(vec_dot_type);
-                    int64_t ne10_block_start = (ith * ne10/bs) / nth;
-                    int64_t ne10_block_end   = ((ith + 1) * ne10/bs) / nth;
-                    from_float((float *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11 + ne10_block_start*bs*nb10),
-                               (void *)               (wdata + i13*nbw3 + i12*nbw2 + i11*nbw1 + ne10_block_start*nbw0),
-                               (ne10_block_end - ne10_block_start) * bs);
+        if (quant_wht) {
+            const size_t bs = ggml_blck_size(vec_dot_type);
+            GGML_ASSERT(256 % bs == 0);
+            for (int64_t i13 = 0; i13 < ne13; ++i13) {
+                for (int64_t i12 = 0; i12 < ne12; ++i12) {
+                    for (int64_t i11 = 0; i11 < ne11; ++i11) {
+                        const float * src_row = (const float *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11);
+                        float * rot_row = wdata_rot + (i13*ne12*ne11 + i12*ne11 + i11)*ne10;
+                        char * q_row = wdata + i13*nbw3 + i12*nbw2 + i11*nbw1;
+                        for (int64_t wht_block = ith; wht_block < ne10/256; wht_block += nth) {
+                            const int64_t col = 256*wht_block;
+                            memcpy(rot_row + col, src_row + col, 256*sizeof(float));
+                            ggml_cpu_quant_wht_forward_256(rot_row + col);
+                            from_float(rot_row + col, (void *)(q_row + (col/bs)*nbw0), 256);
+                        }
+                    }
+                }
+            }
+        } else {
+            for (int64_t i13 = 0; i13 < ne13; ++i13) {
+                for (int64_t i12 = 0; i12 < ne12; ++i12) {
+                    for (int64_t i11 = 0; i11 < ne11; ++i11) {
+                        size_t bs = ggml_blck_size(vec_dot_type);
+                        int64_t ne10_block_start = (ith * ne10/bs) / nth;
+                        int64_t ne10_block_end   = ((ith + 1) * ne10/bs) / nth;
+                        from_float((float *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11 + ne10_block_start*bs*nb10),
+                                   (void *)               (wdata + i13*nbw3 + i12*nbw2 + i11*nbw1 + ne10_block_start*nbw0),
+                                   (ne10_block_end - ne10_block_start) * bs);
+                    }
                 }
             }
         }
@@ -1411,7 +1480,7 @@ UseGgmlGemm1:;
     ggml_barrier(params->threadpool);
 
 #if GGML_USE_LLAMAFILE
-    if (src1->type != vec_dot_type) {
+    if (!quant_wht && src1->type != vec_dot_type) {
         const void* wdata = (src1->type == vec_dot_type) ? src1->data : params->wdata;
         const size_t row_size = ggml_row_size(vec_dot_type, ne10);
 
@@ -1597,10 +1666,12 @@ static void ggml_compute_forward_mul_mat_id(
 
     enum ggml_type    const vec_dot_type    = type_traits_cpu[type].vec_dot_type;
     ggml_from_float_t const from_float      = type_traits_cpu[vec_dot_type].from_float;
+    bool              const quant_wht       = (src0->flags & GGML_TENSOR_FLAG_QUANT_WHT) != 0;
 
     // we don't support permuted src0 or src1
     GGML_ASSERT(nb00 == ggml_type_size(type));
     GGML_ASSERT(nb10 == ggml_type_size(src1->type));
+    GGML_ASSERT(!quant_wht || (src1->type == GGML_TYPE_F32 && src1->type != vec_dot_type && ne10 % 256 == 0));
 
     // dst cannot be transposed or permuted
     GGML_ASSERT(nb0 == sizeof(float));
@@ -1613,9 +1684,14 @@ static void ggml_compute_forward_mul_mat_id(
     const int n_as  = ne02;       // n_expert
 
     void * wdata_cur = params->wdata;
+    char * wdata_q = NULL;
+    float * wdata_rot = NULL;
 
     if (src1->type != vec_dot_type) {
-        incr_ptr_aligned(&wdata_cur, ggml_row_size(vec_dot_type, ggml_nelements(src1)), sizeof(int64_t));
+        wdata_q = (char *) incr_ptr_aligned(&wdata_cur, ggml_row_size(vec_dot_type, ggml_nelements(src1)), sizeof(int64_t));
+        if (quant_wht) {
+            wdata_rot = (float *) incr_ptr_aligned(&wdata_cur, ggml_nelements(src1)*sizeof(float), sizeof(float));
+        }
     }
 
     int64_t * matrix_row_counts = // [n_as]
@@ -1630,7 +1706,7 @@ static void ggml_compute_forward_mul_mat_id(
     GGML_ASSERT(params->wsize >= (size_t)((char *) wdata_cur - (char *) params->wdata));
 
     if (src1->type != vec_dot_type) {
-        char * wdata = params->wdata;
+        char * wdata = wdata_q;
 
         const size_t nbw0 = ggml_type_size(vec_dot_type);
         const size_t nbw1 = ggml_row_size(vec_dot_type, ne10);
@@ -1651,15 +1727,35 @@ static void ggml_compute_forward_mul_mat_id(
             }
         }
 #else
-        for (int64_t i13 = 0; i13 < ne13; ++i13) {
-            for (int64_t i12 = 0; i12 < ne12; ++i12) {
-                for (int64_t i11 = 0; i11 < ne11; ++i11) {
-                    size_t bs = ggml_blck_size(vec_dot_type);
-                    int64_t ne10_block_start = (ith * ne10/bs) / nth;
-                    int64_t ne10_block_end   = ((ith + 1) * ne10/bs) / nth;
-                    from_float((float *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11 + ne10_block_start*bs*nb10),
-                               (void *)               (wdata + i13*nbw3 + i12*nbw2 + i11*nbw1 + ne10_block_start*nbw0),
-                               (ne10_block_end - ne10_block_start) * bs);
+        if (quant_wht) {
+            const size_t bs = ggml_blck_size(vec_dot_type);
+            GGML_ASSERT(256 % bs == 0);
+            for (int64_t i13 = 0; i13 < ne13; ++i13) {
+                for (int64_t i12 = 0; i12 < ne12; ++i12) {
+                    for (int64_t i11 = 0; i11 < ne11; ++i11) {
+                        const float * src_row = (const float *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11);
+                        float * rot_row = wdata_rot + (i13*ne12*ne11 + i12*ne11 + i11)*ne10;
+                        char * q_row = wdata + i13*nbw3 + i12*nbw2 + i11*nbw1;
+                        for (int64_t wht_block = ith; wht_block < ne10/256; wht_block += nth) {
+                            const int64_t col = 256*wht_block;
+                            memcpy(rot_row + col, src_row + col, 256*sizeof(float));
+                            ggml_cpu_quant_wht_forward_256(rot_row + col);
+                            from_float(rot_row + col, (void *)(q_row + (col/bs)*nbw0), 256);
+                        }
+                    }
+                }
+            }
+        } else {
+            for (int64_t i13 = 0; i13 < ne13; ++i13) {
+                for (int64_t i12 = 0; i12 < ne12; ++i12) {
+                    for (int64_t i11 = 0; i11 < ne11; ++i11) {
+                        size_t bs = ggml_blck_size(vec_dot_type);
+                        int64_t ne10_block_start = (ith * ne10/bs) / nth;
+                        int64_t ne10_block_end   = ((ith + 1) * ne10/bs) / nth;
+                        from_float((float *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11 + ne10_block_start*bs*nb10),
+                                   (void *)               (wdata + i13*nbw3 + i12*nbw2 + i11*nbw1 + ne10_block_start*nbw0),
+                                   (ne10_block_end - ne10_block_start) * bs);
+                    }
                 }
             }
         }
@@ -1699,7 +1795,7 @@ static void ggml_compute_forward_mul_mat_id(
         }
 
         const char * src0_cur = (const char *) src0->data + cur_a * nb02;
-        const void * wdata = (src1->type == vec_dot_type) ? src1->data : params->wdata;
+        const void * wdata = (src1->type == vec_dot_type) ? src1->data : wdata_q;
         const size_t row_size = ggml_row_size(vec_dot_type, ne10);
 
         const int64_t nr0 = ne01;
@@ -2878,6 +2974,9 @@ struct ggml_cplan ggml_graph_plan(
 
                         if (node->src[1]->type != vec_dot_type) {
                             cur = ggml_row_size(vec_dot_type, ggml_nelements(node->src[1]));
+                            if (node->src[0]->flags & GGML_TENSOR_FLAG_QUANT_WHT) {
+                                cur = GGML_PAD(cur, sizeof(float)) + ggml_nelements(node->src[1])*sizeof(float);
+                            }
                         }
                     } break;
                 case GGML_OP_MUL_MAT_ID:
@@ -2891,6 +2990,9 @@ struct ggml_cplan ggml_graph_plan(
                         // src1
                         if (src1->type != vec_dot_type) {
                             cur += ggml_row_size(vec_dot_type, ggml_nelements(src1)) + sizeof(int64_t);
+                            if (src0->flags & GGML_TENSOR_FLAG_QUANT_WHT) {
+                                cur += ggml_nelements(src1)*sizeof(float) + sizeof(float);
+                            }
                         }
                         // matrix_row_counts
                         cur += n_as * sizeof(int64_t) + sizeof(int64_t);

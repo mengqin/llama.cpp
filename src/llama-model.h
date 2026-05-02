@@ -562,6 +562,11 @@ struct llama_model {
     // gguf metadata
     std::unordered_map<std::string, std::string> gguf_kv;
 
+    bool quant_wht_enabled = false;
+    uint32_t quant_wht_dim = 0;
+    uint32_t quant_wht_version = 0;
+    std::string quant_wht_scheme;
+
     // list of devices used in this model
     std::vector<llama_device> devices;
 

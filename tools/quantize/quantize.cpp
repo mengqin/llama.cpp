@@ -132,7 +132,7 @@ static bool try_parse_ftype(const std::string & ftype_str_in, llama_ftype & ftyp
 static void usage(const char * executable) {
     printf("usage: %s [--help] [--allow-requantize] [--leave-output-tensor] [--pure] [--imatrix] [--include-weights]\n", executable);
     printf("       [--exclude-weights] [--output-tensor-type] [--token-embedding-type] [--tensor-type] [--tensor-type-file]\n");
-    printf("       [--prune-layers] [--keep-split] [--override-kv] [--dry-run]\n");
+    printf("       [--prune-layers] [--keep-split] [--override-kv] [--dry-run] [--quant-wht] [--quant-wht-dim]\n");
     printf("       model-f32.gguf [model-quant.gguf] type [nthreads]\n\n");
     printf("  --allow-requantize\n");
     printf("                                      allow requantizing tensors that have already been quantized\n");
@@ -172,6 +172,10 @@ static void usage(const char * executable) {
     printf("  --dry-run\n");
     printf("                                      calculate and show the final quantization size without performing quantization\n");
     printf("                                      example: llama-quantize --dry-run model-f32.gguf Q4_K\n\n");
+    printf("  --quant-wht\n");
+    printf("                                      store eligible Q_K tensors in the WHT-rotated domain\n");
+    printf("  --quant-wht-dim N\n");
+    printf("                                      WHT dimension for --quant-wht, currently only 256 is supported\n");
     printf("note: --include-weights and --exclude-weights cannot be used together\n\n");
     printf("-----------------------------------------------------------------------------\n");
     printf(" allowed quantization types\n");
@@ -550,6 +554,18 @@ int main(int argc, char ** argv) {
             }
         } else if (strcmp(argv[arg_idx], "--dry-run") == 0) {
             params.dry_run = true;
+        } else if (strcmp(argv[arg_idx], "--quant-wht") == 0) {
+            params.quant_wht = true;
+        } else if (strcmp(argv[arg_idx], "--quant-wht-dim") == 0) {
+            if (arg_idx < argc-1) {
+                try {
+                    params.quant_wht_dim = (uint32_t) std::stoul(argv[++arg_idx]);
+                } catch (...) {
+                    usage(argv[0]);
+                }
+            } else {
+                usage(argv[0]);
+            }
         } else if (strcmp(argv[arg_idx], "--allow-requantize") == 0) {
             params.allow_requantize = true;
         } else if (strcmp(argv[arg_idx], "--pure") == 0) {
@@ -585,6 +601,10 @@ int main(int argc, char ** argv) {
     }
     if (!included_weights.empty() && !excluded_weights.empty()) {
         usage(argv[0]);
+    }
+    if (params.quant_wht && params.quant_wht_dim != 256) {
+        fprintf(stderr, "%s: --quant-wht-dim currently supports only 256\n", argv[0]);
+        return 1;
     }
 
     std::vector<std::string> imatrix_datasets;
