@@ -566,6 +566,7 @@ struct llama_model {
     uint32_t quant_wht_dim = 0;
     uint32_t quant_wht_version = 0;
     std::string quant_wht_scheme;
+    std::string quant_wht_skip_types;
 
     // list of devices used in this model
     std::vector<llama_device> devices;

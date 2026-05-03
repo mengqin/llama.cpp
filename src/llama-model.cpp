@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cfloat>
+#include <cstdio>
 #include <cstdint>
 #include <cstring>
 #include <cmath>
@@ -731,14 +732,21 @@ void llama_model::load_hparams(llama_model_loader & ml) {
         if (!ml.get_key("general.quant_wht.version", quant_wht_version, false)) {
             throw std::runtime_error("general.quant_wht.enabled=true but general.quant_wht.version is missing");
         }
+        quant_wht_skip_types.clear();
+        ml.get_key("general.quant_wht.skip_types", quant_wht_skip_types, false);
         if (quant_wht_dim != 256 || quant_wht_scheme != "pqk_rht_v1" || quant_wht_version != 1) {
             throw std::runtime_error(format("unsupported general.quant_wht metadata: dim=%u scheme=%s version=%u",
                         quant_wht_dim, quant_wht_scheme.c_str(), quant_wht_version));
         }
         hparams.quant_wht_dim = quant_wht_dim;
         hparams.quant_wht_version = quant_wht_version;
-        LLAMA_LOG_WARN("%s: WARNING: experimental WHT-rotated Q_K GGUF detected (dim=%u, scheme=%s, version=%u)\n",
-                __func__, quant_wht_dim, quant_wht_scheme.c_str(), quant_wht_version);
+        if (quant_wht_skip_types.size() >= sizeof(hparams.quant_wht_skip_types)) {
+            throw std::runtime_error("general.quant_wht.skip_types is too long");
+        }
+        snprintf(hparams.quant_wht_skip_types, sizeof(hparams.quant_wht_skip_types), "%s", quant_wht_skip_types.c_str());
+        LLAMA_LOG_WARN("%s: WARNING: experimental WHT-rotated Q_K/Q8_0/IQ GGUF detected (dim=%u, scheme=%s, version=%u, skip_types=%s)\n",
+                __func__, quant_wht_dim, quant_wht_scheme.c_str(), quant_wht_version,
+                quant_wht_skip_types.empty() ? "<none>" : quant_wht_skip_types.c_str());
     }
 
     // everything past this point is not vocab-related
@@ -8185,6 +8193,7 @@ void llama_model::print_info() const {
     if (quant_wht_enabled) {
         LLAMA_LOG_INFO("%s: quant_wht_dim         = %u\n",     __func__, quant_wht_dim);
         LLAMA_LOG_INFO("%s: quant_wht_scheme      = %s\n",     __func__, quant_wht_scheme.c_str());
+        LLAMA_LOG_INFO("%s: quant_wht_skip_types  = %s\n",     __func__, quant_wht_skip_types.empty() ? "<none>" : quant_wht_skip_types.c_str());
     }
 
     if (!hparams.vocab_only) {

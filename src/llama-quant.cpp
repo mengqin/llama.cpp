@@ -4,6 +4,7 @@
 #include "llama-ext.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstring>
 #include <cinttypes>
@@ -108,6 +109,7 @@ static bool tensor_name_match_output_weight(const char * tensor_name) {
 
 static constexpr int LLAMA_QUANT_WHT_DIM = 256;
 static constexpr const char * LLAMA_QUANT_WHT_SCHEME = "pqk_rht_v1";
+static constexpr const char * LLAMA_QUANT_WHT_DEFAULT_SKIP_TYPES = "Q3_K,IQ2_XXS,IQ2_XS,IQ2_S,IQ3_XXS,IQ3_S";
 static constexpr uint32_t LLAMA_QUANT_WHT_VERSION = 1;
 
 static const uint32_t LLAMA_QUANT_WHT_SIGNS1_256_BITS[8] = {
@@ -168,7 +170,109 @@ static bool llama_quant_wht_type_supported(ggml_type type) {
            type == GGML_TYPE_Q4_K ||
            type == GGML_TYPE_Q5_K ||
            type == GGML_TYPE_Q6_K ||
-           type == GGML_TYPE_Q8_0;
+           type == GGML_TYPE_Q8_0 ||
+           type == GGML_TYPE_IQ1_S ||
+           type == GGML_TYPE_IQ1_M ||
+           type == GGML_TYPE_IQ2_XXS ||
+           type == GGML_TYPE_IQ2_XS ||
+           type == GGML_TYPE_IQ2_S ||
+           type == GGML_TYPE_IQ3_XXS ||
+           type == GGML_TYPE_IQ3_S ||
+           type == GGML_TYPE_IQ4_NL ||
+           type == GGML_TYPE_IQ4_XS;
+}
+
+static const char * llama_quant_wht_type_name(ggml_type type) {
+    switch (type) {
+        case GGML_TYPE_Q2_K:    return "Q2_K";
+        case GGML_TYPE_Q3_K:    return "Q3_K";
+        case GGML_TYPE_Q4_K:    return "Q4_K";
+        case GGML_TYPE_Q5_K:    return "Q5_K";
+        case GGML_TYPE_Q6_K:    return "Q6_K";
+        case GGML_TYPE_Q8_0:    return "Q8_0";
+        case GGML_TYPE_IQ1_S:   return "IQ1_S";
+        case GGML_TYPE_IQ1_M:   return "IQ1_M";
+        case GGML_TYPE_IQ2_XXS: return "IQ2_XXS";
+        case GGML_TYPE_IQ2_XS:  return "IQ2_XS";
+        case GGML_TYPE_IQ2_S:   return "IQ2_S";
+        case GGML_TYPE_IQ3_XXS: return "IQ3_XXS";
+        case GGML_TYPE_IQ3_S:   return "IQ3_S";
+        case GGML_TYPE_IQ4_NL:  return "IQ4_NL";
+        case GGML_TYPE_IQ4_XS:  return "IQ4_XS";
+        default:                return nullptr;
+    }
+}
+
+static std::string llama_quant_wht_normalize_type_token(std::string token) {
+    token.erase(std::remove_if(token.begin(), token.end(), [](unsigned char c) { return std::isspace(c) != 0; }), token.end());
+    std::transform(token.begin(), token.end(), token.begin(), [](unsigned char c) { return (char) std::toupper(c); });
+    return token;
+}
+
+static ggml_type llama_quant_wht_parse_type_token(const std::string & token) {
+    const std::string name = llama_quant_wht_normalize_type_token(token);
+    for (int i = 0; i < GGML_TYPE_COUNT; ++i) {
+        const ggml_type type = (ggml_type) i;
+        const char * type_name = llama_quant_wht_type_name(type);
+        if (type_name != nullptr && name == type_name) {
+            return type;
+        }
+    }
+    return GGML_TYPE_COUNT;
+}
+
+static bool llama_quant_wht_skip_list_has(const std::string & skip_types, ggml_type type) {
+    size_t start = 0;
+    while (start <= skip_types.size()) {
+        const size_t end = skip_types.find(',', start);
+        const std::string token = skip_types.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        if (!llama_quant_wht_normalize_type_token(token).empty()) {
+            const ggml_type parsed = llama_quant_wht_parse_type_token(token);
+            if (parsed == GGML_TYPE_COUNT || !llama_quant_wht_type_supported(parsed)) {
+                throw std::runtime_error(format("unsupported quant_wht skip type: %s", token.c_str()));
+            }
+            if (parsed == type) {
+                return true;
+            }
+        }
+        if (end == std::string::npos) {
+            break;
+        }
+        start = end + 1;
+    }
+    return false;
+}
+
+static std::string llama_quant_wht_normalize_skip_types(const char * skip_types) {
+    const std::string input = skip_types == nullptr ? LLAMA_QUANT_WHT_DEFAULT_SKIP_TYPES : skip_types;
+    std::string result;
+    size_t start = 0;
+    while (start <= input.size()) {
+        const size_t end = input.find(',', start);
+        const std::string token = input.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        if (!llama_quant_wht_normalize_type_token(token).empty()) {
+            const ggml_type parsed = llama_quant_wht_parse_type_token(token);
+            if (parsed == GGML_TYPE_COUNT || !llama_quant_wht_type_supported(parsed)) {
+                throw std::runtime_error(format("unsupported quant_wht skip type: %s", token.c_str()));
+            }
+            if (!llama_quant_wht_skip_list_has(result, parsed)) {
+                if (!result.empty()) {
+                    result += ",";
+                }
+                result += llama_quant_wht_type_name(parsed);
+            }
+        }
+        if (end == std::string::npos) {
+            break;
+        }
+        start = end + 1;
+    }
+    return result;
+}
+
+static bool llama_quant_wht_type_enabled(ggml_type type, const std::string & skip_types) {
+    return llama_quant_wht_type_supported(type) &&
+           !llama_quant_wht_skip_list_has(skip_types, type);
 }
 
 static bool llama_quant_wht_name_supported(const std::string & name, tensor_category category) {
@@ -188,6 +292,41 @@ static bool llama_quant_wht_name_supported(const std::string & name, tensor_cate
         return false;
     }
     return true;
+}
+
+static void llama_quant_wht_inverse_rows_256(float * data, int64_t nrows, int64_t n_per_row, std::vector<std::thread> & workers, int nthread) {
+    GGML_ASSERT(n_per_row % LLAMA_QUANT_WHT_DIM == 0);
+
+    std::mutex mutex;
+    int64_t next_row = 0;
+
+    auto compute = [&]() {
+        while (true) {
+            int64_t row = 0;
+            {
+                std::unique_lock<std::mutex> lock(mutex);
+                row = next_row++;
+            }
+            if (row >= nrows) {
+                break;
+            }
+
+            float * row_data = data + row * n_per_row;
+            for (int64_t col = 0; col < n_per_row; col += LLAMA_QUANT_WHT_DIM) {
+                llama_quant_wht_inverse_256(row_data + col);
+            }
+        }
+    };
+
+    const int nthread_use = nthread > 1 ? nthread : 1;
+    for (int it = 0; it < nthread_use - 1; ++it) {
+        workers.emplace_back(compute);
+    }
+    compute();
+    for (auto & w : workers) {
+        w.join();
+    }
+    workers.clear();
 }
 
 //
@@ -304,6 +443,7 @@ static void llama_tensor_dequantize_impl(
     float * f32_output = (float *) output.data();
 
     const ggml_type_traits * qtype = ggml_get_type_traits(tensor->type);
+    const bool quant_wht = (tensor->flags & GGML_TENSOR_FLAG_QUANT_WHT) != 0;
     if (ggml_is_quantized(tensor->type)) {
         if (qtype->to_float == NULL) {
             throw std::runtime_error(format("type %s unsupported for integer quantization: no dequantization available", ggml_type_name(tensor->type)));
@@ -312,6 +452,18 @@ static void llama_tensor_dequantize_impl(
                tensor->type != GGML_TYPE_BF16) {
         throw std::runtime_error(format("cannot dequantize/convert tensor type %s", ggml_type_name(tensor->type)));
     }
+
+    auto apply_quant_wht_inverse = [&]() {
+        if (!quant_wht) {
+            return;
+        }
+        const int64_t n_per_row = tensor->ne[0];
+        if (n_per_row % LLAMA_QUANT_WHT_DIM != 0 || nelements % (size_t) n_per_row != 0) {
+            throw std::runtime_error(format("cannot inverse quant_wht tensor %s: reduction dimension %" PRId64 " is not divisible by %d",
+                        tensor->name, n_per_row, LLAMA_QUANT_WHT_DIM));
+        }
+        llama_quant_wht_inverse_rows_256(f32_output, (int64_t) (nelements / (size_t) n_per_row), n_per_row, workers, nthread);
+    };
 
     if (nthread < 2) {
         if (tensor->type == GGML_TYPE_F16) {
@@ -323,6 +475,7 @@ static void llama_tensor_dequantize_impl(
         } else {
             GGML_ABORT("fatal error"); // unreachable
         }
+        apply_quant_wht_inverse();
         return;
     }
 
@@ -349,7 +502,7 @@ static void llama_tensor_dequantize_impl(
         size_t thr_elems = thr_blocks * block_size; // number of elements for this thread
         size_t thr_block_bytes = thr_blocks * block_size_bytes; // number of input bytes for this thread
 
-        auto compute = [qtype] (ggml_type typ, uint8_t * inbuf, float * outbuf, int nels) {
+        auto compute = [qtype] (ggml_type typ, uint8_t * inbuf, float * outbuf, int64_t nels) {
             if (typ == GGML_TYPE_F16) {
                 ggml_fp16_to_fp32_row((ggml_fp16_t *)inbuf, outbuf, nels);
             } else if (typ == GGML_TYPE_BF16) {
@@ -358,12 +511,13 @@ static void llama_tensor_dequantize_impl(
                 qtype->to_float(inbuf, outbuf, nels);
             }
         };
-        workers.emplace_back(compute, tensor->type, (uint8_t *) tensor->data + in_buff_offs, f32_output + out_buff_offs, thr_elems);
+        workers.emplace_back(compute, tensor->type, (uint8_t *) tensor->data + in_buff_offs, f32_output + out_buff_offs, (int64_t) thr_elems);
         in_buff_offs += thr_block_bytes;
         out_buff_offs += thr_elems;
     }
     for (auto & w : workers) { w.join(); }
     workers.clear();
+    apply_quant_wht_inverse();
 }
 
 //
@@ -1071,6 +1225,7 @@ static size_t llama_tensor_quantize_wht_imatrix_impl(
     const size_t qsize = ggml_row_size(type, LLAMA_QUANT_WHT_DIM);
     const int64_t blck_size = ggml_blck_size(type);
     const size_t type_size = ggml_type_size(type);
+    const bool requires_imatrix = ggml_quantize_requires_imatrix(type);
 
     bool valid = true;
     std::mutex mutex;
@@ -1101,7 +1256,7 @@ static size_t llama_tensor_quantize_wht_imatrix_impl(
                 const float * block_imatrix = imatrix + col;
                 char * block_dst = row_dst + (col / blck_size) * type_size;
 
-                if (!llama_quant_wht_quantize_candidate_256(type, block_rotated, nullptr, best.data(), qsize)) {
+                if (!llama_quant_wht_quantize_candidate_256(type, block_rotated, requires_imatrix ? block_imatrix : nullptr, best.data(), qsize)) {
                     std::unique_lock<std::mutex> lock(mutex);
                     valid = false;
                     return;
@@ -1110,16 +1265,18 @@ static size_t llama_tensor_quantize_wht_imatrix_impl(
                         type, block_rotated, best.data(), block_imatrix, dequant.data(), residual.data());
 
                 if (type != GGML_TYPE_Q8_0) {
-                    if (!llama_quant_wht_quantize_candidate_256(type, block_rotated, block_imatrix, trial.data(), qsize)) {
-                        std::unique_lock<std::mutex> lock(mutex);
-                        valid = false;
-                        return;
-                    }
-                    float loss = llama_quant_wht_exact_weighted_loss_256(
-                            type, block_rotated, trial.data(), block_imatrix, dequant.data(), residual.data());
-                    if (loss < best_loss) {
-                        best_loss = loss;
-                        std::swap(best, trial);
+                    if (!requires_imatrix) {
+                        if (!llama_quant_wht_quantize_candidate_256(type, block_rotated, block_imatrix, trial.data(), qsize)) {
+                            std::unique_lock<std::mutex> lock(mutex);
+                            valid = false;
+                            return;
+                        }
+                        float loss = llama_quant_wht_exact_weighted_loss_256(
+                                type, block_rotated, trial.data(), block_imatrix, dequant.data(), residual.data());
+                        if (loss < best_loss) {
+                            best_loss = loss;
+                            std::swap(best, trial);
+                        }
                     }
 
                     llama_quant_wht_make_transformed_weights_256(block_imatrix, proposal.data());
@@ -1128,7 +1285,7 @@ static size_t llama_tensor_quantize_wht_imatrix_impl(
                         valid = false;
                         return;
                     }
-                    loss = llama_quant_wht_exact_weighted_loss_256(
+                    float loss = llama_quant_wht_exact_weighted_loss_256(
                             type, block_rotated, trial.data(), block_imatrix, dequant.data(), residual.data());
                     if (loss < best_loss) {
                         best_loss = loss;
@@ -1309,7 +1466,10 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
     if (params->only_copy) {
         ftype = ml.ftype;
     }
-    if (params->quant_wht && params->quant_wht_dim != LLAMA_QUANT_WHT_DIM) {
+    const bool quant_wht_enabled = params->quant_wht || params->quant_wht_full || params->quant_wht_skip_types != nullptr;
+    const std::string quant_wht_skip_types =
+        quant_wht_enabled && !params->quant_wht_full ? llama_quant_wht_normalize_skip_types(params->quant_wht_skip_types) : "";
+    if (quant_wht_enabled && params->quant_wht_dim != LLAMA_QUANT_WHT_DIM) {
         throw std::runtime_error(format("quant_wht_dim %u is unsupported; only %d is supported", params->quant_wht_dim, LLAMA_QUANT_WHT_DIM));
     }
     std::unordered_map<std::string, std::vector<float>> i_data;
@@ -1349,16 +1509,25 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
     gguf_set_val_u32(ctx_out.get(), "general.quantization_version", GGML_QNT_VERSION); // TODO: use LLM_KV
     gguf_set_val_u32(ctx_out.get(), "general.file_type", ftype); // TODO: use LLM_KV
     if (!params->only_copy) {
-        gguf_set_val_bool(ctx_out.get(), "general.quant_wht.enabled", params->quant_wht);
-        if (params->quant_wht) {
+        gguf_set_val_bool(ctx_out.get(), "general.quant_wht.enabled", quant_wht_enabled);
+        if (quant_wht_enabled) {
             gguf_set_val_u32(ctx_out.get(), "general.quant_wht.dim", LLAMA_QUANT_WHT_DIM);
             gguf_set_val_str(ctx_out.get(), "general.quant_wht.scheme", LLAMA_QUANT_WHT_SCHEME);
             gguf_set_val_u32(ctx_out.get(), "general.quant_wht.version", LLAMA_QUANT_WHT_VERSION);
-            LLAMA_LOG_WARN("%s: WARNING: writing experimental WHT-rotated Q_K GGUF; incompatible with builds that do not support general.quant_wht\n", __func__);
+            gguf_remove_key(ctx_out.get(), "general.quant_wht.mode");
+            if (quant_wht_skip_types.empty()) {
+                gguf_remove_key(ctx_out.get(), "general.quant_wht.skip_types");
+            } else {
+                gguf_set_val_str(ctx_out.get(), "general.quant_wht.skip_types", quant_wht_skip_types.c_str());
+            }
+            LLAMA_LOG_WARN("%s: WARNING: writing experimental WHT-rotated Q_K/Q8_0/IQ GGUF (skip_types=%s); incompatible with builds that do not support general.quant_wht\n",
+                    __func__, quant_wht_skip_types.empty() ? "<none>" : quant_wht_skip_types.c_str());
         } else {
             gguf_remove_key(ctx_out.get(), "general.quant_wht.dim");
             gguf_remove_key(ctx_out.get(), "general.quant_wht.scheme");
             gguf_remove_key(ctx_out.get(), "general.quant_wht.version");
+            gguf_remove_key(ctx_out.get(), "general.quant_wht.mode");
+            gguf_remove_key(ctx_out.get(), "general.quant_wht.skip_types");
         }
     }
 
@@ -1441,6 +1610,7 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
     // flag for --dry-run
     bool will_require_imatrix = false;
     int quant_wht_n_tensors = 0;
+    int quant_wht_n_skipped_tensors = 0;
 
     //
     // preliminary iteration over all weights
@@ -1464,16 +1634,19 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
             metadata[i].target_type = tensor->type;
         }
         metadata[i].quant_wht_rotate = false;
-        if (params->quant_wht &&
+        if (quant_wht_enabled &&
                 metadata[i].allows_quantization &&
                 llama_quant_wht_type_supported(metadata[i].target_type) &&
                 llama_quant_wht_name_supported(metadata[i].name, metadata[i].category)) {
-            if (tensor->ne[0] % LLAMA_QUANT_WHT_DIM != 0) {
+            if (!llama_quant_wht_type_enabled(metadata[i].target_type, quant_wht_skip_types)) {
+                ++quant_wht_n_skipped_tensors;
+            } else if (tensor->ne[0] % LLAMA_QUANT_WHT_DIM != 0) {
                 throw std::runtime_error(format("cannot use --quant-wht for tensor %s: reduction dimension %" PRId64 " is not divisible by %d",
                             metadata[i].name.c_str(), tensor->ne[0], LLAMA_QUANT_WHT_DIM));
+            } else {
+                metadata[i].quant_wht_rotate = true;
+                ++quant_wht_n_tensors;
             }
-            metadata[i].quant_wht_rotate = true;
-            ++quant_wht_n_tensors;
         }
 
         metadata[i].requires_imatrix = tensor_requires_imatrix(tensor->name, metadata[i].target_type, ftype);
@@ -1495,9 +1668,13 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
         }
     }
 
-    if (params->quant_wht) {
-        LLAMA_LOG_WARN("%s: WARNING: --quant-wht enabled, rotating %d eligible Q_K/Q8_0 tensor(s) with %dD %s\n",
+    if (quant_wht_enabled) {
+        LLAMA_LOG_WARN("%s: WARNING: --quant-wht enabled, rotating %d eligible Q_K/Q8_0/IQ tensor(s) with %dD %s",
                 __func__, quant_wht_n_tensors, LLAMA_QUANT_WHT_DIM, LLAMA_QUANT_WHT_SCHEME);
+        if (!quant_wht_skip_types.empty()) {
+            LLAMA_LOG_WARN(", skipped %d tensor(s) via skip_types=%s", quant_wht_n_skipped_tensors, quant_wht_skip_types.c_str());
+        }
+        LLAMA_LOG_WARN("\n");
     }
 
     // Set split info if needed
@@ -1702,7 +1879,7 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
                     if (tm.quant_wht_rotate && imatrix_03 && new_type != GGML_TYPE_Q8_0) {
                         static std::once_flag once;
                         std::call_once(once, [] {
-                            LLAMA_LOG_WARN("%s: WARNING: --quant-wht with --imatrix uses experimental exact original-domain scoring over rotated Q_K candidates\n", __func__);
+                            LLAMA_LOG_WARN("%s: WARNING: --quant-wht with --imatrix uses experimental exact original-domain scoring over rotated quantization candidates\n", __func__);
                         });
                         new_size += llama_tensor_quantize_wht_imatrix_impl(new_type, quant_data_03, new_data_03, nrows, n_per_row, imatrix_03, workers, nthread_use);
                     } else {
@@ -1761,6 +1938,8 @@ llama_model_quantize_params llama_model_quantize_default_params() {
         /*.keep_split                  =*/ false,
         /*.dry_run                     =*/ false,
         /*.quant_wht                   =*/ false,
+        /*.quant_wht_full              =*/ false,
+        /*.quant_wht_skip_types        =*/ nullptr,
         /*.quant_wht_dim               =*/ 256,
         /*.imatrix                     =*/ nullptr,
         /*.kv_overrides                =*/ nullptr,

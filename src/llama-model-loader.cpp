@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cinttypes>
 #include <cstdint>
 #include <cstdlib>
@@ -1061,7 +1062,82 @@ static bool llama_model_quant_wht_type_supported(ggml_type type) {
            type == GGML_TYPE_Q4_K ||
            type == GGML_TYPE_Q5_K ||
            type == GGML_TYPE_Q6_K ||
-           type == GGML_TYPE_Q8_0;
+           type == GGML_TYPE_Q8_0 ||
+           type == GGML_TYPE_IQ1_S ||
+           type == GGML_TYPE_IQ1_M ||
+           type == GGML_TYPE_IQ2_XXS ||
+           type == GGML_TYPE_IQ2_XS ||
+           type == GGML_TYPE_IQ2_S ||
+           type == GGML_TYPE_IQ3_XXS ||
+           type == GGML_TYPE_IQ3_S ||
+           type == GGML_TYPE_IQ4_NL ||
+           type == GGML_TYPE_IQ4_XS;
+}
+
+static const char * llama_model_quant_wht_type_name(ggml_type type) {
+    switch (type) {
+        case GGML_TYPE_Q2_K:    return "Q2_K";
+        case GGML_TYPE_Q3_K:    return "Q3_K";
+        case GGML_TYPE_Q4_K:    return "Q4_K";
+        case GGML_TYPE_Q5_K:    return "Q5_K";
+        case GGML_TYPE_Q6_K:    return "Q6_K";
+        case GGML_TYPE_Q8_0:    return "Q8_0";
+        case GGML_TYPE_IQ1_S:   return "IQ1_S";
+        case GGML_TYPE_IQ1_M:   return "IQ1_M";
+        case GGML_TYPE_IQ2_XXS: return "IQ2_XXS";
+        case GGML_TYPE_IQ2_XS:  return "IQ2_XS";
+        case GGML_TYPE_IQ2_S:   return "IQ2_S";
+        case GGML_TYPE_IQ3_XXS: return "IQ3_XXS";
+        case GGML_TYPE_IQ3_S:   return "IQ3_S";
+        case GGML_TYPE_IQ4_NL:  return "IQ4_NL";
+        case GGML_TYPE_IQ4_XS:  return "IQ4_XS";
+        default:                return nullptr;
+    }
+}
+
+static std::string llama_model_quant_wht_normalize_type_token(std::string token) {
+    token.erase(std::remove_if(token.begin(), token.end(), [](unsigned char c) { return std::isspace(c) != 0; }), token.end());
+    std::transform(token.begin(), token.end(), token.begin(), [](unsigned char c) { return (char) std::toupper(c); });
+    return token;
+}
+
+static ggml_type llama_model_quant_wht_parse_type_token(const std::string & token) {
+    const std::string name = llama_model_quant_wht_normalize_type_token(token);
+    for (int i = 0; i < GGML_TYPE_COUNT; ++i) {
+        const ggml_type type = (ggml_type) i;
+        const char * type_name = llama_model_quant_wht_type_name(type);
+        if (type_name != nullptr && name == type_name) {
+            return type;
+        }
+    }
+    return GGML_TYPE_COUNT;
+}
+
+static bool llama_model_quant_wht_skip_list_has(const std::string & skip_types, ggml_type type) {
+    size_t start = 0;
+    while (start <= skip_types.size()) {
+        const size_t end = skip_types.find(',', start);
+        const std::string token = skip_types.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        if (!llama_model_quant_wht_normalize_type_token(token).empty()) {
+            const ggml_type parsed = llama_model_quant_wht_parse_type_token(token);
+            if (parsed == GGML_TYPE_COUNT || !llama_model_quant_wht_type_supported(parsed)) {
+                throw std::runtime_error(format("unsupported general.quant_wht.skip_types entry: %s", token.c_str()));
+            }
+            if (parsed == type) {
+                return true;
+            }
+        }
+        if (end == std::string::npos) {
+            break;
+        }
+        start = end + 1;
+    }
+    return false;
+}
+
+static bool llama_model_quant_wht_type_enabled(ggml_type type, const std::string & skip_types) {
+    return llama_model_quant_wht_type_supported(type) &&
+           !llama_model_quant_wht_skip_list_has(skip_types, type);
 }
 
 static bool llama_model_quant_wht_backend_supported(ggml_backend_dev_t dev) {
@@ -1174,12 +1250,12 @@ struct ggml_tensor * llama_model_loader::create_tensor(
         const bool quant_wht_tensor =
             hparams.quant_wht_enabled &&
             (op == GGML_OP_MUL_MAT || op == GGML_OP_MUL_MAT_ID) &&
-            llama_model_quant_wht_type_supported(t_meta->type) &&
+            llama_model_quant_wht_type_enabled(t_meta->type, hparams.quant_wht_skip_types) &&
             llama_model_quant_wht_name_supported(tn);
 
         if (hparams.quant_wht_enabled &&
                 (op == GGML_OP_MUL_MAT || op == GGML_OP_MUL_MAT_ID) &&
-                llama_model_quant_wht_type_supported(t_meta->type) &&
+                llama_model_quant_wht_type_enabled(t_meta->type, hparams.quant_wht_skip_types) &&
                 llama_model_quant_wht_name_supported(tn) &&
                 t_meta->ne[0] % 256 != 0) {
             throw std::runtime_error(format("general.quant_wht tensor %s has unsupported reduction dimension %" PRId64,
@@ -1191,8 +1267,9 @@ struct ggml_tensor * llama_model_loader::create_tensor(
             if (getenv("GGML_CUDA_LOG_QUANT_WHT") != nullptr) {
                 static int n_logged = 0;
                 if (n_logged < 8) {
-                    LLAMA_LOG_INFO("%s: quant_wht tensor flagged: %s type=%s dim=%" PRId64 "\n",
-                            __func__, tn.str().c_str(), ggml_type_name(t_meta->type), t_meta->ne[0]);
+                    LLAMA_LOG_INFO("%s: quant_wht tensor flagged: %s type=%s dim=%" PRId64 " skip_types=%s\n",
+                            __func__, tn.str().c_str(), ggml_type_name(t_meta->type), t_meta->ne[0],
+                            hparams.quant_wht_skip_types[0] == '\0' ? "<none>" : hparams.quant_wht_skip_types);
                     ++n_logged;
                 }
             }

@@ -132,7 +132,8 @@ static bool try_parse_ftype(const std::string & ftype_str_in, llama_ftype & ftyp
 static void usage(const char * executable) {
     printf("usage: %s [--help] [--allow-requantize] [--leave-output-tensor] [--pure] [--imatrix] [--include-weights]\n", executable);
     printf("       [--exclude-weights] [--output-tensor-type] [--token-embedding-type] [--tensor-type] [--tensor-type-file]\n");
-    printf("       [--prune-layers] [--keep-split] [--override-kv] [--dry-run] [--quant-wht] [--quant-wht-dim]\n");
+    printf("       [--prune-layers] [--keep-split] [--override-kv] [--dry-run] [--quant-wht] [--quant-wht-full]\n");
+    printf("       [--quant-wht-skip-type] [--quant-wht-dim]\n");
     printf("       model-f32.gguf [model-quant.gguf] type [nthreads]\n\n");
     printf("  --allow-requantize\n");
     printf("                                      allow requantizing tensors that have already been quantized\n");
@@ -173,7 +174,12 @@ static void usage(const char * executable) {
     printf("                                      calculate and show the final quantization size without performing quantization\n");
     printf("                                      example: llama-quantize --dry-run model-f32.gguf Q4_K\n\n");
     printf("  --quant-wht\n");
-    printf("                                      store eligible Q_K tensors in the WHT-rotated domain\n");
+    printf("                                      store eligible Q_K/Q8_0/IQ tensors in the WHT-rotated domain;\n");
+    printf("                                      by default skips Q3_K, IQ2_XXS, IQ2_XS, IQ2_S, IQ3_XXS and IQ3_S tensor types\n");
+    printf("  --quant-wht-full\n");
+    printf("                                      store all eligible Q_K/Q8_0/IQ tensors in the WHT-rotated domain\n");
+    printf("  --quant-wht-skip-type T0,T1,...\n");
+    printf("                                      comma-separated GGML tensor types to leave unrotated with --quant-wht\n");
     printf("  --quant-wht-dim N\n");
     printf("                                      WHT dimension for --quant-wht, currently only 256 is supported\n");
     printf("note: --include-weights and --exclude-weights cannot be used together\n\n");
@@ -507,6 +513,8 @@ int main(int argc, char ** argv) {
     }
 
     llama_model_quantize_params params = llama_model_quantize_default_params();
+    bool quant_wht_full_seen = false;
+    bool quant_wht_skip_type_seen = false;
 
     int arg_idx = 1;
     std::string imatrix_file;
@@ -556,6 +564,18 @@ int main(int argc, char ** argv) {
             params.dry_run = true;
         } else if (strcmp(argv[arg_idx], "--quant-wht") == 0) {
             params.quant_wht = true;
+        } else if (strcmp(argv[arg_idx], "--quant-wht-full") == 0) {
+            params.quant_wht = true;
+            params.quant_wht_full = true;
+            quant_wht_full_seen = true;
+        } else if (strcmp(argv[arg_idx], "--quant-wht-skip-type") == 0) {
+            if (arg_idx < argc-1) {
+                params.quant_wht = true;
+                params.quant_wht_skip_types = argv[++arg_idx];
+                quant_wht_skip_type_seen = true;
+            } else {
+                usage(argv[0]);
+            }
         } else if (strcmp(argv[arg_idx], "--quant-wht-dim") == 0) {
             if (arg_idx < argc-1) {
                 try {
@@ -601,6 +621,10 @@ int main(int argc, char ** argv) {
     }
     if (!included_weights.empty() && !excluded_weights.empty()) {
         usage(argv[0]);
+    }
+    if (quant_wht_full_seen && quant_wht_skip_type_seen) {
+        fprintf(stderr, "%s: --quant-wht-full and --quant-wht-skip-type are mutually exclusive\n", argv[0]);
+        return 1;
     }
     if (params.quant_wht && params.quant_wht_dim != 256) {
         fprintf(stderr, "%s: --quant-wht-dim currently supports only 256\n", argv[0]);

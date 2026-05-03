@@ -411,7 +411,9 @@ extern "C" {
         bool pure;                                                  // quantize all tensors to the default type
         bool keep_split;                                            // quantize to the same number of shards
         bool dry_run;                                               // calculate and show the final quantization size without performing quantization
-        bool quant_wht;                                             // store eligible Q_K tensors in WHT-rotated domain
+        bool quant_wht;                                             // store eligible Q_K/Q8_0/IQ tensors in WHT-rotated domain
+        bool quant_wht_full;                                        // rotate every eligible tensor instead of using the skip list
+        const char * quant_wht_skip_types;                          // comma-separated GGML tensor types to leave unrotated when quant_wht_full is false
         uint32_t quant_wht_dim;                                      // WHT dimension, currently only 256 is supported
         const struct llama_model_imatrix_data * imatrix;            // pointer to importance matrix data
         const struct llama_model_kv_override * kv_overrides;        // pointer to kv overrides
