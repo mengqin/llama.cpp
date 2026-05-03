@@ -947,7 +947,9 @@ json oaicompat_chat_params_parse(
         json response_format      = json_value(body, "response_format", json::object());
         std::string response_type = json_value(response_format, "type", std::string());
         if (response_type == "json_object") {
-            json_schema = json_value(response_format, "schema", json::object());
+            if (response_format.contains("schema") || json_schema.empty()) {
+                json_schema = json_value(response_format, "schema", json::object());
+            }
         } else if (response_type == "json_schema") {
             auto schema_wrapper = json_value(response_format, "json_schema", json::object());
             json_schema = json_value(schema_wrapper, "schema", json::object());
@@ -1027,6 +1029,8 @@ json oaicompat_chat_params_parse(
         }
     }
 
+    auto caps = common_chat_templates_get_caps(opt.tmpls.get());
+
     common_chat_templates_inputs inputs;
     inputs.messages              = common_chat_msgs_parse_oaicompat(messages);
     inputs.tools                 = common_chat_tools_parse_oaicompat(tools);
@@ -1034,7 +1038,7 @@ json oaicompat_chat_params_parse(
     inputs.json_schema           = json_schema.is_null() ? "" : json_schema.dump();
     inputs.grammar               = grammar;
     inputs.use_jinja             = opt.use_jinja;
-    inputs.parallel_tool_calls   = json_value(body, "parallel_tool_calls", false);
+    inputs.parallel_tool_calls   = json_value(body, "parallel_tool_calls", caps["supports_parallel_tool_calls"]);
     inputs.add_generation_prompt = json_value(body, "add_generation_prompt", true);
     inputs.reasoning_format      = opt.reasoning_format;
     if (body.contains("reasoning_format")) {
