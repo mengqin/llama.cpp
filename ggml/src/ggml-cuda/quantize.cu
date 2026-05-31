@@ -255,11 +255,69 @@ __device__ __forceinline__ uint8_t compute_e8m0_scale(float amax) {
     return static_cast<uint8_t>(biased);
 }
 
+static __device__ __forceinline__ void quantize_nvfp4_subblock_16_from_scale_code(
+        const float * vals, const uint8_t scale_code, uint32_t & q0, uint32_t & q1) {
+    const float scale = ggml_cuda_ue4m3_to_fp32(scale_code);
+    const float inv_scale = scale > 0.0f ? 0.5f / scale : 0.0f;
+    q0 = 0;
+    q1 = 0;
+
+#pragma unroll
+    for (int k = 0; k < QK_NVFP4_SUB / 4; ++k) {
+        q0 |= (uint32_t) ggml_cuda_float_to_fp4_e2m1(vals[k +  0], inv_scale) << (8 * k);
+        q0 |= (uint32_t) ggml_cuda_float_to_fp4_e2m1(vals[k +  8], inv_scale) << (8 * k + 4);
+        q1 |= (uint32_t) ggml_cuda_float_to_fp4_e2m1(vals[k +  4], inv_scale) << (8 * k);
+        q1 |= (uint32_t) ggml_cuda_float_to_fp4_e2m1(vals[k + 12], inv_scale) << (8 * k + 4);
+    }
+}
+
+static __device__ __forceinline__ float nvfp4_subblock_16_mse_from_scale_code(
+        const float * vals, const uint8_t scale_code) {
+    const float scale = ggml_cuda_ue4m3_to_fp32(scale_code);
+    const float inv_scale = scale > 0.0f ? 0.5f / scale : 0.0f;
+    float mse = 0.0f;
+
+#pragma unroll
+    for (int k = 0; k < QK_NVFP4_SUB; ++k) {
+        const uint8_t q = ggml_cuda_float_to_fp4_e2m1(vals[k], inv_scale);
+        const float err_diff = fabsf(vals[k]) - fabsf(kvalues_mxfp4[q & 0x7]) * scale;
+        mse = fmaf(err_diff, err_diff, mse);
+    }
+
+    return mse;
+}
+
+static __device__ __forceinline__ void nvfp4_add_unique_scale_code(
+        int * codes, int & n_codes, const int n_max_codes, const int code) {
+    if (code < 0 || code > 0x7e || n_codes >= n_max_codes) {
+        return;
+    }
+
+#pragma unroll
+    for (int i = 0; i < 5; ++i) {
+        if (i >= n_codes) {
+            break;
+        }
+        if (codes[i] == code) {
+            return;
+        }
+    }
+
+    codes[n_codes] = code;
+    n_codes++;
+}
+
+static bool ggml_cuda_nvfp4_activity_adaptive_enabled() {
+    static const char * env = getenv("GGML_CUDA_NVFP4_ACTIVITY_ADAPTIVE");
+    static const bool enabled = env != nullptr && strcmp(env, "0") != 0;
+    return enabled;
+}
+
 
 static __global__ void quantize_mmq_nvfp4(
         const float * __restrict__ x, const int32_t * __restrict__ ids, void * __restrict__ vy,
         const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
-        const int64_t ne0, const int64_t ne1, const int64_t ne2) {
+        const int64_t ne0, const int64_t ne1, const int64_t ne2, const bool activity_adaptive) {
 #if defined(BLACKWELL_MMA_AVAILABLE)
 
     const int64_t i0_base = ((int64_t) blockDim.x * blockIdx.y + threadIdx.x) * QK_NVFP4_SUB;
@@ -298,52 +356,58 @@ static __global__ void quantize_mmq_nvfp4(
         }
     }
 
-    static constexpr int test_offsets[5] = { 0, -1, 1, -2, 2};
-    const int first_fp8_code = (int) ggml_cuda_fp32_to_ue4m3(amax_raw / 6.0f);
-
     float best_err = FLT_MAX;
     uint8_t fp8_code = 0;
-    float subblock_scale = 0.0f;
+    uint32_t best_q0 = 0;
+    uint32_t best_q1 = 0;
 
-#pragma unroll // Check +/- 2 to find best code to reduce NVFP4 activation loss. Negligible overhead on Blackwell.
-    for (int i = 0; i < 5; i++) {
-        const int test_code = first_fp8_code + test_offsets[i];
-        if (test_code < 0 || test_code > 0x7e) {
-            continue;
-        }
-        const uint8_t code = (uint8_t) test_code;
-        const float test_scale = ggml_cuda_ue4m3_to_fp32(code);
-        const float test_inv_scale = test_scale > 0.0f ? 0.5f / test_scale : 0.0f;
-        float cur_err = 0.0f;
+    if (activity_adaptive) {
+        static constexpr int n_max_codes = 5;
+        int test_codes[n_max_codes];
+        int n_test_codes = 0;
+        const int code4 = (int) ggml_cuda_fp32_to_ue4m3(amax_raw / 4.0f);
+        const int code5 = (int) ggml_cuda_fp32_to_ue4m3(amax_raw / 5.0f);
+        const int code6 = (int) ggml_cuda_fp32_to_ue4m3(amax_raw / 6.0f);
+        nvfp4_add_unique_scale_code(test_codes, n_test_codes, n_max_codes, code4);
+        nvfp4_add_unique_scale_code(test_codes, n_test_codes, n_max_codes, code5);
+        nvfp4_add_unique_scale_code(test_codes, n_test_codes, n_max_codes, code6);
+        nvfp4_add_unique_scale_code(test_codes, n_test_codes, n_max_codes, code6 - 1);
+        nvfp4_add_unique_scale_code(test_codes, n_test_codes, n_max_codes, code6 + 1);
 #pragma unroll
-        for (int k = 0; k < QK_NVFP4_SUB; ++k) {
-            const float v = vals_raw[k];
-            const uint8_t q = ggml_cuda_float_to_fp4_e2m1(v, test_inv_scale);
-            const float err_diff = fabsf(v) - fabsf(kvalues_mxfp4[q & 0x7]) * test_scale;
-            cur_err = fmaf(err_diff, err_diff, cur_err);
+        for (int i = 0; i < n_max_codes; i++) {
+            if (i >= n_test_codes) {
+                break;
+            }
+            const uint8_t code = (uint8_t) test_codes[i];
+            const float cur_err = nvfp4_subblock_16_mse_from_scale_code(vals_raw, code);
+            if (cur_err < best_err) {
+                best_err = cur_err;
+                fp8_code = code;
+            }
         }
-
-        if (cur_err < best_err) {
-            best_err = cur_err;
-            fp8_code = test_code;
-            subblock_scale = test_scale;
+    } else {
+        static constexpr int test_offsets[5] = { 0, -1, 1, -2, 2 };
+        const int first_fp8_code = (int) ggml_cuda_fp32_to_ue4m3(amax_raw / 6.0f);
+#pragma unroll
+        for (int i = 0; i < 5; i++) {
+            const int test_code = first_fp8_code + test_offsets[i];
+            if (test_code < 0 || test_code > 0x7e) {
+                continue;
+            }
+            const uint8_t code = (uint8_t) test_code;
+            const float cur_err = nvfp4_subblock_16_mse_from_scale_code(vals_raw, code);
+            if (cur_err < best_err) {
+                best_err = cur_err;
+                fp8_code = code;
+            }
         }
     }
 
-    const float inv_scale = subblock_scale > 0.0f ? 0.5f / subblock_scale : 0.0f;
-    uint32_t q0 = 0;
-    uint32_t q1 = 0;
-#pragma unroll // this is faster than the previous __nv_fp4x4_e2m1
-    for (int k = 0; k < QK_NVFP4_SUB / 4; ++k) {
-        q0 |= (uint32_t) ggml_cuda_float_to_fp4_e2m1(vals_raw[k +  0], inv_scale) << (8 * k);
-        q0 |= (uint32_t) ggml_cuda_float_to_fp4_e2m1(vals_raw[k +  8], inv_scale) << (8 * k + 4);
-        q1 |= (uint32_t) ggml_cuda_float_to_fp4_e2m1(vals_raw[k +  4], inv_scale) << (8 * k);
-        q1 |= (uint32_t) ggml_cuda_float_to_fp4_e2m1(vals_raw[k + 12], inv_scale) << (8 * k + 4);
-    }
+    quantize_nvfp4_subblock_16_from_scale_code(vals_raw, fp8_code, best_q0, best_q1);
 
     uint32_t * yqs = reinterpret_cast<uint32_t *>(yb->qs);
-    yqs[2 * sub + 0] = q0;
-    yqs[2 * sub + 1] = q1;
+    yqs[2 * sub + 0] = best_q0;
+    yqs[2 * sub + 1] = best_q1;
     reinterpret_cast<uint8_t *>(yb->d4)[sub] = fp8_code;
 #else
     NO_DEVICE_CODE; // This is for Blackwell NVFP4 activations only.
@@ -829,7 +893,7 @@ void quantize_mmq_fp4_cuda(
         const dim3 block_size(nvfp4_block_size, 1, 1);
         const dim3 num_blocks(ne1, block_num_y, ne2 * ne3);
         quantize_mmq_nvfp4<<<num_blocks, block_size, 0, stream>>>(
-            x, ids, vy, ne00, s01, s02, s03, ne0, ne1, ne2);
+            x, ids, vy, ne00, s01, s02, s03, ne0, ne1, ne2, ggml_cuda_nvfp4_activity_adaptive_enabled());
     } else {
         GGML_ASSERT(ne0 % (2 * QK_MXFP4) == 0);
 

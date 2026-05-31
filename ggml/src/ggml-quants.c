@@ -5,6 +5,7 @@
 #include "ggml-impl.h"
 #include "ggml-cpu/ggml-cpu-impl.h"
 #include "ggml-cpu.h"
+#include "ggml-threading.h"
 
 #include <math.h>
 #include <string.h>
@@ -12,6 +13,9 @@
 #include <float.h>
 #include <stdlib.h> // for qsort
 #include <stdio.h>  // for GGML_ASSERT
+#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
 
 #ifdef GGML_USE_OPENMP
 #include <omp.h>
@@ -23,7 +27,120 @@
 #define GROUP_MAX_EPS_IQ1_M 1e-7f
 #define GROUP_MAX_EPS_IQ1_S 1e-12f
 
+#define GGML_NVFP4_IMATRIX_ORDINARY_MSE_GUARD_DEFAULT 16.0f
+
 #define UNUSED GGML_UNUSED
+
+enum ggml_nvfp4_imatrix_select_mode ggml_nvfp4_get_imatrix_select_mode(void) {
+    static int initialized = 0;
+    static enum ggml_nvfp4_imatrix_select_mode mode = GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE;
+
+    if (!initialized) {
+        const char * env = getenv("GGML_NVFP4_IMATRIX_SELECT_MODE");
+        if (env == NULL || env[0] == '\0' || strcmp(env, "two_objective") == 0) {
+            mode = GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE;
+        } else if (strcmp(env, "ordinary") == 0) {
+            mode = GGML_NVFP4_IMATRIX_SELECT_ORDINARY;
+        } else if (strcmp(env, "weighted_guard") == 0) {
+            mode = GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD;
+        } else if (strcmp(env, "weighted_raw") == 0) {
+            mode = GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_RAW;
+        } else {
+            fprintf(stderr,
+                    "ggml_nvfp4_imatrix_select_mode: warning: invalid GGML_NVFP4_IMATRIX_SELECT_MODE='%s', using two_objective\n",
+                    env);
+            mode = GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE;
+        }
+        initialized = 1;
+    }
+
+    return mode;
+}
+
+const char * ggml_nvfp4_imatrix_select_mode_name(enum ggml_nvfp4_imatrix_select_mode mode) {
+    switch (mode) {
+        case GGML_NVFP4_IMATRIX_SELECT_ORDINARY:       return "ordinary";
+        case GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD: return "weighted_guard";
+        case GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_RAW:   return "weighted_raw";
+        case GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE:
+        default:                                       return "two_objective";
+    }
+}
+
+const char * ggml_nvfp4_imatrix_select_criterion(void) {
+    switch (ggml_nvfp4_get_imatrix_select_mode()) {
+        case GGML_NVFP4_IMATRIX_SELECT_ORDINARY:       return "imatrix_ordinary_mse";
+        case GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD: return "imatrix_weighted_guard";
+        case GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_RAW:   return "imatrix_weighted_raw";
+        case GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE:
+        default:                                       return "imatrix_two_objective_log_square";
+    }
+}
+
+float ggml_nvfp4_imatrix_ordinary_mse_guard(void) {
+    static int initialized = 0;
+    static float guard = GGML_NVFP4_IMATRIX_ORDINARY_MSE_GUARD_DEFAULT;
+
+    if (!initialized) {
+        const char * env = getenv("GGML_NVFP4_IMATRIX_ORDINARY_MSE_GUARD");
+        if (env != NULL && env[0] != '\0') {
+            char * end = NULL;
+            const float parsed = strtof(env, &end);
+            if (end != env && isfinite(parsed) && parsed > 0.0f) {
+                guard = parsed;
+            } else {
+                fprintf(stderr,
+                        "ggml_nvfp4_imatrix_ordinary_mse_guard: warning: invalid GGML_NVFP4_IMATRIX_ORDINARY_MSE_GUARD='%s', using %.6g\n",
+                        env, (double) GGML_NVFP4_IMATRIX_ORDINARY_MSE_GUARD_DEFAULT);
+                guard = GGML_NVFP4_IMATRIX_ORDINARY_MSE_GUARD_DEFAULT;
+            }
+        }
+        initialized = 1;
+    }
+
+    return guard;
+}
+
+static bool ggml_nvfp4_imatrix_select_debug_enabled(void) {
+    static int enabled = -1;
+    if (enabled < 0) {
+        const char * env = getenv("GGML_NVFP4_IMATRIX_SELECT_DEBUG");
+        enabled = env != NULL && env[0] != '\0' && strcmp(env, "0") != 0;
+    }
+    return enabled != 0;
+}
+
+static int64_t ggml_nvfp4_imatrix_select_debug_limit(void) {
+    static int64_t limit = -1;
+    if (limit < 0) {
+        limit = 32;
+        const char * env = getenv("GGML_NVFP4_IMATRIX_SELECT_DEBUG_LIMIT");
+        if (env != NULL && env[0] != '\0') {
+            char * end = NULL;
+            const long parsed = strtol(env, &end, 10);
+            if (end != env && parsed > 0) {
+                limit = parsed;
+            }
+        }
+    }
+    return limit;
+}
+
+static double ggml_nvfp4_imatrix_select_debug_min_ro(void) {
+    static double min_ro = -1.0;
+    if (min_ro < 0.0) {
+        min_ro = 0.0;
+        const char * env = getenv("GGML_NVFP4_IMATRIX_SELECT_DEBUG_MIN_RO");
+        if (env != NULL && env[0] != '\0') {
+            char * end = NULL;
+            const double parsed = strtod(env, &end);
+            if (end != env && isfinite(parsed) && parsed >= 0.0) {
+                min_ro = parsed;
+            }
+        }
+    }
+    return min_ro;
+}
 
 static inline int best_index_int8(int n, const int8_t * val, float x) {
     if (x <= val[0]) return 0;
@@ -309,6 +426,267 @@ static inline int best_index_mxfp4(float x, float e) {
     return best_index;
 }
 
+static enum ggml_nvfp4_scale_mode g_nvfp4_scale_mode = GGML_NVFP4_SCALE_MODE_M6;
+static ggml_nvfp4_scale_stats g_nvfp4_scale_stats;
+static const char * g_nvfp4_debug_tensor_name = NULL;
+static const float * g_nvfp4_debug_data = NULL;
+static int64_t g_nvfp4_debug_n_per_row = 0;
+static int64_t g_nvfp4_debug_printed = 0;
+
+static void ggml_nvfp4_scale_lock(void) {
+    ggml_critical_section_start();
+}
+
+static void ggml_nvfp4_scale_unlock(void) {
+    ggml_critical_section_end();
+}
+
+void ggml_nvfp4_set_scale_mode(enum ggml_nvfp4_scale_mode mode) {
+    if (mode != GGML_NVFP4_SCALE_MODE_M4 && mode != GGML_NVFP4_SCALE_MODE_ADAPTIVE) {
+        mode = GGML_NVFP4_SCALE_MODE_M6;
+    }
+
+    ggml_nvfp4_scale_lock();
+    g_nvfp4_scale_mode = mode;
+    ggml_nvfp4_scale_unlock();
+}
+
+void ggml_nvfp4_reset_scale_stats(void) {
+    ggml_nvfp4_scale_lock();
+    memset(&g_nvfp4_scale_stats, 0, sizeof(g_nvfp4_scale_stats));
+    g_nvfp4_debug_printed = 0;
+    ggml_nvfp4_scale_unlock();
+}
+
+int ggml_nvfp4_get_scale_stats(ggml_nvfp4_scale_stats * stats) {
+    ggml_nvfp4_scale_lock();
+    *stats = g_nvfp4_scale_stats;
+    ggml_nvfp4_scale_unlock();
+    return stats->n_subblocks > 0;
+}
+
+static enum ggml_nvfp4_scale_mode ggml_nvfp4_scale_get_mode(void) {
+    ggml_nvfp4_scale_lock();
+    const enum ggml_nvfp4_scale_mode mode = g_nvfp4_scale_mode;
+    ggml_nvfp4_scale_unlock();
+    return mode;
+}
+
+static void ggml_nvfp4_scale_accum_stats(const ggml_nvfp4_scale_stats * add) {
+    if (add->n_subblocks == 0) {
+        return;
+    }
+
+    ggml_nvfp4_scale_lock();
+    g_nvfp4_scale_stats.n_subblocks           += add->n_subblocks;
+    g_nvfp4_scale_stats.n_weighted_subblocks  += add->n_weighted_subblocks;
+    g_nvfp4_scale_stats.n_ordinary_best_selected += add->n_ordinary_best_selected;
+    g_nvfp4_scale_stats.n_weighted_best_selected += add->n_weighted_best_selected;
+    g_nvfp4_scale_stats.n_knee_selected          += add->n_knee_selected;
+    g_nvfp4_scale_stats.n_weighted_guard_accepted += add->n_weighted_guard_accepted;
+    g_nvfp4_scale_stats.n_weighted_guard_fallback += add->n_weighted_guard_fallback;
+    g_nvfp4_scale_stats.n_m4                  += add->n_m4;
+    g_nvfp4_scale_stats.n_m5                  += add->n_m5;
+    g_nvfp4_scale_stats.n_m6                  += add->n_m6;
+    g_nvfp4_scale_stats.mse_m6                += add->mse_m6;
+    g_nvfp4_scale_stats.mse_selected          += add->mse_selected;
+    g_nvfp4_scale_stats.weighted_mse_m6       += add->weighted_mse_m6;
+    g_nvfp4_scale_stats.weighted_mse_selected += add->weighted_mse_selected;
+    ggml_nvfp4_scale_unlock();
+}
+
+const char * ggml_nvfp4_adaptive_candidates(void) {
+    return "4,5,6";
+}
+
+void ggml_nvfp4_set_debug_context(const char * tensor_name, const float * data, int64_t n_per_row) {
+    ggml_nvfp4_scale_lock();
+    g_nvfp4_debug_tensor_name = tensor_name;
+    g_nvfp4_debug_data = data;
+    g_nvfp4_debug_n_per_row = n_per_row;
+    ggml_nvfp4_scale_unlock();
+}
+
+static int64_t ggml_nvfp4_debug_row_offset(const float * data, int64_t n_per_row) {
+    if (!ggml_nvfp4_imatrix_select_debug_enabled()) {
+        return -1;
+    }
+
+    ggml_nvfp4_scale_lock();
+    const float * base = g_nvfp4_debug_data;
+    const int64_t base_n_per_row = g_nvfp4_debug_n_per_row;
+    ggml_nvfp4_scale_unlock();
+
+    if (base == NULL || base_n_per_row != n_per_row || data < base) {
+        return -1;
+    }
+
+    const ptrdiff_t delta = data - base;
+    if (delta % n_per_row != 0) {
+        return -1;
+    }
+
+    return delta / n_per_row;
+}
+
+typedef struct {
+    uint8_t scale;
+    uint8_t qs[QK_NVFP4_SUB/2];
+    float   mse;
+    double  weighted_mse;
+} ggml_nvfp4_candidate;
+
+static double ggml_nvfp4_two_objective_score(
+        const ggml_nvfp4_candidate * candidate,
+        const ggml_nvfp4_candidate * ordinary_best,
+        const ggml_nvfp4_candidate * weighted_best) {
+    static const double eps = 1e-30;
+
+    double ro = ((double) candidate->mse + eps) / ((double) ordinary_best->mse + eps);
+    double rw = (candidate->weighted_mse + eps) / (weighted_best->weighted_mse + eps);
+    ro = MAX(ro, 1.0);
+    rw = MAX(rw, 1.0);
+
+    const double lo = log(ro);
+    const double lw = log(rw);
+    return lo*lo + lw*lw;
+}
+
+static void ggml_nvfp4_debug_print_selection(
+        enum ggml_nvfp4_imatrix_select_mode select_mode, float guard,
+        int64_t row, int block, int sub, float sigma2,
+        const float * x, const float * raw_weights, const float * effective_weights,
+        const ggml_nvfp4_candidate * c4, const ggml_nvfp4_candidate * c5, const ggml_nvfp4_candidate * c6,
+        const ggml_nvfp4_candidate * ordinary_best, int ordinary_best_m,
+        const ggml_nvfp4_candidate * weighted_best, int weighted_best_m,
+        const ggml_nvfp4_candidate * selected, int selected_m) {
+    if (!ggml_nvfp4_imatrix_select_debug_enabled()) {
+        return;
+    }
+
+    const double weighted_best_ro = ((double) weighted_best->mse + 1e-30) / ((double) ordinary_best->mse + 1e-30);
+    if (weighted_best_ro < ggml_nvfp4_imatrix_select_debug_min_ro()) {
+        return;
+    }
+
+    float xmin = FLT_MAX;
+    float xmax = -FLT_MAX;
+    float amax = 0.0f;
+    float raw_w_min = FLT_MAX;
+    float raw_w_max = -FLT_MAX;
+    double raw_w_sum = 0.0;
+    float eff_w_min = FLT_MAX;
+    float eff_w_max = -FLT_MAX;
+    double eff_w_sum = 0.0;
+    for (int j = 0; j < QK_NVFP4_SUB; ++j) {
+        xmin = MIN(xmin, x[j]);
+        xmax = MAX(xmax, x[j]);
+        amax = MAX(amax, fabsf(x[j]));
+        if (raw_weights) {
+            raw_w_min = MIN(raw_w_min, raw_weights[j]);
+            raw_w_max = MAX(raw_w_max, raw_weights[j]);
+            raw_w_sum += raw_weights[j];
+        }
+        if (effective_weights) {
+            eff_w_min = MIN(eff_w_min, effective_weights[j]);
+            eff_w_max = MAX(eff_w_max, effective_weights[j]);
+            eff_w_sum += effective_weights[j];
+        }
+    }
+
+    const double selected_ro = ((double) selected->mse + 1e-30) / ((double) ordinary_best->mse + 1e-30);
+    const double selected_rw = (selected->weighted_mse + 1e-30) / (weighted_best->weighted_mse + 1e-30);
+    const double ro4 = ((double) c4->mse + 1e-30) / ((double) ordinary_best->mse + 1e-30);
+    const double ro5 = ((double) c5->mse + 1e-30) / ((double) ordinary_best->mse + 1e-30);
+    const double ro6 = ((double) c6->mse + 1e-30) / ((double) ordinary_best->mse + 1e-30);
+    const double rw4 = (c4->weighted_mse + 1e-30) / (weighted_best->weighted_mse + 1e-30);
+    const double rw5 = (c5->weighted_mse + 1e-30) / (weighted_best->weighted_mse + 1e-30);
+    const double rw6 = (c6->weighted_mse + 1e-30) / (weighted_best->weighted_mse + 1e-30);
+    const double score4 = ggml_nvfp4_two_objective_score(c4, ordinary_best, weighted_best);
+    const double score5 = ggml_nvfp4_two_objective_score(c5, ordinary_best, weighted_best);
+    const double score6 = ggml_nvfp4_two_objective_score(c6, ordinary_best, weighted_best);
+    const double raw_w_mean = raw_weights ? raw_w_sum / QK_NVFP4_SUB : 0.0;
+    const double eff_w_mean = effective_weights ? eff_w_sum / QK_NVFP4_SUB : 0.0;
+
+    ggml_nvfp4_scale_lock();
+    const int64_t limit = ggml_nvfp4_imatrix_select_debug_limit();
+    if (g_nvfp4_debug_printed >= limit) {
+        ggml_nvfp4_scale_unlock();
+        return;
+    }
+    const int64_t index = ++g_nvfp4_debug_printed;
+    const char * tensor_name = g_nvfp4_debug_tensor_name ? g_nvfp4_debug_tensor_name : "(unknown)";
+
+    fprintf(stderr,
+            "\nggml_nvfp4_select_debug[%lld]: tensor=%s row=%lld block=%d sub=%d "
+            "select_mode=%s guard=%g ordinary_best=M%d weighted_best=M%d selected=M%d selected_ro=%g selected_rw=%g weighted_best_ro=%g sigma2=%g amax=%g "
+            "x=[%g,%g] raw_w=[%g,%g,%g] eff_w=[%g,%g,%g]\n",
+            (long long) index, tensor_name, (long long) row, block, sub,
+            ggml_nvfp4_imatrix_select_mode_name(select_mode), (double) guard,
+            ordinary_best_m, weighted_best_m, selected_m, selected_ro, selected_rw, weighted_best_ro, (double) sigma2, (double) amax,
+            (double) xmin, (double) xmax,
+            (double) raw_w_min, raw_w_mean, (double) raw_w_max,
+            (double) eff_w_min, eff_w_mean, (double) eff_w_max);
+    fprintf(stderr,
+            "ggml_nvfp4_select_debug[%lld]: M4(scale=%u,mse=%g,wmse=%g,ro=%g,rw=%g,score=%g) "
+            "M5(scale=%u,mse=%g,wmse=%g,ro=%g,rw=%g,score=%g) M6(scale=%u,mse=%g,wmse=%g,ro=%g,rw=%g,score=%g)\n",
+            (long long) index,
+            (unsigned) c4->scale, (double) c4->mse, c4->weighted_mse, ro4, rw4, score4,
+            (unsigned) c5->scale, (double) c5->mse, c5->weighted_mse, ro5, rw5, score5,
+            (unsigned) c6->scale, (double) c6->mse, c6->weighted_mse, ro6, rw6, score6);
+    if (g_nvfp4_debug_printed == limit) {
+        fprintf(stderr, "ggml_nvfp4_select_debug: reached GGML_NVFP4_IMATRIX_SELECT_DEBUG_LIMIT=%lld\n",
+                (long long) limit);
+    }
+    ggml_nvfp4_scale_unlock();
+}
+
+static void eval_nvfp4_candidate_m(const float * x, const float * weights, float m, ggml_nvfp4_candidate * out) {
+    static const int qk_sub = QK_NVFP4_SUB;
+
+    float amax = 0.0f;
+    for (int j = 0; j < qk_sub; j++) {
+        if (amax < fabsf(x[j])) {
+            amax = fabsf(x[j]);
+        }
+    }
+
+    const uint8_t ue = ggml_fp32_to_ue4m3(amax / m);
+    const float d = ggml_ue4m3_to_fp32(ue);
+
+    double err = 0.0;
+    double weighted_err = 0.0;
+    for (int j = 0; j < qk_sub/2; ++j) {
+        const uint8_t x0 = best_index_mxfp4(x[0        + j], d);
+        const uint8_t x1 = best_index_mxfp4(x[qk_sub/2 + j], d);
+
+        out->qs[j] = x0 | (x1 << 4);
+
+        const float q0 = kvalues_mxfp4[x0] * d;
+        const float q1 = kvalues_mxfp4[x1] * d;
+        const float e0 = q0 - x[0        + j];
+        const float e1 = q1 - x[qk_sub/2 + j];
+        err += (double) e0 * (double) e0;
+        err += (double) e1 * (double) e1;
+        if (weights) {
+            weighted_err += (double) weights[0        + j] * (double) e0 * (double) e0;
+            weighted_err += (double) weights[qk_sub/2 + j] * (double) e1 * (double) e1;
+        }
+    }
+
+    out->scale = ue;
+    out->mse = (float) err;
+    out->weighted_mse = weights ? weighted_err : err;
+}
+
+static void quantize_nvfp4_subblock_m(const float * x, float m, uint8_t * scale, uint8_t * qs, float * mse) {
+    ggml_nvfp4_candidate candidate;
+    eval_nvfp4_candidate_m(x, NULL, m, &candidate);
+    *scale = candidate.scale;
+    memcpy(qs, candidate.qs, sizeof(candidate.qs));
+    *mse = candidate.mse;
+}
+
 void quantize_row_mxfp4_ref(const float * GGML_RESTRICT x, block_mxfp4 * GGML_RESTRICT y, int64_t k) {
     static const int qk = QK_MXFP4;
 
@@ -343,39 +721,176 @@ void quantize_row_mxfp4_ref(const float * GGML_RESTRICT x, block_mxfp4 * GGML_RE
     }
 }
 
-void quantize_row_nvfp4_ref(const float * GGML_RESTRICT x, block_nvfp4 * GGML_RESTRICT y, int64_t k) {
+static void quantize_row_nvfp4_impl(const float * GGML_RESTRICT x, block_nvfp4 * GGML_RESTRICT y, int64_t n_per_row, const float * quant_weights, int64_t row_index) {
     static const int qk = QK_NVFP4;
     static const int qk_sub = QK_NVFP4_SUB;
     static const int n_sub = QK_NVFP4 / QK_NVFP4_SUB;
 
-    assert(k % qk == 0);
+    assert(n_per_row % qk == 0);
 
-    const int nb = k / qk;
+    const int nb = n_per_row / qk;
+    const enum ggml_nvfp4_scale_mode mode = ggml_nvfp4_scale_get_mode();
+    ggml_nvfp4_scale_stats stats = { 0 };
+    const bool use_weights = mode == GGML_NVFP4_SCALE_MODE_ADAPTIVE && quant_weights != NULL;
+    const enum ggml_nvfp4_imatrix_select_mode select_mode = use_weights ?
+            ggml_nvfp4_get_imatrix_select_mode() : GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE;
+    const float imatrix_guard = select_mode == GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD ?
+            ggml_nvfp4_imatrix_ordinary_mse_guard() : 0.0f;
+
+    float sigma2 = 0.0f;
+    if (use_weights) {
+        double sum_x2 = 0.0;
+        for (int64_t j = 0; j < n_per_row; ++j) {
+            sum_x2 += (double) x[j] * (double) x[j];
+        }
+        sigma2 = (float) (sum_x2 / (double) n_per_row);
+    }
 
     for (int i = 0; i < nb; i++) {
         for (int s = 0; s < n_sub; s++) {
             const float * xb = x + i*qk + s*qk_sub;
+            uint8_t * qsb = y[i].qs + s*(qk_sub/2);
 
-            float amax = 0.0f;
-            for (int j = 0; j < qk_sub; j++) {
-                if (amax < fabsf(xb[j])) {
-                    amax = fabsf(xb[j]);
+            if (mode == GGML_NVFP4_SCALE_MODE_ADAPTIVE) {
+                float weights[QK_NVFP4_SUB];
+                const float * weights_ptr = NULL;
+                const float * raw_weights_ptr = NULL;
+                if (use_weights) {
+                    const float * qw = quant_weights + i*qk + s*qk_sub;
+                    raw_weights_ptr = qw;
+                    for (int j = 0; j < qk_sub; ++j) {
+                        weights[j] = qw[j] * sqrtf(sigma2 + xb[j]*xb[j]);
+                    }
+                    weights_ptr = weights;
                 }
-            }
 
-            // UE4M3 scale: amax / 6.0 maps the max E2M1 value (6.0) to amax
-            const uint8_t ue = ggml_fp32_to_ue4m3(amax / 6.0f);
-            y[i].d[s] = ue;
-            const float d = ggml_ue4m3_to_fp32(ue);
+                ggml_nvfp4_candidate c6;
+                ggml_nvfp4_candidate c4;
+                eval_nvfp4_candidate_m(xb, weights_ptr, 6.0f, &c6);
+                eval_nvfp4_candidate_m(xb, weights_ptr, 4.0f, &c4);
 
-            for (int j = 0; j < qk_sub/2; ++j) {
-                const uint8_t x0 = best_index_mxfp4(xb[0        + j], d);
-                const uint8_t x1 = best_index_mxfp4(xb[qk_sub/2 + j], d);
+                stats.n_subblocks++;
+                stats.mse_m6 += c6.mse;
+                if (weights_ptr) {
+                    stats.n_weighted_subblocks++;
+                    stats.weighted_mse_m6 += c6.weighted_mse;
+                }
 
-                y[i].qs[s*(qk_sub/2) + j] = x0 | (x1 << 4);
+                ggml_nvfp4_candidate c5;
+                eval_nvfp4_candidate_m(xb, weights_ptr, 5.0f, &c5);
+
+                const ggml_nvfp4_candidate * ordinary_best = &c6;
+                int ordinary_best_m = 6;
+                if (c4.mse < ordinary_best->mse) {
+                    ordinary_best = &c4;
+                    ordinary_best_m = 4;
+                }
+                if (c5.mse < ordinary_best->mse) {
+                    ordinary_best = &c5;
+                    ordinary_best_m = 5;
+                }
+
+                const ggml_nvfp4_candidate * best = ordinary_best;
+                int best_m = ordinary_best_m;
+
+                if (weights_ptr) {
+                    const ggml_nvfp4_candidate * weighted_best = &c6;
+                    int weighted_best_m = 6;
+                    if (c4.weighted_mse < weighted_best->weighted_mse) {
+                        weighted_best = &c4;
+                        weighted_best_m = 4;
+                    }
+                    if (c5.weighted_mse < weighted_best->weighted_mse) {
+                        weighted_best = &c5;
+                        weighted_best_m = 5;
+                    }
+
+                    switch (select_mode) {
+                        case GGML_NVFP4_IMATRIX_SELECT_ORDINARY:
+                            best = ordinary_best;
+                            best_m = ordinary_best_m;
+                            stats.n_ordinary_best_selected++;
+                            break;
+                        case GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_RAW:
+                            best = weighted_best;
+                            best_m = weighted_best_m;
+                            stats.n_weighted_best_selected++;
+                            break;
+                        case GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD:
+                            if ((double) weighted_best->mse <= (double) ordinary_best->mse * (double) imatrix_guard) {
+                                best = weighted_best;
+                                best_m = weighted_best_m;
+                                stats.n_weighted_guard_accepted++;
+                                stats.n_weighted_best_selected++;
+                            } else {
+                                best = ordinary_best;
+                                best_m = ordinary_best_m;
+                                stats.n_weighted_guard_fallback++;
+                                stats.n_ordinary_best_selected++;
+                            }
+                            break;
+                        case GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE:
+                        default: {
+                            const ggml_nvfp4_candidate * candidates[3] = { &c4, &c5, &c6 };
+                            const int candidate_m[3] = { 4, 5, 6 };
+                            double best_score = DBL_MAX;
+                            int best_index = 0;
+                            for (int ci = 0; ci < 3; ++ci) {
+                                const double score = ggml_nvfp4_two_objective_score(candidates[ci], ordinary_best, weighted_best);
+                                if (score < best_score) {
+                                    best_score = score;
+                                    best_index = ci;
+                                }
+                            }
+                            best = candidates[best_index];
+                            best_m = candidate_m[best_index];
+
+                            if (best == ordinary_best) {
+                                stats.n_ordinary_best_selected++;
+                            } else if (best == weighted_best) {
+                                stats.n_weighted_best_selected++;
+                            } else {
+                                stats.n_knee_selected++;
+                            }
+                            break;
+                        }
+                    }
+
+                    ggml_nvfp4_debug_print_selection(
+                            select_mode, imatrix_guard, row_index, i, s, sigma2, xb, raw_weights_ptr, weights_ptr,
+                            &c4, &c5, &c6, ordinary_best, ordinary_best_m, weighted_best, weighted_best_m, best, best_m);
+                }
+
+                y[i].d[s] = best->scale;
+                memcpy(qsb, best->qs, sizeof(best->qs));
+                stats.mse_selected += best->mse;
+                if (weights_ptr) {
+                    stats.weighted_mse_selected += best->weighted_mse;
+                }
+
+                if (best_m == 4) {
+                    stats.n_m4++;
+                } else if (best_m == 5) {
+                    stats.n_m5++;
+                } else {
+                    stats.n_m6++;
+                }
+            } else {
+                const float m = mode == GGML_NVFP4_SCALE_MODE_M4 ? 4.0f : 6.0f;
+                float mse;
+                quantize_nvfp4_subblock_m(xb, m, &y[i].d[s], qsb, &mse);
+                GGML_UNUSED(mse);
             }
         }
     }
+
+    if (mode == GGML_NVFP4_SCALE_MODE_ADAPTIVE) {
+        ggml_nvfp4_scale_accum_stats(&stats);
+    }
+}
+
+void quantize_row_nvfp4_ref(const float * GGML_RESTRICT x, block_nvfp4 * GGML_RESTRICT y, int64_t k) {
+    quantize_row_nvfp4_impl(x, y, k, NULL, -1);
 }
 
 void dequantize_row_q1_0(const block_q1_0 * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k) {
@@ -2234,9 +2749,22 @@ size_t quantize_mxfp4(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
 }
 
 size_t quantize_nvfp4(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
-    GGML_UNUSED(quant_weights);
-    quantize_row_nvfp4_ref(src, dst, (int64_t)nrow*n_per_row);
-    return nrow * ggml_row_size(GGML_TYPE_NVFP4, n_per_row);
+    const size_t row_size = ggml_row_size(GGML_TYPE_NVFP4, n_per_row);
+    const enum ggml_nvfp4_scale_mode mode = ggml_nvfp4_scale_get_mode();
+    if (!quant_weights || mode != GGML_NVFP4_SCALE_MODE_ADAPTIVE) {
+        quantize_row_nvfp4_ref(src, dst, (int64_t)nrow*n_per_row);
+        return nrow * row_size;
+    }
+
+    char * qrow = (char *)dst;
+    const int64_t debug_row_offset = ggml_nvfp4_debug_row_offset(src, n_per_row);
+    for (int64_t row = 0; row < nrow; ++row) {
+        const int64_t debug_row = debug_row_offset >= 0 ? debug_row_offset + row : row;
+        quantize_row_nvfp4_impl(src, (block_nvfp4 *) qrow, n_per_row, quant_weights, debug_row);
+        src += n_per_row;
+        qrow += row_size;
+    }
+    return nrow * row_size;
 }
 
 // ====================== Ternary (de)-quantization (BitNet b1.58 and TriLMs)
@@ -5487,7 +6015,7 @@ bool ggml_validate_row_data(enum ggml_type type, const void * data, size_t nbyte
             } break;
         case GGML_TYPE_NVFP4:
             {
-                // UE4M3 scales are uint8_t — all byte values are valid
+                // UE4M3 scales are uint8_t �?all byte values are valid
                 GGML_UNUSED(data);
                 GGML_UNUSED(nb);
             } break;

@@ -161,8 +161,15 @@ extern "C" {
         LLAMA_FTYPE_MOSTLY_PQ2_K         = 44, // except 1d tensors
         LLAMA_FTYPE_MOSTLY_PQ3_K         = 45, // except 1d tensors
         LLAMA_FTYPE_MOSTLY_PQ4_K         = 46, // except 1d tensors
+        LLAMA_FTYPE_MOSTLY_NVFP4_M       = 47, // except 1d tensors
 
         LLAMA_FTYPE_GUESSED = 1024, // not specified in the model file
+    };
+
+    enum llama_nvfp4_scale_mode {
+        LLAMA_NVFP4_SCALE_MODE_M6       = 0, // standard NVFP4, scale = amax / 6
+        LLAMA_NVFP4_SCALE_MODE_M4       = 1, // diagnostic mode, scale = amax / 4
+        LLAMA_NVFP4_SCALE_MODE_ADAPTIVE = 2, // choose per NVFP4 subblock by lowest error
     };
 
     enum llama_rope_scaling_type {
@@ -426,6 +433,7 @@ extern "C" {
         const struct llama_model_kv_override * kv_overrides;        // pointer to kv overrides
         const struct llama_model_tensor_override * tt_overrides;    // pointer to tensor overrides
         const int32_t * prune_layers;                               // pointer to layer indices to prune
+        enum llama_nvfp4_scale_mode nvfp4_scale_mode;                // NVFP4 scale selection mode
     } llama_model_quantize_params;
 
     typedef struct llama_logit_bias {

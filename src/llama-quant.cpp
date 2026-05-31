@@ -2,6 +2,7 @@
 #include "llama-model.h"
 #include "llama-model-loader.h"
 #include "llama-ext.h"
+#include "ggml-quants.h"
 
 #include <algorithm>
 #include <cctype>
@@ -111,6 +112,24 @@ static constexpr int LLAMA_QUANT_WHT_DIM = 256;
 static constexpr const char * LLAMA_QUANT_WHT_SCHEME = "pqk_rht_v1";
 static constexpr const char * LLAMA_QUANT_WHT_DEFAULT_SKIP_TYPES = "Q3_K,IQ2_XXS,IQ2_XS,IQ2_S,IQ3_XXS,IQ3_S";
 static constexpr uint32_t LLAMA_QUANT_WHT_VERSION = 1;
+
+static const char * llama_nvfp4_scale_mode_name(llama_nvfp4_scale_mode mode) {
+    switch (mode) {
+        case LLAMA_NVFP4_SCALE_MODE_M6:       return "m6";
+        case LLAMA_NVFP4_SCALE_MODE_M4:       return "m4";
+        case LLAMA_NVFP4_SCALE_MODE_ADAPTIVE: return "adaptive";
+        default:                              return "m6";
+    }
+}
+
+static ggml_nvfp4_scale_mode llama_nvfp4_scale_mode_to_ggml(llama_nvfp4_scale_mode mode) {
+    switch (mode) {
+        case LLAMA_NVFP4_SCALE_MODE_M4:       return GGML_NVFP4_SCALE_MODE_M4;
+        case LLAMA_NVFP4_SCALE_MODE_ADAPTIVE: return GGML_NVFP4_SCALE_MODE_ADAPTIVE;
+        case LLAMA_NVFP4_SCALE_MODE_M6:
+        default:                              return GGML_NVFP4_SCALE_MODE_M6;
+    }
+}
 
 static const uint32_t LLAMA_QUANT_WHT_SIGNS1_256_BITS[8] = {
     0xc3284666u, 0xce93b542u, 0x79141579u, 0x9aa89715u,
@@ -379,6 +398,14 @@ static bool category_is_attn_v(tensor_category cat) {
            cat == tensor_category::ATTENTION_KV_B;
 }
 
+static int tensor_layer_from_name_or(const std::string & name, int fallback, int n_layers) {
+    int i_layer = fallback;
+    if (sscanf(name.c_str(), "blk.%d.", &i_layer) == 1 && i_layer >= 0 && i_layer < n_layers) {
+        return i_layer;
+    }
+    return fallback;
+}
+
 //
 // quantization state
 //
@@ -428,6 +455,54 @@ struct tensor_metadata {
     bool            requires_imatrix;
     bool            quant_wht_rotate;
 };
+
+struct nvfp4_m_policy_bucket {
+    uint64_t count = 0;
+    size_t bytes = 0;
+};
+
+struct nvfp4_m_policy_summary {
+    nvfp4_m_policy_bucket nvfp4;
+    nvfp4_m_policy_bucket q5_k;
+    nvfp4_m_policy_bucket q6_k;
+    nvfp4_m_policy_bucket q8_0;
+    nvfp4_m_policy_bucket other;
+};
+
+static size_t tensor_size_as_type(const ggml_tensor * tensor, ggml_type type) {
+    return (size_t) ggml_nrows(tensor) * ggml_row_size(type, tensor->ne[0]);
+}
+
+static void nvfp4_m_policy_summary_add(nvfp4_m_policy_summary & summary, const ggml_tensor * tensor, ggml_type type) {
+    nvfp4_m_policy_bucket * bucket = nullptr;
+    switch (type) {
+        case GGML_TYPE_NVFP4: bucket = &summary.nvfp4; break;
+        case GGML_TYPE_Q5_K:  bucket = &summary.q5_k;  break;
+        case GGML_TYPE_Q6_K:  bucket = &summary.q6_k;  break;
+        case GGML_TYPE_Q8_0:  bucket = &summary.q8_0;  break;
+        default:              bucket = &summary.other; break;
+    }
+
+    bucket->count++;
+    bucket->bytes += tensor_size_as_type(tensor, type);
+}
+
+static void nvfp4_m_policy_summary_print(const nvfp4_m_policy_summary & summary) {
+    const char * prefix = __func__;
+    auto print_bucket = [prefix](const char * name, const nvfp4_m_policy_bucket & bucket) {
+        LLAMA_LOG_INFO("%s:   %-5s count=%4llu bytes=%10.2f MiB\n", prefix, name,
+                (unsigned long long) bucket.count, bucket.bytes / 1024.0 / 1024.0);
+    };
+
+    LLAMA_LOG_INFO("%s: NVFP4_M policy enabled\n", prefix);
+    LLAMA_LOG_INFO("%s:   default type: NVFP4\n", prefix);
+    LLAMA_LOG_INFO("%s:   overrides / target type summary:\n", prefix);
+    print_bucket("NVFP4", summary.nvfp4);
+    print_bucket("Q5_K",  summary.q5_k);
+    print_bucket("Q6_K",  summary.q6_k);
+    print_bucket("Q8_0",  summary.q8_0);
+    print_bucket("other", summary.other);
+}
 
 //
 // dequantization
@@ -820,6 +895,39 @@ static ggml_type llama_tensor_get_type_impl(quantize_state_impl & qs, ggml_type 
             else if (ftype == LLAMA_FTYPE_MOSTLY_TQ1_0 || ftype == LLAMA_FTYPE_MOSTLY_TQ2_0) {
                 new_type = GGML_TYPE_Q4_K;
             }
+        }
+    } else if (ftype == LLAMA_FTYPE_MOSTLY_NVFP4_M) {
+        const int n_layers = (int) qs.model.hparams.n_layer;
+
+        if (name.find("ssm_alpha.weight") != std::string::npos ||
+            name.find("ssm_beta.weight")  != std::string::npos) {
+            new_type = GGML_TYPE_Q8_0;
+        } else if (name.find("ssm_out.weight")  != std::string::npos ||
+                   name.find("attn_gate.weight") != std::string::npos) {
+            new_type = GGML_TYPE_Q5_K;
+        } else if (category == tensor_category::ATTENTION_QKV ||
+                   category == tensor_category::ATTENTION_K   ||
+                   category == tensor_category::ATTENTION_V   ||
+                   category == tensor_category::ATTENTION_OUTPUT) {
+            const int i_layer = tensor_layer_from_name_or(name, qs.i_attention_wv, n_layers);
+            if (use_more_bits(i_layer, n_layers)) {
+                new_type = GGML_TYPE_Q5_K;
+            }
+        } else if (category == tensor_category::FFN_DOWN) {
+            const int i_layer = tensor_layer_from_name_or(name, qs.i_ffn_down, n_layers);
+            if (use_more_bits(i_layer, n_layers)) {
+                new_type = GGML_TYPE_Q5_K;
+            }
+        }
+
+        if (category_is_attn_v(category)) {
+            ++qs.i_attention_wv;
+        } else if (category == tensor_category::FFN_DOWN) {
+            ++qs.i_ffn_down;
+        } else if (category == tensor_category::FFN_GATE) {
+            ++qs.i_ffn_gate;
+        } else if (category == tensor_category::FFN_UP) {
+            ++qs.i_ffn_up;
         }
     } else if (ftype_is_pq_k(ftype)) {
         const llama_ftype ref_ftype = pqk_reference_ftype(ftype);
@@ -1369,6 +1477,8 @@ ggml_type llama_ftype_get_default_type(llama_ftype ftype) {
         case LLAMA_FTYPE_MOSTLY_Q1_0: return GGML_TYPE_Q1_0;
 
         case LLAMA_FTYPE_MOSTLY_MXFP4_MOE: return GGML_TYPE_MXFP4;
+        case LLAMA_FTYPE_MOSTLY_NVFP4:     return GGML_TYPE_NVFP4;
+        case LLAMA_FTYPE_MOSTLY_NVFP4_M:   return GGML_TYPE_NVFP4;
 
         // K-quants
         case LLAMA_FTYPE_MOSTLY_Q2_K_S:
@@ -1439,6 +1549,13 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
     ggml_type default_type = llama_ftype_get_default_type(ftype);
     if (default_type == GGML_TYPE_COUNT) {
         throw std::runtime_error(format("invalid output file type %d\n", ftype));
+    }
+
+    const bool nvfp4_mode_relevant = default_type == GGML_TYPE_NVFP4 || params->nvfp4_scale_mode != LLAMA_NVFP4_SCALE_MODE_M6;
+    ggml_nvfp4_set_scale_mode(llama_nvfp4_scale_mode_to_ggml(params->nvfp4_scale_mode));
+    ggml_nvfp4_reset_scale_stats();
+    if (nvfp4_mode_relevant) {
+        LLAMA_LOG_INFO("%s: NVFP4 scale mode: %s\n", __func__, llama_nvfp4_scale_mode_name(params->nvfp4_scale_mode));
     }
 
     // mmap consistently increases speed on Linux, and also increases speed on Windows with
@@ -1513,6 +1630,32 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
     gguf_set_kv     (ctx_out.get(), ml.metadata);
     gguf_set_val_u32(ctx_out.get(), "general.quantization_version", GGML_QNT_VERSION); // TODO: use LLM_KV
     gguf_set_val_u32(ctx_out.get(), "general.file_type", ftype); // TODO: use LLM_KV
+    if (!params->only_copy && default_type == GGML_TYPE_NVFP4) {
+        gguf_set_val_str(ctx_out.get(), "general.quantization.nvfp4_scale_mode", llama_nvfp4_scale_mode_name(params->nvfp4_scale_mode));
+        if (params->nvfp4_scale_mode == LLAMA_NVFP4_SCALE_MODE_ADAPTIVE) {
+            gguf_set_val_str(ctx_out.get(), "general.quantization.nvfp4_adaptive_candidates", ggml_nvfp4_adaptive_candidates());
+            if (imatrix_data) {
+                gguf_set_val_str(ctx_out.get(), "general.quantization.nvfp4_adaptive_criterion", ggml_nvfp4_imatrix_select_criterion());
+                if (ggml_nvfp4_get_imatrix_select_mode() == GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD) {
+                    gguf_set_val_f32(ctx_out.get(), "general.quantization.nvfp4_imatrix_guard", ggml_nvfp4_imatrix_ordinary_mse_guard());
+                } else {
+                    gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_imatrix_guard");
+                }
+            } else {
+                gguf_set_val_str(ctx_out.get(), "general.quantization.nvfp4_adaptive_criterion", "mse");
+                gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_imatrix_guard");
+            }
+        } else {
+            gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_adaptive_candidates");
+            gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_adaptive_criterion");
+            gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_imatrix_guard");
+        }
+    } else {
+        gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_scale_mode");
+        gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_adaptive_candidates");
+        gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_adaptive_criterion");
+        gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_imatrix_guard");
+    }
     if (!params->only_copy) {
         gguf_set_val_bool(ctx_out.get(), "general.quant_wht.enabled", quant_wht_enabled);
         if (quant_wht_enabled) {
@@ -1671,6 +1814,14 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
                 throw std::runtime_error("this quantization requires an imatrix!");
             }
         }
+    }
+
+    if (ftype == LLAMA_FTYPE_MOSTLY_NVFP4_M) {
+        nvfp4_m_policy_summary summary;
+        for (size_t i = 0; i < tensors.size(); ++i) {
+            nvfp4_m_policy_summary_add(summary, tensors[i]->tensor, metadata[i].target_type);
+        }
+        nvfp4_m_policy_summary_print(summary);
     }
 
     if (quant_wht_enabled) {
@@ -1881,6 +2032,10 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
                         quant_data_03 = (const float *) quant_wht_buf.data();
                     }
 
+                    if (new_type == GGML_TYPE_NVFP4) {
+                        ggml_nvfp4_set_debug_context(metadata[i].name.c_str(), quant_data_03, n_per_row);
+                    }
+
                     if (tm.quant_wht_rotate && imatrix_03 && new_type != GGML_TYPE_Q8_0) {
                         static std::once_flag once;
                         std::call_once(once, [] {
@@ -1889,6 +2044,10 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
                         new_size += llama_tensor_quantize_wht_imatrix_impl(new_type, quant_data_03, new_data_03, nrows, n_per_row, imatrix_03, workers, nthread_use);
                     } else {
                         new_size += llama_tensor_quantize_impl(new_type, quant_data_03, new_data_03, chunk_size, nrows, n_per_row, imatrix_03, workers, nthread_use);
+                    }
+
+                    if (new_type == GGML_TYPE_NVFP4) {
+                        ggml_nvfp4_set_debug_context(nullptr, nullptr, 0);
                     }
                 }
                 LLAMA_LOG_INFO("size = %8.2f MiB -> %8.2f MiB\n", tensor_size/1024.0/1024.0, new_size/1024.0/1024.0);
@@ -1913,6 +2072,71 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
 
     LLAMA_LOG_INFO("%s: model size  = %8.2f MiB (%.2f BPW)\n", __func__, total_size_org/1024.0/1024.0, total_size_org*8.0/ml.n_elements);
     LLAMA_LOG_INFO("%s: quant size  = %8.2f MiB (%.2f BPW)\n", __func__, total_size_new/1024.0/1024.0, total_size_new*8.0/ml.n_elements);
+
+    if (params->nvfp4_scale_mode == LLAMA_NVFP4_SCALE_MODE_ADAPTIVE) {
+        ggml_nvfp4_scale_stats stats;
+        if (ggml_nvfp4_get_scale_stats(&stats)) {
+            const double p4 = 100.0 * (double) stats.n_m4 / (double) stats.n_subblocks;
+            const double p5 = 100.0 * (double) stats.n_m5 / (double) stats.n_subblocks;
+            const double p6 = 100.0 * (double) stats.n_m6 / (double) stats.n_subblocks;
+            const double ratio = stats.mse_m6 > 0.0 ? stats.mse_selected / stats.mse_m6 : 1.0;
+            const bool weighted = stats.n_weighted_subblocks > 0;
+            const double weighted_ratio = stats.weighted_mse_m6 > 0.0 ? stats.weighted_mse_selected / stats.weighted_mse_m6 : 1.0;
+            const double ordinary_best_pct = weighted ? 100.0 * (double) stats.n_ordinary_best_selected / (double) stats.n_weighted_subblocks : 0.0;
+            const double weighted_best_pct = weighted ? 100.0 * (double) stats.n_weighted_best_selected / (double) stats.n_weighted_subblocks : 0.0;
+            const double knee_pct = weighted ? 100.0 * (double) stats.n_knee_selected / (double) stats.n_weighted_subblocks : 0.0;
+            const double guard_accepted_pct = weighted ? 100.0 * (double) stats.n_weighted_guard_accepted / (double) stats.n_weighted_subblocks : 0.0;
+            const double guard_fallback_pct = weighted ? 100.0 * (double) stats.n_weighted_guard_fallback / (double) stats.n_weighted_subblocks : 0.0;
+            const ggml_nvfp4_imatrix_select_mode select_mode = weighted ?
+                    ggml_nvfp4_get_imatrix_select_mode() : GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE;
+            LLAMA_LOG_INFO("%s: NVFP4 adaptive:\n", __func__);
+            LLAMA_LOG_INFO("%s:   candidates: %s\n", __func__, ggml_nvfp4_adaptive_candidates());
+            if (weighted) {
+                switch (select_mode) {
+                    case GGML_NVFP4_IMATRIX_SELECT_ORDINARY:
+                        LLAMA_LOG_INFO("%s:   criterion: imatrix ordinary MSE\n", __func__);
+                        break;
+                    case GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD:
+                        LLAMA_LOG_INFO("%s:   criterion: imatrix weighted guard, guard=%.6g\n", __func__,
+                                (double) ggml_nvfp4_imatrix_ordinary_mse_guard());
+                        break;
+                    case GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_RAW:
+                        LLAMA_LOG_INFO("%s:   criterion: imatrix weighted raw\n", __func__);
+                        LLAMA_LOG_WARN("%s:   warning: NVFP4 imatrix weighted_raw may produce NaN\n", __func__);
+                        break;
+                    case GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE:
+                    default:
+                        LLAMA_LOG_INFO("%s:   criterion: imatrix two-objective log-square\n", __func__);
+                        break;
+                }
+            } else {
+                LLAMA_LOG_INFO("%s:   criterion: ordinary MSE\n", __func__);
+            }
+            LLAMA_LOG_INFO("%s:   subblocks: %llu\n", __func__, (unsigned long long) stats.n_subblocks);
+            LLAMA_LOG_INFO("%s:   M=4 selected: %llu (%.3f%%)\n", __func__, (unsigned long long) stats.n_m4, p4);
+            LLAMA_LOG_INFO("%s:   M=5 selected: %llu (%.3f%%)\n", __func__, (unsigned long long) stats.n_m5, p5);
+            LLAMA_LOG_INFO("%s:   M=6 selected: %llu (%.3f%%)\n", __func__, (unsigned long long) stats.n_m6, p6);
+            if (weighted) {
+                if (select_mode == GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD) {
+                    LLAMA_LOG_INFO("%s:   weighted accepted: %llu (%.3f%%)\n", __func__,
+                            (unsigned long long) stats.n_weighted_guard_accepted, guard_accepted_pct);
+                    LLAMA_LOG_INFO("%s:   fallback to ordinary: %llu (%.3f%%)\n", __func__,
+                            (unsigned long long) stats.n_weighted_guard_fallback, guard_fallback_pct);
+                } else {
+                    LLAMA_LOG_INFO("%s:   ordinary-best selected: %llu (%.3f%%)\n", __func__,
+                            (unsigned long long) stats.n_ordinary_best_selected, ordinary_best_pct);
+                    LLAMA_LOG_INFO("%s:   weighted-best selected: %llu (%.3f%%)\n", __func__,
+                            (unsigned long long) stats.n_weighted_best_selected, weighted_best_pct);
+                    LLAMA_LOG_INFO("%s:   knee selected: %llu (%.3f%%)\n", __func__,
+                            (unsigned long long) stats.n_knee_selected, knee_pct);
+                }
+                LLAMA_LOG_INFO("%s:   selected vs M=6 weighted reconstruction MSE ratio: %.9g\n", __func__, weighted_ratio);
+                LLAMA_LOG_INFO("%s:   selected vs M=6 ordinary reconstruction MSE ratio: %.9g\n", __func__, ratio);
+            } else {
+                LLAMA_LOG_INFO("%s:   selected vs M=6 reconstruction MSE ratio: %.9g\n", __func__, ratio);
+            }
+        }
+    }
 
     if (!params->imatrix && params->dry_run && will_require_imatrix) {
         LLAMA_LOG_WARN("%s: WARNING: dry run completed successfully, but actually completing this quantization will require an imatrix!\n",
@@ -1949,7 +2173,8 @@ llama_model_quantize_params llama_model_quantize_default_params() {
         /*.imatrix                     =*/ nullptr,
         /*.kv_overrides                =*/ nullptr,
         /*.tensor_type                 =*/ nullptr,
-        /*.prune_layers                =*/ nullptr
+        /*.prune_layers                =*/ nullptr,
+        /*.nvfp4_scale_mode            =*/ LLAMA_NVFP4_SCALE_MODE_M6,
     };
 
     return result;

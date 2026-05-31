@@ -13,6 +13,46 @@ extern "C" {
 
 // NOTE: these functions are defined as GGML_API because they used by the CPU backend
 
+enum ggml_nvfp4_scale_mode {
+    GGML_NVFP4_SCALE_MODE_M6       = 0,
+    GGML_NVFP4_SCALE_MODE_M4       = 1,
+    GGML_NVFP4_SCALE_MODE_ADAPTIVE = 2,
+};
+
+enum ggml_nvfp4_imatrix_select_mode {
+    GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE = 0,
+    GGML_NVFP4_IMATRIX_SELECT_ORDINARY      = 1,
+    GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD = 2,
+    GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_RAW  = 3,
+};
+
+typedef struct ggml_nvfp4_scale_stats {
+    uint64_t n_subblocks;
+    uint64_t n_weighted_subblocks;
+    uint64_t n_ordinary_best_selected;
+    uint64_t n_weighted_best_selected;
+    uint64_t n_knee_selected;
+    uint64_t n_weighted_guard_accepted;
+    uint64_t n_weighted_guard_fallback;
+    uint64_t n_m4;
+    uint64_t n_m5;
+    uint64_t n_m6;
+    double   mse_m6;
+    double   mse_selected;
+    double   weighted_mse_m6;
+    double   weighted_mse_selected;
+} ggml_nvfp4_scale_stats;
+
+GGML_API void ggml_nvfp4_set_scale_mode(enum ggml_nvfp4_scale_mode mode);
+GGML_API void ggml_nvfp4_reset_scale_stats(void);
+GGML_API int  ggml_nvfp4_get_scale_stats(ggml_nvfp4_scale_stats * stats);
+GGML_API const char * ggml_nvfp4_adaptive_candidates(void);
+GGML_API enum ggml_nvfp4_imatrix_select_mode ggml_nvfp4_get_imatrix_select_mode(void);
+GGML_API const char * ggml_nvfp4_imatrix_select_mode_name(enum ggml_nvfp4_imatrix_select_mode mode);
+GGML_API const char * ggml_nvfp4_imatrix_select_criterion(void);
+GGML_API float ggml_nvfp4_imatrix_ordinary_mse_guard(void);
+GGML_API void ggml_nvfp4_set_debug_context(const char * tensor_name, const float * data, int64_t n_per_row);
+
 // Quantization
 GGML_API void quantize_row_q1_0_ref(const float * GGML_RESTRICT x, block_q1_0 * GGML_RESTRICT y, int64_t k);
 GGML_API void quantize_row_q4_0_ref(const float * GGML_RESTRICT x, block_q4_0 * GGML_RESTRICT y, int64_t k);

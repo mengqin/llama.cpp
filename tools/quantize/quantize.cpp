@@ -36,6 +36,8 @@ static const std::vector<quant_option> QUANT_OPTIONS = {
     { "Q4_0",     LLAMA_FTYPE_MOSTLY_Q4_0,     " 4.34G, +0.4685 ppl @ Llama-3-8B",  },
     { "Q4_1",     LLAMA_FTYPE_MOSTLY_Q4_1,     " 4.78G, +0.4511 ppl @ Llama-3-8B",  },
     { "MXFP4_MOE",LLAMA_FTYPE_MOSTLY_MXFP4_MOE," MXFP4 MoE",  },
+    { "NVFP4",    LLAMA_FTYPE_MOSTLY_NVFP4,    " NVFP4 quantization",                },
+    { "NVFP4_M",  LLAMA_FTYPE_MOSTLY_NVFP4_M,  " NVFP4 mixed tensor policy",         },
     { "Q5_0",     LLAMA_FTYPE_MOSTLY_Q5_0,     " 5.21G, +0.1316 ppl @ Llama-3-8B",  },
     { "Q5_1",     LLAMA_FTYPE_MOSTLY_Q5_1,     " 5.65G, +0.1062 ppl @ Llama-3-8B",  },
     { "IQ2_XXS",  LLAMA_FTYPE_MOSTLY_IQ2_XXS,  " 2.06 bpw quantization",            },
@@ -128,12 +130,28 @@ static bool try_parse_ftype(const std::string & ftype_str_in, llama_ftype & ftyp
     return false;
 }
 
+static bool parse_nvfp4_scale_mode(const char * value, llama_nvfp4_scale_mode & mode) {
+    if (striequals(value, "m6")) {
+        mode = LLAMA_NVFP4_SCALE_MODE_M6;
+        return true;
+    }
+    if (striequals(value, "m4")) {
+        mode = LLAMA_NVFP4_SCALE_MODE_M4;
+        return true;
+    }
+    if (striequals(value, "adaptive")) {
+        mode = LLAMA_NVFP4_SCALE_MODE_ADAPTIVE;
+        return true;
+    }
+    return false;
+}
+
 [[noreturn]]
 static void usage(const char * executable) {
     printf("usage: %s [--help] [--allow-requantize] [--leave-output-tensor] [--pure] [--imatrix] [--include-weights]\n", executable);
     printf("       [--exclude-weights] [--output-tensor-type] [--token-embedding-type] [--tensor-type] [--tensor-type-file]\n");
     printf("       [--prune-layers] [--keep-split] [--override-kv] [--dry-run] [--quant-wht] [--quant-wht-full]\n");
-    printf("       [--quant-wht-skip-type] [--quant-wht-dim]\n");
+    printf("       [--quant-wht-skip-type] [--quant-wht-dim] [--nvfp4-scale-mode]\n");
     printf("       model-f32.gguf [model-quant.gguf] type [nthreads]\n\n");
     printf("  --allow-requantize\n");
     printf("                                      allow requantizing tensors that have already been quantized\n");
@@ -182,6 +200,12 @@ static void usage(const char * executable) {
     printf("                                      comma-separated GGML tensor types to leave unrotated with --quant-wht\n");
     printf("  --quant-wht-dim N\n");
     printf("                                      WHT dimension for --quant-wht, currently only 256 is supported\n");
+    printf("  --nvfp4-scale-mode <m6|m4|adaptive>\n");
+    printf("                                      NVFP4 scale selection mode. m6 is standard NVFP4.\n");
+    printf("                                      adaptive selects the best per-subblock NVFP4 scale candidate.\n");
+    printf("                                      adaptive balances ordinary and imatrix-weighted reconstruction error when imatrix is available.\n");
+    printf("                                      use GGML_NVFP4_IMATRIX_SELECT_MODE to change imatrix selection behavior.\n");
+    printf("                                      does not change GGML_TYPE_NVFP4 or runtime compatibility\n");
     printf("note: --include-weights and --exclude-weights cannot be used together\n\n");
     printf("-----------------------------------------------------------------------------\n");
     printf(" allowed quantization types\n");
@@ -588,6 +612,11 @@ int llama_quantize(int argc, char ** argv) {
                 }
             } else {
                 usage(argv[0]);
+            }
+        } else if (strcmp(argv[arg_idx], "--nvfp4-scale-mode") == 0) {
+            if (arg_idx == argc-1 || !parse_nvfp4_scale_mode(argv[++arg_idx], params.nvfp4_scale_mode)) {
+                fprintf(stderr, "%s: invalid --nvfp4-scale-mode value; allowed values: m6, m4, adaptive\n", argv[0]);
+                return 1;
             }
         } else if (strcmp(argv[arg_idx], "--allow-requantize") == 0) {
             params.allow_requantize = true;
