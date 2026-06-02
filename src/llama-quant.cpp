@@ -1158,6 +1158,21 @@ static ggml_type llama_tensor_get_type(quantize_state_impl & qs, const llama_mod
 // quantization implementation
 //
 
+struct llama_nvfp4_rsf_override_scope {
+    bool active = false;
+
+    void set(float multiplier) {
+        ggml_nvfp4_set_rsf_multiplier_override(multiplier);
+        active = true;
+    }
+
+    ~llama_nvfp4_rsf_override_scope() {
+        if (active) {
+            ggml_nvfp4_clear_rsf_multiplier_override();
+        }
+    }
+};
+
 static size_t llama_tensor_quantize_impl(enum ggml_type new_type, const float * f32_data, void * new_data, const int64_t chunk_size, int64_t nrows, int64_t n_per_row, const float * imatrix, std::vector<std::thread> & workers, const int nthread) {
     if (nthread < 2) {
         // single-thread
@@ -2032,6 +2047,13 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
                         quant_data_03 = (const float *) quant_wht_buf.data();
                     }
 
+                    llama_nvfp4_rsf_override_scope nvfp4_rsf_scope;
+                    if (new_type == GGML_TYPE_NVFP4 &&
+                            params->nvfp4_scale_mode == LLAMA_NVFP4_SCALE_MODE_ADAPTIVE &&
+                            ggml_nvfp4_rsf_lite_enabled()) {
+                        nvfp4_rsf_scope.set(ggml_nvfp4_choose_rsf_multiplier(quant_data_03, nrows, n_per_row, imatrix_03));
+                    }
+
                     if (new_type == GGML_TYPE_NVFP4) {
                         ggml_nvfp4_set_debug_context(metadata[i].name.c_str(), quant_data_03, n_per_row);
                     }
@@ -2087,10 +2109,43 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
             const double knee_pct = weighted ? 100.0 * (double) stats.n_knee_selected / (double) stats.n_weighted_subblocks : 0.0;
             const double guard_accepted_pct = weighted ? 100.0 * (double) stats.n_weighted_guard_accepted / (double) stats.n_weighted_subblocks : 0.0;
             const double guard_fallback_pct = weighted ? 100.0 * (double) stats.n_weighted_guard_fallback / (double) stats.n_weighted_subblocks : 0.0;
+            const bool rich = ggml_nvfp4_rich_scale_search_enabled() != 0;
+            const bool rsf = ggml_nvfp4_rsf_lite_enabled() != 0;
             const ggml_nvfp4_imatrix_select_mode select_mode = weighted ?
                     ggml_nvfp4_get_imatrix_select_mode() : GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE;
             LLAMA_LOG_INFO("%s: NVFP4 adaptive:\n", __func__);
             LLAMA_LOG_INFO("%s:   candidates: %s\n", __func__, ggml_nvfp4_adaptive_candidates());
+            LLAMA_LOG_INFO("%s:   rich scale search: %s\n", __func__, rich ? "enabled" : "disabled");
+            if (rich) {
+                const double avg_candidates = stats.n_subblocks > 0 ?
+                        (double) stats.candidate_count_total / (double) stats.n_subblocks : 0.0;
+                const double p_top1 = stats.n_subblocks > 0 ? 100.0 * (double) stats.n_anchor_top1 / (double) stats.n_subblocks : 0.0;
+                const double p_slot1 = stats.n_subblocks > 0 ? 100.0 * (double) stats.n_slot1 / (double) stats.n_subblocks : 0.0;
+                const double p_slot15 = stats.n_subblocks > 0 ? 100.0 * (double) stats.n_slot15 / (double) stats.n_subblocks : 0.0;
+                const double p_slot2 = stats.n_subblocks > 0 ? 100.0 * (double) stats.n_slot2 / (double) stats.n_subblocks : 0.0;
+                const double p_slot3 = stats.n_subblocks > 0 ? 100.0 * (double) stats.n_slot3 / (double) stats.n_subblocks : 0.0;
+                LLAMA_LOG_INFO("%s:   rich anchor: top1 maxabs\n", __func__);
+                LLAMA_LOG_INFO("%s:   rich slots: 6,5,4,3,2,1.5,1\n", __func__);
+                LLAMA_LOG_INFO("%s:   rich slot code_radius: %d\n", __func__, ggml_nvfp4_rich_scale_code_radius());
+                LLAMA_LOG_INFO("%s:   rich avg candidates after dedup: %.3f\n", __func__, avg_candidates);
+                LLAMA_LOG_INFO("%s:   rich selected anchor top1: %.3f%%\n", __func__, p_top1);
+                LLAMA_LOG_INFO("%s:   slot distribution: 6=%.3f%%, 5=%.3f%%, 4=%.3f%%, 3=%.3f%%, 2=%.3f%%, 1.5=%.3f%%, 1=%.3f%%\n",
+                        __func__, p6, p5, p4, p_slot3, p_slot2, p_slot15, p_slot1);
+            }
+            LLAMA_LOG_INFO("%s:   RSF-lite: %s\n", __func__, rsf ? "enabled" : "disabled");
+            if (rsf) {
+                const double rsf_ratio = stats.rsf_sample_error_baseline > 0.0 ?
+                        stats.rsf_sample_error_selected / stats.rsf_sample_error_baseline : 1.0;
+                LLAMA_LOG_INFO("%s:   RSF tensors: %llu\n", __func__, (unsigned long long) stats.n_rsf_tensors);
+                LLAMA_LOG_INFO("%s:   RSF multiplier counts: 0.875=%llu, 0.9375=%llu, 1.0=%llu, 1.0625=%llu, 1.125=%llu\n",
+                        __func__,
+                        (unsigned long long) stats.n_rsf_0875,
+                        (unsigned long long) stats.n_rsf_09375,
+                        (unsigned long long) stats.n_rsf_1000,
+                        (unsigned long long) stats.n_rsf_10625,
+                        (unsigned long long) stats.n_rsf_1125);
+                LLAMA_LOG_INFO("%s:   RSF sampled error ratio vs r=1.0: %.9g\n", __func__, rsf_ratio);
+            }
             if (weighted) {
                 switch (select_mode) {
                     case GGML_NVFP4_IMATRIX_SELECT_ORDINARY:

@@ -29,6 +29,22 @@
 
 #define GGML_NVFP4_IMATRIX_ORDINARY_MSE_GUARD_DEFAULT 16.0f
 
+#ifndef GGML_NVFP4_RICH_SCALE_SEARCH
+#define GGML_NVFP4_RICH_SCALE_SEARCH 1
+#endif
+
+#ifndef GGML_NVFP4_RICH_SCALE_CODE_RADIUS
+#define GGML_NVFP4_RICH_SCALE_CODE_RADIUS 1
+#endif
+
+#ifndef GGML_NVFP4_RSF_LITE
+#define GGML_NVFP4_RSF_LITE 1
+#endif
+
+#ifndef GGML_NVFP4_RSF_LITE_MAX_SAMPLES
+#define GGML_NVFP4_RSF_LITE_MAX_SAMPLES 4096
+#endif
+
 #define UNUSED GGML_UNUSED
 
 enum ggml_nvfp4_imatrix_select_mode ggml_nvfp4_get_imatrix_select_mode(void) {
@@ -428,6 +444,8 @@ static inline int best_index_mxfp4(float x, float e) {
 
 static enum ggml_nvfp4_scale_mode g_nvfp4_scale_mode = GGML_NVFP4_SCALE_MODE_M6;
 static ggml_nvfp4_scale_stats g_nvfp4_scale_stats;
+static int g_nvfp4_rsf_multiplier_override_enabled = 0;
+static float g_nvfp4_rsf_multiplier_override = 1.0f;
 static const char * g_nvfp4_debug_tensor_name = NULL;
 static const float * g_nvfp4_debug_data = NULL;
 static int64_t g_nvfp4_debug_n_per_row = 0;
@@ -473,7 +491,7 @@ static enum ggml_nvfp4_scale_mode ggml_nvfp4_scale_get_mode(void) {
 }
 
 static void ggml_nvfp4_scale_accum_stats(const ggml_nvfp4_scale_stats * add) {
-    if (add->n_subblocks == 0) {
+    if (add->n_subblocks == 0 && add->n_rsf_tensors == 0) {
         return;
     }
 
@@ -492,11 +510,63 @@ static void ggml_nvfp4_scale_accum_stats(const ggml_nvfp4_scale_stats * add) {
     g_nvfp4_scale_stats.mse_selected          += add->mse_selected;
     g_nvfp4_scale_stats.weighted_mse_m6       += add->weighted_mse_m6;
     g_nvfp4_scale_stats.weighted_mse_selected += add->weighted_mse_selected;
+    g_nvfp4_scale_stats.candidate_count_total += add->candidate_count_total;
+    g_nvfp4_scale_stats.n_anchor_top1         += add->n_anchor_top1;
+    g_nvfp4_scale_stats.n_slot1               += add->n_slot1;
+    g_nvfp4_scale_stats.n_slot15              += add->n_slot15;
+    g_nvfp4_scale_stats.n_slot2               += add->n_slot2;
+    g_nvfp4_scale_stats.n_slot3               += add->n_slot3;
+    g_nvfp4_scale_stats.n_rsf_tensors         += add->n_rsf_tensors;
+    g_nvfp4_scale_stats.n_rsf_0875            += add->n_rsf_0875;
+    g_nvfp4_scale_stats.n_rsf_09375           += add->n_rsf_09375;
+    g_nvfp4_scale_stats.n_rsf_1000            += add->n_rsf_1000;
+    g_nvfp4_scale_stats.n_rsf_10625           += add->n_rsf_10625;
+    g_nvfp4_scale_stats.n_rsf_1125            += add->n_rsf_1125;
+    g_nvfp4_scale_stats.rsf_sample_error_baseline += add->rsf_sample_error_baseline;
+    g_nvfp4_scale_stats.rsf_sample_error_selected += add->rsf_sample_error_selected;
     ggml_nvfp4_scale_unlock();
 }
 
 const char * ggml_nvfp4_adaptive_candidates(void) {
+#if GGML_NVFP4_RICH_SCALE_SEARCH
+    return "rich top1 anchor, slots=6,5,4,3,2,1.5,1, slot_code_radius=1";
+#else
     return "4,5,6";
+#endif
+}
+
+int ggml_nvfp4_rich_scale_search_enabled(void) {
+    return GGML_NVFP4_RICH_SCALE_SEARCH != 0;
+}
+
+int ggml_nvfp4_rich_scale_code_radius(void) {
+    return GGML_NVFP4_RICH_SCALE_CODE_RADIUS;
+}
+
+int ggml_nvfp4_rsf_lite_enabled(void) {
+    return GGML_NVFP4_RSF_LITE != 0;
+}
+
+void ggml_nvfp4_set_rsf_multiplier_override(float multiplier) {
+    ggml_nvfp4_scale_lock();
+    g_nvfp4_rsf_multiplier_override_enabled = 1;
+    g_nvfp4_rsf_multiplier_override = multiplier;
+    ggml_nvfp4_scale_unlock();
+}
+
+void ggml_nvfp4_clear_rsf_multiplier_override(void) {
+    ggml_nvfp4_scale_lock();
+    g_nvfp4_rsf_multiplier_override_enabled = 0;
+    g_nvfp4_rsf_multiplier_override = 1.0f;
+    ggml_nvfp4_scale_unlock();
+}
+
+static int ggml_nvfp4_get_rsf_multiplier_override(float * multiplier) {
+    ggml_nvfp4_scale_lock();
+    const int enabled = g_nvfp4_rsf_multiplier_override_enabled;
+    *multiplier = g_nvfp4_rsf_multiplier_override;
+    ggml_nvfp4_scale_unlock();
+    return enabled;
 }
 
 void ggml_nvfp4_set_debug_context(const char * tensor_name, const float * data, int64_t n_per_row) {
@@ -534,7 +604,15 @@ typedef struct {
     uint8_t qs[QK_NVFP4_SUB/2];
     float   mse;
     double  weighted_mse;
+    int     slot_x2;
+    int     anchor_rank;
 } ggml_nvfp4_candidate;
+
+#define GGML_NVFP4_MAX_CANDIDATES 64
+
+static double ggml_nvfp4_slot_value(int slot_x2) {
+    return 0.5 * (double) slot_x2;
+}
 
 static double ggml_nvfp4_two_objective_score(
         const ggml_nvfp4_candidate * candidate,
@@ -557,9 +635,9 @@ static void ggml_nvfp4_debug_print_selection(
         int64_t row, int block, int sub, float sigma2,
         const float * x, const float * raw_weights, const float * effective_weights,
         const ggml_nvfp4_candidate * c4, const ggml_nvfp4_candidate * c5, const ggml_nvfp4_candidate * c6,
-        const ggml_nvfp4_candidate * ordinary_best, int ordinary_best_m,
-        const ggml_nvfp4_candidate * weighted_best, int weighted_best_m,
-        const ggml_nvfp4_candidate * selected, int selected_m) {
+        const ggml_nvfp4_candidate * ordinary_best, int ordinary_best_slot_x2,
+        const ggml_nvfp4_candidate * weighted_best, int weighted_best_slot_x2,
+        const ggml_nvfp4_candidate * selected, int selected_slot_x2) {
     if (!ggml_nvfp4_imatrix_select_debug_enabled()) {
         return;
     }
@@ -619,11 +697,14 @@ static void ggml_nvfp4_debug_print_selection(
 
     fprintf(stderr,
             "\nggml_nvfp4_select_debug[%lld]: tensor=%s row=%lld block=%d sub=%d "
-            "select_mode=%s guard=%g ordinary_best=M%d weighted_best=M%d selected=M%d selected_ro=%g selected_rw=%g weighted_best_ro=%g sigma2=%g amax=%g "
+            "select_mode=%s guard=%g ordinary_best=M%.3g weighted_best=M%.3g selected=M%.3g selected_ro=%g selected_rw=%g weighted_best_ro=%g sigma2=%g amax=%g "
             "x=[%g,%g] raw_w=[%g,%g,%g] eff_w=[%g,%g,%g]\n",
             (long long) index, tensor_name, (long long) row, block, sub,
             ggml_nvfp4_imatrix_select_mode_name(select_mode), (double) guard,
-            ordinary_best_m, weighted_best_m, selected_m, selected_ro, selected_rw, weighted_best_ro, (double) sigma2, (double) amax,
+            ggml_nvfp4_slot_value(ordinary_best_slot_x2),
+            ggml_nvfp4_slot_value(weighted_best_slot_x2),
+            ggml_nvfp4_slot_value(selected_slot_x2),
+            selected_ro, selected_rw, weighted_best_ro, (double) sigma2, (double) amax,
             (double) xmin, (double) xmax,
             (double) raw_w_min, raw_w_mean, (double) raw_w_max,
             (double) eff_w_min, eff_w_mean, (double) eff_w_max);
@@ -641,17 +722,9 @@ static void ggml_nvfp4_debug_print_selection(
     ggml_nvfp4_scale_unlock();
 }
 
-static void eval_nvfp4_candidate_m(const float * x, const float * weights, float m, ggml_nvfp4_candidate * out) {
+static void eval_nvfp4_candidate_code(const float * x, const float * weights, uint8_t ue, int slot_x2, int anchor_rank, ggml_nvfp4_candidate * out) {
     static const int qk_sub = QK_NVFP4_SUB;
 
-    float amax = 0.0f;
-    for (int j = 0; j < qk_sub; j++) {
-        if (amax < fabsf(x[j])) {
-            amax = fabsf(x[j]);
-        }
-    }
-
-    const uint8_t ue = ggml_fp32_to_ue4m3(amax / m);
     const float d = ggml_ue4m3_to_fp32(ue);
 
     double err = 0.0;
@@ -677,14 +750,87 @@ static void eval_nvfp4_candidate_m(const float * x, const float * weights, float
     out->scale = ue;
     out->mse = (float) err;
     out->weighted_mse = weights ? weighted_err : err;
+    out->slot_x2 = slot_x2;
+    out->anchor_rank = anchor_rank;
+}
+
+static void eval_nvfp4_candidate_m(const float * x, const float * weights, float m, float scale_multiplier, ggml_nvfp4_candidate * out) {
+    static const int qk_sub = QK_NVFP4_SUB;
+
+    float amax = 0.0f;
+    for (int j = 0; j < qk_sub; j++) {
+        if (amax < fabsf(x[j])) {
+            amax = fabsf(x[j]);
+        }
+    }
+
+    const uint8_t ue = ggml_fp32_to_ue4m3((amax / m) * scale_multiplier);
+    eval_nvfp4_candidate_code(x, weights, ue, (int) lroundf(2.0f * m), 1, out);
 }
 
 static void quantize_nvfp4_subblock_m(const float * x, float m, uint8_t * scale, uint8_t * qs, float * mse) {
     ggml_nvfp4_candidate candidate;
-    eval_nvfp4_candidate_m(x, NULL, m, &candidate);
+    eval_nvfp4_candidate_m(x, NULL, m, 1.0f, &candidate);
     *scale = candidate.scale;
     memcpy(qs, candidate.qs, sizeof(candidate.qs));
     *mse = candidate.mse;
+}
+
+static void ggml_nvfp4_add_code_candidate(
+        const float * x, const float * weights, uint8_t code, int slot_x2, int anchor_rank,
+        ggml_nvfp4_candidate * candidates, int * n_candidates) {
+    for (int i = 0; i < *n_candidates; ++i) {
+        if (candidates[i].scale == code) {
+            return;
+        }
+    }
+
+    GGML_ASSERT(*n_candidates < GGML_NVFP4_MAX_CANDIDATES);
+    eval_nvfp4_candidate_code(x, weights, code, slot_x2, anchor_rank, &candidates[*n_candidates]);
+    ++(*n_candidates);
+}
+
+static int ggml_nvfp4_build_rich_candidates(
+        const float * x, const float * weights, float scale_multiplier,
+        ggml_nvfp4_candidate * candidates) {
+    typedef struct {
+        float value;
+        int   x2;
+    } ggml_nvfp4_rich_slot;
+
+    static const ggml_nvfp4_rich_slot slots[] = {
+        { 6.0f, 12 },
+        { 5.0f, 10 },
+        { 4.0f,  8 },
+        { 3.0f,  6 },
+        { 2.0f,  4 },
+        { 1.5f,  3 },
+        { 1.0f,  2 },
+    };
+    static const int qk_sub = QK_NVFP4_SUB;
+
+    float anchor = 0.0f;
+    for (int j = 0; j < qk_sub; ++j) {
+        const float a = fabsf(x[j]);
+        if (a > anchor) {
+            anchor = a;
+        }
+    }
+
+    int n_candidates = 0;
+    for (int si = 0; si < (int) (sizeof(slots) / sizeof(slots[0])); ++si) {
+        const ggml_nvfp4_rich_slot slot = slots[si];
+        const uint8_t base_code = ggml_fp32_to_ue4m3((anchor / slot.value) * scale_multiplier);
+        for (int dr = -GGML_NVFP4_RICH_SCALE_CODE_RADIUS; dr <= GGML_NVFP4_RICH_SCALE_CODE_RADIUS; ++dr) {
+            const int code = (int) base_code + dr;
+            if (code < 0 || code > 255) {
+                continue;
+            }
+            ggml_nvfp4_add_code_candidate(x, weights, (uint8_t) code, slot.x2, 1, candidates, &n_candidates);
+        }
+    }
+
+    return n_candidates;
 }
 
 void quantize_row_mxfp4_ref(const float * GGML_RESTRICT x, block_mxfp4 * GGML_RESTRICT y, int64_t k) {
@@ -721,7 +867,7 @@ void quantize_row_mxfp4_ref(const float * GGML_RESTRICT x, block_mxfp4 * GGML_RE
     }
 }
 
-static void quantize_row_nvfp4_impl(const float * GGML_RESTRICT x, block_nvfp4 * GGML_RESTRICT y, int64_t n_per_row, const float * quant_weights, int64_t row_index) {
+static void quantize_row_nvfp4_impl(const float * GGML_RESTRICT x, block_nvfp4 * GGML_RESTRICT y, int64_t n_per_row, const float * quant_weights, int64_t row_index, float scale_multiplier) {
     static const int qk = QK_NVFP4;
     static const int qk_sub = QK_NVFP4_SUB;
     static const int n_sub = QK_NVFP4 / QK_NVFP4_SUB;
@@ -766,8 +912,8 @@ static void quantize_row_nvfp4_impl(const float * GGML_RESTRICT x, block_nvfp4 *
 
                 ggml_nvfp4_candidate c6;
                 ggml_nvfp4_candidate c4;
-                eval_nvfp4_candidate_m(xb, weights_ptr, 6.0f, &c6);
-                eval_nvfp4_candidate_m(xb, weights_ptr, 4.0f, &c4);
+                eval_nvfp4_candidate_m(xb, weights_ptr, 6.0f, scale_multiplier, &c6);
+                eval_nvfp4_candidate_m(xb, weights_ptr, 4.0f, scale_multiplier, &c4);
 
                 stats.n_subblocks++;
                 stats.mse_m6 += c6.mse;
@@ -777,62 +923,107 @@ static void quantize_row_nvfp4_impl(const float * GGML_RESTRICT x, block_nvfp4 *
                 }
 
                 ggml_nvfp4_candidate c5;
-                eval_nvfp4_candidate_m(xb, weights_ptr, 5.0f, &c5);
+                eval_nvfp4_candidate_m(xb, weights_ptr, 5.0f, scale_multiplier, &c5);
+
+                ggml_nvfp4_candidate rich_candidates[GGML_NVFP4_MAX_CANDIDATES];
+                int n_rich_candidates = 0;
+#if GGML_NVFP4_RICH_SCALE_SEARCH
+                n_rich_candidates = ggml_nvfp4_build_rich_candidates(xb, weights_ptr, scale_multiplier, rich_candidates);
+                if (n_rich_candidates == 0) {
+                    rich_candidates[n_rich_candidates++] = c6;
+                }
+                stats.candidate_count_total += (uint64_t) n_rich_candidates;
+#endif
 
                 const ggml_nvfp4_candidate * ordinary_best = &c6;
-                int ordinary_best_m = 6;
+                int ordinary_best_slot_x2 = 12;
+#if GGML_NVFP4_RICH_SCALE_SEARCH
+                ordinary_best = &rich_candidates[0];
+                ordinary_best_slot_x2 = rich_candidates[0].slot_x2;
+                for (int ci = 1; ci < n_rich_candidates; ++ci) {
+                    if (rich_candidates[ci].mse < ordinary_best->mse) {
+                        ordinary_best = &rich_candidates[ci];
+                        ordinary_best_slot_x2 = rich_candidates[ci].slot_x2;
+                    }
+                }
+#else
                 if (c4.mse < ordinary_best->mse) {
                     ordinary_best = &c4;
-                    ordinary_best_m = 4;
+                    ordinary_best_slot_x2 = 8;
                 }
                 if (c5.mse < ordinary_best->mse) {
                     ordinary_best = &c5;
-                    ordinary_best_m = 5;
+                    ordinary_best_slot_x2 = 10;
                 }
+#endif
 
                 const ggml_nvfp4_candidate * best = ordinary_best;
-                int best_m = ordinary_best_m;
+                int best_slot_x2 = ordinary_best_slot_x2;
 
                 if (weights_ptr) {
                     const ggml_nvfp4_candidate * weighted_best = &c6;
-                    int weighted_best_m = 6;
+                    int weighted_best_slot_x2 = 12;
+#if GGML_NVFP4_RICH_SCALE_SEARCH
+                    weighted_best = &rich_candidates[0];
+                    weighted_best_slot_x2 = rich_candidates[0].slot_x2;
+                    for (int ci = 1; ci < n_rich_candidates; ++ci) {
+                        if (rich_candidates[ci].weighted_mse < weighted_best->weighted_mse) {
+                            weighted_best = &rich_candidates[ci];
+                            weighted_best_slot_x2 = rich_candidates[ci].slot_x2;
+                        }
+                    }
+#else
                     if (c4.weighted_mse < weighted_best->weighted_mse) {
                         weighted_best = &c4;
-                        weighted_best_m = 4;
+                        weighted_best_slot_x2 = 8;
                     }
                     if (c5.weighted_mse < weighted_best->weighted_mse) {
                         weighted_best = &c5;
-                        weighted_best_m = 5;
+                        weighted_best_slot_x2 = 10;
                     }
+#endif
 
                     switch (select_mode) {
                         case GGML_NVFP4_IMATRIX_SELECT_ORDINARY:
                             best = ordinary_best;
-                            best_m = ordinary_best_m;
+                            best_slot_x2 = ordinary_best_slot_x2;
                             stats.n_ordinary_best_selected++;
                             break;
                         case GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_RAW:
                             best = weighted_best;
-                            best_m = weighted_best_m;
+                            best_slot_x2 = weighted_best_slot_x2;
                             stats.n_weighted_best_selected++;
                             break;
                         case GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD:
                             if ((double) weighted_best->mse <= (double) ordinary_best->mse * (double) imatrix_guard) {
                                 best = weighted_best;
-                                best_m = weighted_best_m;
+                                best_slot_x2 = weighted_best_slot_x2;
                                 stats.n_weighted_guard_accepted++;
                                 stats.n_weighted_best_selected++;
                             } else {
                                 best = ordinary_best;
-                                best_m = ordinary_best_m;
+                                best_slot_x2 = ordinary_best_slot_x2;
                                 stats.n_weighted_guard_fallback++;
                                 stats.n_ordinary_best_selected++;
                             }
                             break;
                         case GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE:
                         default: {
+#if GGML_NVFP4_RICH_SCALE_SEARCH
+                            double best_score = DBL_MAX;
+                            int best_index = 0;
+                            for (int ci = 0; ci < n_rich_candidates; ++ci) {
+                                const double score = ggml_nvfp4_two_objective_score(&rich_candidates[ci], ordinary_best, weighted_best);
+                                if (score < best_score) {
+                                    best_score = score;
+                                    best_index = ci;
+                                }
+                            }
+                            best = &rich_candidates[best_index];
+                            best_slot_x2 = best->slot_x2;
+#else
                             const ggml_nvfp4_candidate * candidates[3] = { &c4, &c5, &c6 };
-                            const int candidate_m[3] = { 4, 5, 6 };
+                            const int candidate_slot_x2[3] = { 8, 10, 12 };
                             double best_score = DBL_MAX;
                             int best_index = 0;
                             for (int ci = 0; ci < 3; ++ci) {
@@ -843,7 +1034,8 @@ static void quantize_row_nvfp4_impl(const float * GGML_RESTRICT x, block_nvfp4 *
                                 }
                             }
                             best = candidates[best_index];
-                            best_m = candidate_m[best_index];
+                            best_slot_x2 = candidate_slot_x2[best_index];
+#endif
 
                             if (best == ordinary_best) {
                                 stats.n_ordinary_best_selected++;
@@ -858,7 +1050,7 @@ static void quantize_row_nvfp4_impl(const float * GGML_RESTRICT x, block_nvfp4 *
 
                     ggml_nvfp4_debug_print_selection(
                             select_mode, imatrix_guard, row_index, i, s, sigma2, xb, raw_weights_ptr, weights_ptr,
-                            &c4, &c5, &c6, ordinary_best, ordinary_best_m, weighted_best, weighted_best_m, best, best_m);
+                            &c4, &c5, &c6, ordinary_best, ordinary_best_slot_x2, weighted_best, weighted_best_slot_x2, best, best_slot_x2);
                 }
 
                 y[i].d[s] = best->scale;
@@ -868,13 +1060,20 @@ static void quantize_row_nvfp4_impl(const float * GGML_RESTRICT x, block_nvfp4 *
                     stats.weighted_mse_selected += best->weighted_mse;
                 }
 
-                if (best_m == 4) {
-                    stats.n_m4++;
-                } else if (best_m == 5) {
-                    stats.n_m5++;
-                } else {
-                    stats.n_m6++;
+                switch (best_slot_x2) {
+                    case 12: stats.n_m6++;     break;
+                    case 10: stats.n_m5++;     break;
+                    case  8: stats.n_m4++;     break;
+                    case  6: stats.n_slot3++;  break;
+                    case  4: stats.n_slot2++;  break;
+                    case  3: stats.n_slot15++; break;
+                    case  2: stats.n_slot1++;  break;
+                    default: stats.n_m6++;     break;
                 }
+#if GGML_NVFP4_RICH_SCALE_SEARCH
+                GGML_ASSERT(best->anchor_rank == 1);
+                stats.n_anchor_top1++;
+#endif
             } else {
                 const float m = mode == GGML_NVFP4_SCALE_MODE_M4 ? 4.0f : 6.0f;
                 float mse;
@@ -890,7 +1089,7 @@ static void quantize_row_nvfp4_impl(const float * GGML_RESTRICT x, block_nvfp4 *
 }
 
 void quantize_row_nvfp4_ref(const float * GGML_RESTRICT x, block_nvfp4 * GGML_RESTRICT y, int64_t k) {
-    quantize_row_nvfp4_impl(x, y, k, NULL, -1);
+    quantize_row_nvfp4_impl(x, y, k, NULL, -1, 1.0f);
 }
 
 void dequantize_row_q1_0(const block_q1_0 * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k) {
@@ -2748,19 +2947,231 @@ size_t quantize_mxfp4(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
     return nrow * ggml_row_size(GGML_TYPE_MXFP4, n_per_row);
 }
 
+static void ggml_nvfp4_eval_selected_error(
+        const float * xb, const float * weights,
+        enum ggml_nvfp4_imatrix_select_mode select_mode, float imatrix_guard,
+        float scale_multiplier, double * mse, double * weighted_mse) {
+    ggml_nvfp4_candidate c6;
+    ggml_nvfp4_candidate c4;
+    ggml_nvfp4_candidate c5;
+    eval_nvfp4_candidate_m(xb, weights, 6.0f, scale_multiplier, &c6);
+    eval_nvfp4_candidate_m(xb, weights, 4.0f, scale_multiplier, &c4);
+    eval_nvfp4_candidate_m(xb, weights, 5.0f, scale_multiplier, &c5);
+
+    const ggml_nvfp4_candidate * ordinary_best = &c6;
+#if GGML_NVFP4_RICH_SCALE_SEARCH
+    ggml_nvfp4_candidate rich_candidates[GGML_NVFP4_MAX_CANDIDATES];
+    int n_rich_candidates = ggml_nvfp4_build_rich_candidates(xb, weights, scale_multiplier, rich_candidates);
+    if (n_rich_candidates == 0) {
+        rich_candidates[n_rich_candidates++] = c6;
+    }
+    ordinary_best = &rich_candidates[0];
+    for (int ci = 1; ci < n_rich_candidates; ++ci) {
+        if (rich_candidates[ci].mse < ordinary_best->mse) {
+            ordinary_best = &rich_candidates[ci];
+        }
+    }
+#else
+    if (c4.mse < ordinary_best->mse) {
+        ordinary_best = &c4;
+    }
+    if (c5.mse < ordinary_best->mse) {
+        ordinary_best = &c5;
+    }
+#endif
+
+    const ggml_nvfp4_candidate * selected = ordinary_best;
+    if (weights != NULL) {
+        const ggml_nvfp4_candidate * weighted_best = &c6;
+#if GGML_NVFP4_RICH_SCALE_SEARCH
+        weighted_best = &rich_candidates[0];
+        for (int ci = 1; ci < n_rich_candidates; ++ci) {
+            if (rich_candidates[ci].weighted_mse < weighted_best->weighted_mse) {
+                weighted_best = &rich_candidates[ci];
+            }
+        }
+#else
+        if (c4.weighted_mse < weighted_best->weighted_mse) {
+            weighted_best = &c4;
+        }
+        if (c5.weighted_mse < weighted_best->weighted_mse) {
+            weighted_best = &c5;
+        }
+#endif
+
+        switch (select_mode) {
+            case GGML_NVFP4_IMATRIX_SELECT_ORDINARY:
+                selected = ordinary_best;
+                break;
+            case GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_RAW:
+                selected = weighted_best;
+                break;
+            case GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD:
+                selected = (double) weighted_best->mse <= (double) ordinary_best->mse * (double) imatrix_guard ?
+                        weighted_best : ordinary_best;
+                break;
+            case GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE:
+            default: {
+                double best_score = DBL_MAX;
+#if GGML_NVFP4_RICH_SCALE_SEARCH
+                int best_index = 0;
+                for (int ci = 0; ci < n_rich_candidates; ++ci) {
+                    const double score = ggml_nvfp4_two_objective_score(&rich_candidates[ci], ordinary_best, weighted_best);
+                    if (score < best_score) {
+                        best_score = score;
+                        best_index = ci;
+                    }
+                }
+                selected = &rich_candidates[best_index];
+#else
+                const ggml_nvfp4_candidate * candidates[3] = { &c4, &c5, &c6 };
+                int best_index = 0;
+                for (int ci = 0; ci < 3; ++ci) {
+                    const double score = ggml_nvfp4_two_objective_score(candidates[ci], ordinary_best, weighted_best);
+                    if (score < best_score) {
+                        best_score = score;
+                        best_index = ci;
+                    }
+                }
+                selected = candidates[best_index];
+#endif
+                break;
+            }
+        }
+    }
+
+    *mse = selected->mse;
+    *weighted_mse = selected->weighted_mse;
+}
+
+float ggml_nvfp4_choose_rsf_multiplier(const float * GGML_RESTRICT src, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+#if GGML_NVFP4_RSF_LITE
+    static const float multipliers[] = { 0.875f, 0.9375f, 1.0f, 1.0625f, 1.125f };
+    static const int n_multipliers = (int) (sizeof(multipliers) / sizeof(multipliers[0]));
+    static const int baseline_index = 2;
+    static const int qk = QK_NVFP4;
+    static const int qk_sub = QK_NVFP4_SUB;
+    static const int n_sub = QK_NVFP4 / QK_NVFP4_SUB;
+
+    const int64_t blocks_per_row = n_per_row / qk;
+    const int64_t subblocks_per_row = blocks_per_row * n_sub;
+    const int64_t total_subblocks = nrow * subblocks_per_row;
+    if (total_subblocks <= 0) {
+        return 1.0f;
+    }
+
+    const int64_t n_samples = MIN((int64_t) GGML_NVFP4_RSF_LITE_MAX_SAMPLES, total_subblocks);
+    const bool use_weights = quant_weights != NULL;
+    const enum ggml_nvfp4_imatrix_select_mode select_mode = use_weights ?
+            ggml_nvfp4_get_imatrix_select_mode() : GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE;
+    const float imatrix_guard = select_mode == GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD ?
+            ggml_nvfp4_imatrix_ordinary_mse_guard() : 0.0f;
+
+    float * sigma2 = NULL;
+    if (use_weights) {
+        sigma2 = (float *) malloc((size_t) nrow * sizeof(float));
+        if (sigma2 == NULL) {
+            return 1.0f;
+        }
+        for (int64_t row = 0; row < nrow; ++row) {
+            double sum_x2 = 0.0;
+            const float * xr = src + row*n_per_row;
+            for (int64_t j = 0; j < n_per_row; ++j) {
+                sum_x2 += (double) xr[j] * (double) xr[j];
+            }
+            sigma2[row] = (float) (sum_x2 / (double) n_per_row);
+        }
+    }
+
+    double errors[5];
+    for (int i = 0; i < n_multipliers; ++i) {
+        errors[i] = 0.0;
+    }
+
+    for (int64_t sample = 0; sample < n_samples; ++sample) {
+        const int64_t subblock_index = (sample * total_subblocks) / n_samples;
+        const int64_t row = subblock_index / subblocks_per_row;
+        const int64_t in_row = subblock_index - row*subblocks_per_row;
+        const int64_t block = in_row / n_sub;
+        const int64_t sub = in_row - block*n_sub;
+        const float * xb = src + row*n_per_row + block*qk + sub*qk_sub;
+
+        float weights[QK_NVFP4_SUB];
+        const float * weights_ptr = NULL;
+        if (use_weights) {
+            const float * qw = quant_weights + block*qk + sub*qk_sub;
+            for (int j = 0; j < qk_sub; ++j) {
+                weights[j] = qw[j] * sqrtf(sigma2[row] + xb[j]*xb[j]);
+            }
+            weights_ptr = weights;
+        }
+
+        for (int ri = 0; ri < n_multipliers; ++ri) {
+            double mse = 0.0;
+            double weighted_mse = 0.0;
+            ggml_nvfp4_eval_selected_error(xb, weights_ptr, select_mode, imatrix_guard, multipliers[ri], &mse, &weighted_mse);
+            errors[ri] += use_weights ? weighted_mse : mse;
+        }
+    }
+
+    free(sigma2);
+
+    int best = 0;
+    for (int ri = 1; ri < n_multipliers; ++ri) {
+        if (errors[ri] < errors[best]) {
+            best = ri;
+        }
+    }
+
+    ggml_nvfp4_scale_stats stats = { 0 };
+    stats.n_rsf_tensors = 1;
+    stats.rsf_sample_error_baseline = errors[baseline_index];
+    stats.rsf_sample_error_selected = errors[best];
+    switch (best) {
+        case 0: stats.n_rsf_0875++;  break;
+        case 1: stats.n_rsf_09375++; break;
+        case 2: stats.n_rsf_1000++;  break;
+        case 3: stats.n_rsf_10625++; break;
+        case 4: stats.n_rsf_1125++;  break;
+        default: break;
+    }
+    ggml_nvfp4_scale_accum_stats(&stats);
+
+    return multipliers[best];
+#else
+    GGML_UNUSED(src);
+    GGML_UNUSED(nrow);
+    GGML_UNUSED(n_per_row);
+    GGML_UNUSED(quant_weights);
+    return 1.0f;
+#endif
+}
+
 size_t quantize_nvfp4(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     const size_t row_size = ggml_row_size(GGML_TYPE_NVFP4, n_per_row);
     const enum ggml_nvfp4_scale_mode mode = ggml_nvfp4_scale_get_mode();
-    if (!quant_weights || mode != GGML_NVFP4_SCALE_MODE_ADAPTIVE) {
+    if (mode != GGML_NVFP4_SCALE_MODE_ADAPTIVE) {
         quantize_row_nvfp4_ref(src, dst, (int64_t)nrow*n_per_row);
         return nrow * row_size;
     }
+
+    float scale_multiplier = 1.0f;
+#if !GGML_NVFP4_RSF_LITE
+    if (!quant_weights) {
+        quantize_row_nvfp4_ref(src, dst, (int64_t)nrow*n_per_row);
+        return nrow * row_size;
+    }
+#else
+    if (!ggml_nvfp4_get_rsf_multiplier_override(&scale_multiplier)) {
+        scale_multiplier = ggml_nvfp4_choose_rsf_multiplier(src, nrow, n_per_row, quant_weights);
+    }
+#endif
 
     char * qrow = (char *)dst;
     const int64_t debug_row_offset = ggml_nvfp4_debug_row_offset(src, n_per_row);
     for (int64_t row = 0; row < nrow; ++row) {
         const int64_t debug_row = debug_row_offset >= 0 ? debug_row_offset + row : row;
-        quantize_row_nvfp4_impl(src, (block_nvfp4 *) qrow, n_per_row, quant_weights, debug_row);
+        quantize_row_nvfp4_impl(src, (block_nvfp4 *) qrow, n_per_row, quant_weights, debug_row, scale_multiplier);
         src += n_per_row;
         qrow += row_size;
     }
