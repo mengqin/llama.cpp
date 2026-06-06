@@ -202,7 +202,9 @@ static void usage(const char * executable) {
     printf("                                      WHT dimension for --quant-wht, currently only 256 is supported\n");
     printf("  --nvfp4-scale-mode <m6|m4|adaptive>\n");
     printf("                                      NVFP4 scale selection mode. m6 is standard NVFP4.\n");
-    printf("                                      adaptive uses rich scale search and RSF-lite by default.\n");
+    printf("                                      adaptive uses rich+CJSO scale search and RSF-lite by default.\n");
+    printf("                                      set GGML_NVFP4_SEARCH_ALGO=<rich|cjso|rich_cjso> for weight-side search A/B testing.\n");
+    printf("                                      set GGML_NVFP4_SEARCH_ALGO=rich for the lighter previous rich-only search.\n");
     printf("                                      adaptive balances ordinary and imatrix-weighted reconstruction error when imatrix is available.\n");
     printf("                                      use GGML_NVFP4_IMATRIX_SELECT_MODE only for A/B or debug selection behavior.\n");
     printf("                                      weighted_raw is debug-only and may degrade quality or produce NaN.\n");

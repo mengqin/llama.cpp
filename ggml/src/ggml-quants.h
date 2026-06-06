@@ -26,6 +26,12 @@ enum ggml_nvfp4_imatrix_select_mode {
     GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_RAW  = 3,
 };
 
+enum ggml_nvfp4_search_algo {
+    GGML_NVFP4_SEARCH_RICH      = 0,
+    GGML_NVFP4_SEARCH_CJSO      = 1,
+    GGML_NVFP4_SEARCH_RICH_CJSO = 2,
+};
+
 typedef struct ggml_nvfp4_scale_stats {
     uint64_t n_subblocks;
     uint64_t n_weighted_subblocks;
@@ -47,6 +53,24 @@ typedef struct ggml_nvfp4_scale_stats {
     uint64_t n_slot15;
     uint64_t n_slot2;
     uint64_t n_slot3;
+    uint64_t n_slot_other;
+    uint64_t n_source_rich;
+    uint64_t n_source_cjso_ordinary;
+    uint64_t n_source_cjso_weighted;
+    uint64_t n_source_both;
+    uint64_t n_source_fallback;
+    uint64_t n_cjso_ordinary_candidates;
+    uint64_t n_cjso_weighted_candidates;
+    uint64_t n_cjso_delta_m4;
+    uint64_t n_cjso_delta_m3;
+    uint64_t n_cjso_delta_m2;
+    uint64_t n_cjso_delta_m1;
+    uint64_t n_cjso_delta_0;
+    uint64_t n_cjso_delta_p1;
+    uint64_t n_cjso_delta_p2;
+    uint64_t n_cjso_delta_p3;
+    uint64_t n_cjso_delta_p4;
+    uint64_t n_cjso_delta_other;
     uint64_t n_rsf_tensors;
     uint64_t n_rsf_0875;
     uint64_t n_rsf_09375;
@@ -63,6 +87,9 @@ GGML_API int  ggml_nvfp4_get_scale_stats(ggml_nvfp4_scale_stats * stats);
 GGML_API const char * ggml_nvfp4_adaptive_candidates(void);
 GGML_API int  ggml_nvfp4_rich_scale_search_enabled(void);
 GGML_API int  ggml_nvfp4_rich_scale_code_radius(void);
+GGML_API enum ggml_nvfp4_search_algo ggml_nvfp4_get_search_algo(void);
+GGML_API const char * ggml_nvfp4_search_algo_name(enum ggml_nvfp4_search_algo algo);
+GGML_API int  ggml_nvfp4_cjso_radius(void);
 GGML_API int  ggml_nvfp4_rsf_lite_enabled(void);
 GGML_API float ggml_nvfp4_choose_rsf_multiplier(const float * src, int64_t nrow, int64_t n_per_row, const float * quant_weights);
 GGML_API void ggml_nvfp4_set_rsf_multiplier_override(float multiplier);

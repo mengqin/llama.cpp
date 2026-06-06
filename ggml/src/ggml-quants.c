@@ -41,6 +41,10 @@
 #define GGML_NVFP4_RSF_LITE 1
 #endif
 
+#ifndef GGML_NVFP4_CJSO_RADIUS_DEFAULT
+#define GGML_NVFP4_CJSO_RADIUS_DEFAULT 2
+#endif
+
 #ifndef GGML_NVFP4_RSF_LITE_MAX_SAMPLES
 #define GGML_NVFP4_RSF_LITE_MAX_SAMPLES 4096
 #endif
@@ -516,6 +520,24 @@ static void ggml_nvfp4_scale_accum_stats(const ggml_nvfp4_scale_stats * add) {
     g_nvfp4_scale_stats.n_slot15              += add->n_slot15;
     g_nvfp4_scale_stats.n_slot2               += add->n_slot2;
     g_nvfp4_scale_stats.n_slot3               += add->n_slot3;
+    g_nvfp4_scale_stats.n_slot_other          += add->n_slot_other;
+    g_nvfp4_scale_stats.n_source_rich         += add->n_source_rich;
+    g_nvfp4_scale_stats.n_source_cjso_ordinary += add->n_source_cjso_ordinary;
+    g_nvfp4_scale_stats.n_source_cjso_weighted += add->n_source_cjso_weighted;
+    g_nvfp4_scale_stats.n_source_both         += add->n_source_both;
+    g_nvfp4_scale_stats.n_source_fallback     += add->n_source_fallback;
+    g_nvfp4_scale_stats.n_cjso_ordinary_candidates += add->n_cjso_ordinary_candidates;
+    g_nvfp4_scale_stats.n_cjso_weighted_candidates += add->n_cjso_weighted_candidates;
+    g_nvfp4_scale_stats.n_cjso_delta_m4       += add->n_cjso_delta_m4;
+    g_nvfp4_scale_stats.n_cjso_delta_m3       += add->n_cjso_delta_m3;
+    g_nvfp4_scale_stats.n_cjso_delta_m2       += add->n_cjso_delta_m2;
+    g_nvfp4_scale_stats.n_cjso_delta_m1       += add->n_cjso_delta_m1;
+    g_nvfp4_scale_stats.n_cjso_delta_0        += add->n_cjso_delta_0;
+    g_nvfp4_scale_stats.n_cjso_delta_p1       += add->n_cjso_delta_p1;
+    g_nvfp4_scale_stats.n_cjso_delta_p2       += add->n_cjso_delta_p2;
+    g_nvfp4_scale_stats.n_cjso_delta_p3       += add->n_cjso_delta_p3;
+    g_nvfp4_scale_stats.n_cjso_delta_p4       += add->n_cjso_delta_p4;
+    g_nvfp4_scale_stats.n_cjso_delta_other    += add->n_cjso_delta_other;
     g_nvfp4_scale_stats.n_rsf_tensors         += add->n_rsf_tensors;
     g_nvfp4_scale_stats.n_rsf_0875            += add->n_rsf_0875;
     g_nvfp4_scale_stats.n_rsf_09375           += add->n_rsf_09375;
@@ -528,15 +550,83 @@ static void ggml_nvfp4_scale_accum_stats(const ggml_nvfp4_scale_stats * add) {
 }
 
 const char * ggml_nvfp4_adaptive_candidates(void) {
-#if GGML_NVFP4_RICH_SCALE_SEARCH
-    return "rich top1 anchor, slots=6,5,4,3,2,1.5,1, slot_code_radius=1";
-#else
-    return "4,5,6";
-#endif
+    switch (ggml_nvfp4_get_search_algo()) {
+        case GGML_NVFP4_SEARCH_CJSO:
+            return "cjso local anchors, radius=GGML_NVFP4_CJSO_RADIUS";
+        case GGML_NVFP4_SEARCH_RICH_CJSO:
+            return "rich top1 slots=6,5,4,3,2,1.5,1 + cjso local anchors";
+        case GGML_NVFP4_SEARCH_RICH:
+        default:
+            return "rich top1 anchor, slots=6,5,4,3,2,1.5,1, slot_code_radius=1";
+    }
+}
+
+static int ggml_nvfp4_env_flag(const char * name, int default_value) {
+    const char * env = getenv(name);
+    if (env == NULL || env[0] == '\0') {
+        return default_value;
+    }
+    return strcmp(env, "0") != 0;
+}
+
+const char * ggml_nvfp4_search_algo_name(enum ggml_nvfp4_search_algo algo) {
+    switch (algo) {
+        case GGML_NVFP4_SEARCH_CJSO:      return "cjso";
+        case GGML_NVFP4_SEARCH_RICH_CJSO: return "rich_cjso";
+        case GGML_NVFP4_SEARCH_RICH:
+        default:                          return "rich";
+    }
+}
+
+enum ggml_nvfp4_search_algo ggml_nvfp4_get_search_algo(void) {
+    static int initialized = 0;
+    static enum ggml_nvfp4_search_algo algo = GGML_NVFP4_SEARCH_RICH_CJSO;
+    if (!initialized) {
+        const char * env = getenv("GGML_NVFP4_SEARCH_ALGO");
+        if (env == NULL || env[0] == '\0' || strcmp(env, "rich_cjso") == 0) {
+            algo = GGML_NVFP4_SEARCH_RICH_CJSO;
+        } else if (strcmp(env, "rich") == 0) {
+            algo = GGML_NVFP4_SEARCH_RICH;
+        } else if (strcmp(env, "cjso") == 0) {
+            algo = GGML_NVFP4_SEARCH_CJSO;
+        } else {
+            fprintf(stderr,
+                    "ggml_nvfp4_search_algo: warning: invalid GGML_NVFP4_SEARCH_ALGO='%s', using rich_cjso\n",
+                    env);
+            algo = GGML_NVFP4_SEARCH_RICH_CJSO;
+        }
+        initialized = 1;
+    }
+    return algo;
+}
+
+static int ggml_nvfp4_env_int(const char * name, int default_value, int min_value, int max_value) {
+    const char * env = getenv(name);
+    if (env == NULL || env[0] == '\0') {
+        return default_value;
+    }
+    char * end = NULL;
+    const long parsed = strtol(env, &end, 10);
+    if (end == env || *end != '\0' || parsed < min_value || parsed > max_value) {
+        fprintf(stderr,
+                "ggml_nvfp4_env_int: warning: invalid %s='%s', using %d\n",
+                name, env, default_value);
+        return default_value;
+    }
+    return (int) parsed;
+}
+
+int ggml_nvfp4_cjso_radius(void) {
+    static int radius = -1;
+    if (radius < 0) {
+        radius = ggml_nvfp4_env_int("GGML_NVFP4_CJSO_RADIUS", GGML_NVFP4_CJSO_RADIUS_DEFAULT, 0, 16);
+    }
+    return radius;
 }
 
 int ggml_nvfp4_rich_scale_search_enabled(void) {
-    return GGML_NVFP4_RICH_SCALE_SEARCH != 0;
+    const enum ggml_nvfp4_search_algo algo = ggml_nvfp4_get_search_algo();
+    return algo == GGML_NVFP4_SEARCH_RICH || algo == GGML_NVFP4_SEARCH_RICH_CJSO;
 }
 
 int ggml_nvfp4_rich_scale_code_radius(void) {
@@ -544,7 +634,11 @@ int ggml_nvfp4_rich_scale_code_radius(void) {
 }
 
 int ggml_nvfp4_rsf_lite_enabled(void) {
-    return GGML_NVFP4_RSF_LITE != 0;
+    static int enabled = -1;
+    if (enabled < 0) {
+        enabled = ggml_nvfp4_env_flag("GGML_NVFP4_RSF_LITE", GGML_NVFP4_RSF_LITE != 0);
+    }
+    return enabled;
 }
 
 void ggml_nvfp4_set_rsf_multiplier_override(float multiplier) {
@@ -606,9 +700,16 @@ typedef struct {
     double  weighted_mse;
     int     slot_x2;
     int     anchor_rank;
+    unsigned source;
+    int     cjso_delta;
 } ggml_nvfp4_candidate;
 
-#define GGML_NVFP4_MAX_CANDIDATES 64
+#define GGML_NVFP4_MAX_CANDIDATES 128
+#define GGML_NVFP4_CANDIDATE_SOURCE_RICH         0x01u
+#define GGML_NVFP4_CANDIDATE_SOURCE_CJSO_ORD     0x02u
+#define GGML_NVFP4_CANDIDATE_SOURCE_CJSO_WEIGHT  0x04u
+#define GGML_NVFP4_CANDIDATE_SOURCE_FALLBACK     0x08u
+#define GGML_NVFP4_CJSO_DELTA_NONE               99
 
 static double ggml_nvfp4_slot_value(int slot_x2) {
     return 0.5 * (double) slot_x2;
@@ -752,6 +853,8 @@ static void eval_nvfp4_candidate_code(const float * x, const float * weights, ui
     out->weighted_mse = weights ? weighted_err : err;
     out->slot_x2 = slot_x2;
     out->anchor_rank = anchor_rank;
+    out->source = 0;
+    out->cjso_delta = GGML_NVFP4_CJSO_DELTA_NONE;
 }
 
 static void eval_nvfp4_candidate_m(const float * x, const float * weights, float m, float scale_multiplier, ggml_nvfp4_candidate * out) {
@@ -778,21 +881,29 @@ static void quantize_nvfp4_subblock_m(const float * x, float m, uint8_t * scale,
 
 static void ggml_nvfp4_add_code_candidate(
         const float * x, const float * weights, uint8_t code, int slot_x2, int anchor_rank,
+        unsigned source, int cjso_delta,
         ggml_nvfp4_candidate * candidates, int * n_candidates) {
     for (int i = 0; i < *n_candidates; ++i) {
         if (candidates[i].scale == code) {
+            candidates[i].source |= source;
+            if (cjso_delta != GGML_NVFP4_CJSO_DELTA_NONE &&
+                    candidates[i].cjso_delta == GGML_NVFP4_CJSO_DELTA_NONE) {
+                candidates[i].cjso_delta = cjso_delta;
+            }
             return;
         }
     }
 
     GGML_ASSERT(*n_candidates < GGML_NVFP4_MAX_CANDIDATES);
     eval_nvfp4_candidate_code(x, weights, code, slot_x2, anchor_rank, &candidates[*n_candidates]);
+    candidates[*n_candidates].source = source;
+    candidates[*n_candidates].cjso_delta = cjso_delta;
     ++(*n_candidates);
 }
 
-static int ggml_nvfp4_build_rich_candidates(
+static void ggml_nvfp4_add_rich_candidates(
         const float * x, const float * weights, float scale_multiplier,
-        ggml_nvfp4_candidate * candidates) {
+        ggml_nvfp4_candidate * candidates, int * n_candidates) {
     typedef struct {
         float value;
         int   x2;
@@ -817,7 +928,6 @@ static int ggml_nvfp4_build_rich_candidates(
         }
     }
 
-    int n_candidates = 0;
     for (int si = 0; si < (int) (sizeof(slots) / sizeof(slots[0])); ++si) {
         const ggml_nvfp4_rich_slot slot = slots[si];
         const uint8_t base_code = ggml_fp32_to_ue4m3((anchor / slot.value) * scale_multiplier);
@@ -826,8 +936,106 @@ static int ggml_nvfp4_build_rich_candidates(
             if (code < 0 || code > 255) {
                 continue;
             }
-            ggml_nvfp4_add_code_candidate(x, weights, (uint8_t) code, slot.x2, 1, candidates, &n_candidates);
+            ggml_nvfp4_add_code_candidate(x, weights, (uint8_t) code, slot.x2, 1,
+                    GGML_NVFP4_CANDIDATE_SOURCE_RICH, GGML_NVFP4_CJSO_DELTA_NONE,
+                    candidates, n_candidates);
         }
+    }
+}
+
+static void ggml_nvfp4_add_cjso_anchor_candidates(
+        const float * x, const float * weights, float scale_multiplier,
+        float anchor_scale, unsigned source, int * n_anchor_candidates,
+        ggml_nvfp4_candidate * candidates, int * n_candidates) {
+    if (!isfinite(anchor_scale) || anchor_scale <= 0.0f) {
+        return;
+    }
+
+    const uint8_t base_code = ggml_fp32_to_ue4m3(anchor_scale * scale_multiplier);
+    const int radius = ggml_nvfp4_cjso_radius();
+    for (int dr = -radius; dr <= radius; ++dr) {
+        const int code = (int) base_code + dr;
+        if (code < 0 || code > 255) {
+            continue;
+        }
+        ++(*n_anchor_candidates);
+        ggml_nvfp4_add_code_candidate(x, weights, (uint8_t) code, 0, 0,
+                source, dr, candidates, n_candidates);
+    }
+}
+
+static void ggml_nvfp4_add_cjso_candidates(
+        const float * x, const float * weights, float scale_multiplier,
+        ggml_nvfp4_candidate * candidates, int * n_candidates,
+        int * n_ordinary_anchor_candidates, int * n_weighted_anchor_candidates) {
+    static const int qk_sub = QK_NVFP4_SUB;
+
+    float amax = 0.0f;
+    for (int j = 0; j < qk_sub; ++j) {
+        amax = MAX(amax, fabsf(x[j]));
+    }
+
+    const uint8_t init_code = ggml_fp32_to_ue4m3(amax / 6.0f);
+    const float init_d = ggml_ue4m3_to_fp32(init_code);
+    if (amax <= 0.0f || !isfinite(init_d) || init_d <= 0.0f) {
+        return;
+    }
+
+    double num = 0.0;
+    double den = 0.0;
+    double wnum = 0.0;
+    double wden = 0.0;
+    for (int j = 0; j < qk_sub; ++j) {
+        const int qi = best_index_mxfp4(x[j], init_d);
+        const double qf = (double) kvalues_mxfp4[qi];
+        num += (double) x[j] * qf;
+        den += qf * qf;
+        if (weights != NULL) {
+            const double w = (double) weights[j];
+            wnum += w * (double) x[j] * qf;
+            wden += w * qf * qf;
+        }
+    }
+
+    if (den > 0.0) {
+        ggml_nvfp4_add_cjso_anchor_candidates(
+                x, weights, scale_multiplier, (float) (num / den),
+                GGML_NVFP4_CANDIDATE_SOURCE_CJSO_ORD, n_ordinary_anchor_candidates,
+                candidates, n_candidates);
+    }
+
+    if (weights != NULL && wden > 0.0) {
+        ggml_nvfp4_add_cjso_anchor_candidates(
+                x, weights, scale_multiplier, (float) (wnum / wden),
+                GGML_NVFP4_CANDIDATE_SOURCE_CJSO_WEIGHT, n_weighted_anchor_candidates,
+                candidates, n_candidates);
+    }
+}
+
+static int ggml_nvfp4_build_search_candidates(
+        const float * x, const float * weights, float scale_multiplier,
+        const ggml_nvfp4_candidate * fallback,
+        ggml_nvfp4_candidate * candidates,
+        int * n_cjso_ordinary_candidates,
+        int * n_cjso_weighted_candidates) {
+    int n_candidates = 0;
+    *n_cjso_ordinary_candidates = 0;
+    *n_cjso_weighted_candidates = 0;
+
+    const enum ggml_nvfp4_search_algo algo = ggml_nvfp4_get_search_algo();
+    if (algo == GGML_NVFP4_SEARCH_RICH || algo == GGML_NVFP4_SEARCH_RICH_CJSO) {
+        ggml_nvfp4_add_rich_candidates(x, weights, scale_multiplier, candidates, &n_candidates);
+    }
+    if (algo == GGML_NVFP4_SEARCH_CJSO || algo == GGML_NVFP4_SEARCH_RICH_CJSO) {
+        ggml_nvfp4_add_cjso_candidates(
+                x, weights, scale_multiplier, candidates, &n_candidates,
+                n_cjso_ordinary_candidates, n_cjso_weighted_candidates);
+    }
+
+    if (n_candidates == 0 && fallback != NULL) {
+        ggml_nvfp4_add_code_candidate(x, weights, fallback->scale, 12, 1,
+                GGML_NVFP4_CANDIDATE_SOURCE_FALLBACK, GGML_NVFP4_CJSO_DELTA_NONE,
+                candidates, &n_candidates);
     }
 
     return n_candidates;
@@ -925,63 +1133,38 @@ static void quantize_row_nvfp4_impl(const float * GGML_RESTRICT x, block_nvfp4 *
                 ggml_nvfp4_candidate c5;
                 eval_nvfp4_candidate_m(xb, weights_ptr, 5.0f, scale_multiplier, &c5);
 
-                ggml_nvfp4_candidate rich_candidates[GGML_NVFP4_MAX_CANDIDATES];
-                int n_rich_candidates = 0;
-#if GGML_NVFP4_RICH_SCALE_SEARCH
-                n_rich_candidates = ggml_nvfp4_build_rich_candidates(xb, weights_ptr, scale_multiplier, rich_candidates);
-                if (n_rich_candidates == 0) {
-                    rich_candidates[n_rich_candidates++] = c6;
-                }
-                stats.candidate_count_total += (uint64_t) n_rich_candidates;
-#endif
+                ggml_nvfp4_candidate search_candidates[GGML_NVFP4_MAX_CANDIDATES];
+                int n_cjso_ordinary_candidates = 0;
+                int n_cjso_weighted_candidates = 0;
+                const int n_search_candidates = ggml_nvfp4_build_search_candidates(
+                        xb, weights_ptr, scale_multiplier, &c6, search_candidates,
+                        &n_cjso_ordinary_candidates, &n_cjso_weighted_candidates);
+                GGML_ASSERT(n_search_candidates > 0);
+                stats.candidate_count_total += (uint64_t) n_search_candidates;
+                stats.n_cjso_ordinary_candidates += (uint64_t) n_cjso_ordinary_candidates;
+                stats.n_cjso_weighted_candidates += (uint64_t) n_cjso_weighted_candidates;
 
-                const ggml_nvfp4_candidate * ordinary_best = &c6;
-                int ordinary_best_slot_x2 = 12;
-#if GGML_NVFP4_RICH_SCALE_SEARCH
-                ordinary_best = &rich_candidates[0];
-                ordinary_best_slot_x2 = rich_candidates[0].slot_x2;
-                for (int ci = 1; ci < n_rich_candidates; ++ci) {
-                    if (rich_candidates[ci].mse < ordinary_best->mse) {
-                        ordinary_best = &rich_candidates[ci];
-                        ordinary_best_slot_x2 = rich_candidates[ci].slot_x2;
+                const ggml_nvfp4_candidate * ordinary_best = &search_candidates[0];
+                int ordinary_best_slot_x2 = ordinary_best->slot_x2;
+                for (int ci = 1; ci < n_search_candidates; ++ci) {
+                    if (search_candidates[ci].mse < ordinary_best->mse) {
+                        ordinary_best = &search_candidates[ci];
+                        ordinary_best_slot_x2 = search_candidates[ci].slot_x2;
                     }
                 }
-#else
-                if (c4.mse < ordinary_best->mse) {
-                    ordinary_best = &c4;
-                    ordinary_best_slot_x2 = 8;
-                }
-                if (c5.mse < ordinary_best->mse) {
-                    ordinary_best = &c5;
-                    ordinary_best_slot_x2 = 10;
-                }
-#endif
 
                 const ggml_nvfp4_candidate * best = ordinary_best;
                 int best_slot_x2 = ordinary_best_slot_x2;
 
                 if (weights_ptr) {
-                    const ggml_nvfp4_candidate * weighted_best = &c6;
-                    int weighted_best_slot_x2 = 12;
-#if GGML_NVFP4_RICH_SCALE_SEARCH
-                    weighted_best = &rich_candidates[0];
-                    weighted_best_slot_x2 = rich_candidates[0].slot_x2;
-                    for (int ci = 1; ci < n_rich_candidates; ++ci) {
-                        if (rich_candidates[ci].weighted_mse < weighted_best->weighted_mse) {
-                            weighted_best = &rich_candidates[ci];
-                            weighted_best_slot_x2 = rich_candidates[ci].slot_x2;
+                    const ggml_nvfp4_candidate * weighted_best = &search_candidates[0];
+                    int weighted_best_slot_x2 = weighted_best->slot_x2;
+                    for (int ci = 1; ci < n_search_candidates; ++ci) {
+                        if (search_candidates[ci].weighted_mse < weighted_best->weighted_mse) {
+                            weighted_best = &search_candidates[ci];
+                            weighted_best_slot_x2 = search_candidates[ci].slot_x2;
                         }
                     }
-#else
-                    if (c4.weighted_mse < weighted_best->weighted_mse) {
-                        weighted_best = &c4;
-                        weighted_best_slot_x2 = 8;
-                    }
-                    if (c5.weighted_mse < weighted_best->weighted_mse) {
-                        weighted_best = &c5;
-                        weighted_best_slot_x2 = 10;
-                    }
-#endif
 
                     switch (select_mode) {
                         case GGML_NVFP4_IMATRIX_SELECT_ORDINARY:
@@ -1009,33 +1192,17 @@ static void quantize_row_nvfp4_impl(const float * GGML_RESTRICT x, block_nvfp4 *
                             break;
                         case GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE:
                         default: {
-#if GGML_NVFP4_RICH_SCALE_SEARCH
                             double best_score = DBL_MAX;
                             int best_index = 0;
-                            for (int ci = 0; ci < n_rich_candidates; ++ci) {
-                                const double score = ggml_nvfp4_two_objective_score(&rich_candidates[ci], ordinary_best, weighted_best);
+                            for (int ci = 0; ci < n_search_candidates; ++ci) {
+                                const double score = ggml_nvfp4_two_objective_score(&search_candidates[ci], ordinary_best, weighted_best);
                                 if (score < best_score) {
                                     best_score = score;
                                     best_index = ci;
                                 }
                             }
-                            best = &rich_candidates[best_index];
+                            best = &search_candidates[best_index];
                             best_slot_x2 = best->slot_x2;
-#else
-                            const ggml_nvfp4_candidate * candidates[3] = { &c4, &c5, &c6 };
-                            const int candidate_slot_x2[3] = { 8, 10, 12 };
-                            double best_score = DBL_MAX;
-                            int best_index = 0;
-                            for (int ci = 0; ci < 3; ++ci) {
-                                const double score = ggml_nvfp4_two_objective_score(candidates[ci], ordinary_best, weighted_best);
-                                if (score < best_score) {
-                                    best_score = score;
-                                    best_index = ci;
-                                }
-                            }
-                            best = candidates[best_index];
-                            best_slot_x2 = candidate_slot_x2[best_index];
-#endif
 
                             if (best == ordinary_best) {
                                 stats.n_ordinary_best_selected++;
@@ -1068,12 +1235,41 @@ static void quantize_row_nvfp4_impl(const float * GGML_RESTRICT x, block_nvfp4 *
                     case  4: stats.n_slot2++;  break;
                     case  3: stats.n_slot15++; break;
                     case  2: stats.n_slot1++;  break;
-                    default: stats.n_m6++;     break;
+                    default: stats.n_slot_other++; break;
                 }
-#if GGML_NVFP4_RICH_SCALE_SEARCH
-                GGML_ASSERT(best->anchor_rank == 1);
-                stats.n_anchor_top1++;
-#endif
+                const bool selected_rich = (best->source & GGML_NVFP4_CANDIDATE_SOURCE_RICH) != 0;
+                const bool selected_cjso_ord = (best->source & GGML_NVFP4_CANDIDATE_SOURCE_CJSO_ORD) != 0;
+                const bool selected_cjso_wgt = (best->source & GGML_NVFP4_CANDIDATE_SOURCE_CJSO_WEIGHT) != 0;
+                const bool selected_cjso = selected_cjso_ord || selected_cjso_wgt;
+                const bool selected_fallback = (best->source & GGML_NVFP4_CANDIDATE_SOURCE_FALLBACK) != 0;
+                if (selected_fallback) {
+                    stats.n_source_fallback++;
+                } else if ((selected_rich && selected_cjso) || (selected_cjso_ord && selected_cjso_wgt)) {
+                    stats.n_source_both++;
+                } else if (selected_rich) {
+                    stats.n_source_rich++;
+                } else if (selected_cjso_wgt) {
+                    stats.n_source_cjso_weighted++;
+                } else if (selected_cjso_ord) {
+                    stats.n_source_cjso_ordinary++;
+                }
+                if (selected_cjso) {
+                    switch (best->cjso_delta) {
+                        case -4: stats.n_cjso_delta_m4++; break;
+                        case -3: stats.n_cjso_delta_m3++; break;
+                        case -2: stats.n_cjso_delta_m2++; break;
+                        case -1: stats.n_cjso_delta_m1++; break;
+                        case  0: stats.n_cjso_delta_0++;  break;
+                        case  1: stats.n_cjso_delta_p1++; break;
+                        case  2: stats.n_cjso_delta_p2++; break;
+                        case  3: stats.n_cjso_delta_p3++; break;
+                        case  4: stats.n_cjso_delta_p4++; break;
+                        default: stats.n_cjso_delta_other++; break;
+                    }
+                }
+                if (selected_rich) {
+                    stats.n_anchor_top1++;
+                }
             } else {
                 const float m = mode == GGML_NVFP4_SCALE_MODE_M4 ? 4.0f : 6.0f;
                 float mse;
@@ -2952,52 +3148,33 @@ static void ggml_nvfp4_eval_selected_error(
         enum ggml_nvfp4_imatrix_select_mode select_mode, float imatrix_guard,
         float scale_multiplier, double * mse, double * weighted_mse) {
     ggml_nvfp4_candidate c6;
-    ggml_nvfp4_candidate c4;
-    ggml_nvfp4_candidate c5;
     eval_nvfp4_candidate_m(xb, weights, 6.0f, scale_multiplier, &c6);
-    eval_nvfp4_candidate_m(xb, weights, 4.0f, scale_multiplier, &c4);
-    eval_nvfp4_candidate_m(xb, weights, 5.0f, scale_multiplier, &c5);
 
-    const ggml_nvfp4_candidate * ordinary_best = &c6;
-#if GGML_NVFP4_RICH_SCALE_SEARCH
-    ggml_nvfp4_candidate rich_candidates[GGML_NVFP4_MAX_CANDIDATES];
-    int n_rich_candidates = ggml_nvfp4_build_rich_candidates(xb, weights, scale_multiplier, rich_candidates);
-    if (n_rich_candidates == 0) {
-        rich_candidates[n_rich_candidates++] = c6;
-    }
-    ordinary_best = &rich_candidates[0];
-    for (int ci = 1; ci < n_rich_candidates; ++ci) {
-        if (rich_candidates[ci].mse < ordinary_best->mse) {
-            ordinary_best = &rich_candidates[ci];
+    ggml_nvfp4_candidate search_candidates[GGML_NVFP4_MAX_CANDIDATES];
+    int n_cjso_ordinary_candidates = 0;
+    int n_cjso_weighted_candidates = 0;
+    const int n_search_candidates = ggml_nvfp4_build_search_candidates(
+            xb, weights, scale_multiplier, &c6, search_candidates,
+            &n_cjso_ordinary_candidates, &n_cjso_weighted_candidates);
+    GGML_ASSERT(n_search_candidates > 0);
+    GGML_UNUSED(n_cjso_ordinary_candidates);
+    GGML_UNUSED(n_cjso_weighted_candidates);
+
+    const ggml_nvfp4_candidate * ordinary_best = &search_candidates[0];
+    for (int ci = 1; ci < n_search_candidates; ++ci) {
+        if (search_candidates[ci].mse < ordinary_best->mse) {
+            ordinary_best = &search_candidates[ci];
         }
     }
-#else
-    if (c4.mse < ordinary_best->mse) {
-        ordinary_best = &c4;
-    }
-    if (c5.mse < ordinary_best->mse) {
-        ordinary_best = &c5;
-    }
-#endif
 
     const ggml_nvfp4_candidate * selected = ordinary_best;
     if (weights != NULL) {
-        const ggml_nvfp4_candidate * weighted_best = &c6;
-#if GGML_NVFP4_RICH_SCALE_SEARCH
-        weighted_best = &rich_candidates[0];
-        for (int ci = 1; ci < n_rich_candidates; ++ci) {
-            if (rich_candidates[ci].weighted_mse < weighted_best->weighted_mse) {
-                weighted_best = &rich_candidates[ci];
+        const ggml_nvfp4_candidate * weighted_best = &search_candidates[0];
+        for (int ci = 1; ci < n_search_candidates; ++ci) {
+            if (search_candidates[ci].weighted_mse < weighted_best->weighted_mse) {
+                weighted_best = &search_candidates[ci];
             }
         }
-#else
-        if (c4.weighted_mse < weighted_best->weighted_mse) {
-            weighted_best = &c4;
-        }
-        if (c5.weighted_mse < weighted_best->weighted_mse) {
-            weighted_best = &c5;
-        }
-#endif
 
         switch (select_mode) {
             case GGML_NVFP4_IMATRIX_SELECT_ORDINARY:
@@ -3013,28 +3190,15 @@ static void ggml_nvfp4_eval_selected_error(
             case GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE:
             default: {
                 double best_score = DBL_MAX;
-#if GGML_NVFP4_RICH_SCALE_SEARCH
                 int best_index = 0;
-                for (int ci = 0; ci < n_rich_candidates; ++ci) {
-                    const double score = ggml_nvfp4_two_objective_score(&rich_candidates[ci], ordinary_best, weighted_best);
+                for (int ci = 0; ci < n_search_candidates; ++ci) {
+                    const double score = ggml_nvfp4_two_objective_score(&search_candidates[ci], ordinary_best, weighted_best);
                     if (score < best_score) {
                         best_score = score;
                         best_index = ci;
                     }
                 }
-                selected = &rich_candidates[best_index];
-#else
-                const ggml_nvfp4_candidate * candidates[3] = { &c4, &c5, &c6 };
-                int best_index = 0;
-                for (int ci = 0; ci < 3; ++ci) {
-                    const double score = ggml_nvfp4_two_objective_score(candidates[ci], ordinary_best, weighted_best);
-                    if (score < best_score) {
-                        best_score = score;
-                        best_index = ci;
-                    }
-                }
-                selected = candidates[best_index];
-#endif
+                selected = &search_candidates[best_index];
                 break;
             }
         }
@@ -3044,14 +3208,37 @@ static void ggml_nvfp4_eval_selected_error(
     *weighted_mse = selected->weighted_mse;
 }
 
+static void ggml_nvfp4_rsf_count_multiplier(ggml_nvfp4_scale_stats * stats, float multiplier) {
+    if (fabsf(multiplier - 0.875f) < 1e-6f) {
+        stats->n_rsf_0875++;
+    } else if (fabsf(multiplier - 0.9375f) < 1e-6f) {
+        stats->n_rsf_09375++;
+    } else if (fabsf(multiplier - 1.0f) < 1e-6f) {
+        stats->n_rsf_1000++;
+    } else if (fabsf(multiplier - 1.0625f) < 1e-6f) {
+        stats->n_rsf_10625++;
+    } else if (fabsf(multiplier - 1.125f) < 1e-6f) {
+        stats->n_rsf_1125++;
+    }
+}
+
 float ggml_nvfp4_choose_rsf_multiplier(const float * GGML_RESTRICT src, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
 #if GGML_NVFP4_RSF_LITE
+    if (!ggml_nvfp4_rsf_lite_enabled()) {
+        GGML_UNUSED(src);
+        GGML_UNUSED(nrow);
+        GGML_UNUSED(n_per_row);
+        GGML_UNUSED(quant_weights);
+        return 1.0f;
+    }
+
     static const float multipliers[] = { 0.875f, 0.9375f, 1.0f, 1.0625f, 1.125f };
-    static const int n_multipliers = (int) (sizeof(multipliers) / sizeof(multipliers[0]));
-    static const int baseline_index = 2;
+    const int n_multipliers = (int) (sizeof(multipliers) / sizeof(multipliers[0]));
+    const int baseline_index = 2;
     static const int qk = QK_NVFP4;
     static const int qk_sub = QK_NVFP4_SUB;
     static const int n_sub = QK_NVFP4 / QK_NVFP4_SUB;
+    GGML_ASSERT(n_multipliers > 0 && n_multipliers <= 16);
 
     const int64_t blocks_per_row = n_per_row / qk;
     const int64_t subblocks_per_row = blocks_per_row * n_sub;
@@ -3083,7 +3270,7 @@ float ggml_nvfp4_choose_rsf_multiplier(const float * GGML_RESTRICT src, int64_t 
         }
     }
 
-    double errors[5];
+    double errors[16];
     for (int i = 0; i < n_multipliers; ++i) {
         errors[i] = 0.0;
     }
@@ -3127,14 +3314,7 @@ float ggml_nvfp4_choose_rsf_multiplier(const float * GGML_RESTRICT src, int64_t 
     stats.n_rsf_tensors = 1;
     stats.rsf_sample_error_baseline = errors[baseline_index];
     stats.rsf_sample_error_selected = errors[best];
-    switch (best) {
-        case 0: stats.n_rsf_0875++;  break;
-        case 1: stats.n_rsf_09375++; break;
-        case 2: stats.n_rsf_1000++;  break;
-        case 3: stats.n_rsf_10625++; break;
-        case 4: stats.n_rsf_1125++;  break;
-        default: break;
-    }
+    ggml_nvfp4_rsf_count_multiplier(&stats, multipliers[best]);
     ggml_nvfp4_scale_accum_stats(&stats);
 
     return multipliers[best];
@@ -3162,8 +3342,10 @@ size_t quantize_nvfp4(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
         return nrow * row_size;
     }
 #else
-    if (!ggml_nvfp4_get_rsf_multiplier_override(&scale_multiplier)) {
-        scale_multiplier = ggml_nvfp4_choose_rsf_multiplier(src, nrow, n_per_row, quant_weights);
+    if (ggml_nvfp4_rsf_lite_enabled()) {
+        if (!ggml_nvfp4_get_rsf_multiplier_override(&scale_multiplier)) {
+            scale_multiplier = ggml_nvfp4_choose_rsf_multiplier(src, nrow, n_per_row, quant_weights);
+        }
     }
 #endif
 

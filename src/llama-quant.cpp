@@ -5,15 +5,19 @@
 #include "ggml-quants.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstring>
 #include <cinttypes>
+#include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <mutex>
 #include <regex>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 // result of parsing --tensor-type option
 // (changes to this struct must be reflected in tools/quantize/quantize.cpp)
@@ -129,6 +133,243 @@ static ggml_nvfp4_scale_mode llama_nvfp4_scale_mode_to_ggml(llama_nvfp4_scale_mo
         case LLAMA_NVFP4_SCALE_MODE_M6:
         default:                              return GGML_NVFP4_SCALE_MODE_M6;
     }
+}
+
+static const char * llama_env_or_unset(const char * name) {
+    const char * value = std::getenv(name);
+    return value && value[0] ? value : "(unset)";
+}
+
+static bool llama_nvfp4_debug_tensor_match(const char * tensor_name) {
+    const char * env = std::getenv("GGML_NVFP4_DEBUG_TENSOR");
+    if (env == nullptr || env[0] == '\0') {
+        return false;
+    }
+
+    const std::string list(env);
+    size_t start = 0;
+    while (start <= list.size()) {
+        const size_t comma = list.find(',', start);
+        const size_t end = comma == std::string::npos ? list.size() : comma;
+        size_t left = start;
+        size_t right = end;
+        while (left < right && std::isspace((unsigned char) list[left])) {
+            ++left;
+        }
+        while (right > left && std::isspace((unsigned char) list[right - 1])) {
+            --right;
+        }
+        if (right > left && list.compare(left, right - left, tensor_name) == 0) {
+            return true;
+        }
+        if (comma == std::string::npos) {
+            break;
+        }
+        start = comma + 1;
+    }
+
+    return false;
+}
+
+static ggml_nvfp4_scale_stats llama_nvfp4_scale_stats_subtract(
+        const ggml_nvfp4_scale_stats & after,
+        const ggml_nvfp4_scale_stats & before) {
+    ggml_nvfp4_scale_stats out = {};
+#define LLAMA_NVFP4_DIFF_U(field) out.field = after.field >= before.field ? after.field - before.field : 0
+#define LLAMA_NVFP4_DIFF_D(field) out.field = after.field - before.field
+    LLAMA_NVFP4_DIFF_U(n_subblocks);
+    LLAMA_NVFP4_DIFF_U(n_weighted_subblocks);
+    LLAMA_NVFP4_DIFF_U(n_ordinary_best_selected);
+    LLAMA_NVFP4_DIFF_U(n_weighted_best_selected);
+    LLAMA_NVFP4_DIFF_U(n_knee_selected);
+    LLAMA_NVFP4_DIFF_U(n_weighted_guard_accepted);
+    LLAMA_NVFP4_DIFF_U(n_weighted_guard_fallback);
+    LLAMA_NVFP4_DIFF_U(n_m4);
+    LLAMA_NVFP4_DIFF_U(n_m5);
+    LLAMA_NVFP4_DIFF_U(n_m6);
+    LLAMA_NVFP4_DIFF_D(mse_m6);
+    LLAMA_NVFP4_DIFF_D(mse_selected);
+    LLAMA_NVFP4_DIFF_D(weighted_mse_m6);
+    LLAMA_NVFP4_DIFF_D(weighted_mse_selected);
+    LLAMA_NVFP4_DIFF_U(candidate_count_total);
+    LLAMA_NVFP4_DIFF_U(n_anchor_top1);
+    LLAMA_NVFP4_DIFF_U(n_slot1);
+    LLAMA_NVFP4_DIFF_U(n_slot15);
+    LLAMA_NVFP4_DIFF_U(n_slot2);
+    LLAMA_NVFP4_DIFF_U(n_slot3);
+    LLAMA_NVFP4_DIFF_U(n_slot_other);
+    LLAMA_NVFP4_DIFF_U(n_source_rich);
+    LLAMA_NVFP4_DIFF_U(n_source_cjso_ordinary);
+    LLAMA_NVFP4_DIFF_U(n_source_cjso_weighted);
+    LLAMA_NVFP4_DIFF_U(n_source_both);
+    LLAMA_NVFP4_DIFF_U(n_source_fallback);
+    LLAMA_NVFP4_DIFF_U(n_cjso_ordinary_candidates);
+    LLAMA_NVFP4_DIFF_U(n_cjso_weighted_candidates);
+    LLAMA_NVFP4_DIFF_U(n_cjso_delta_m4);
+    LLAMA_NVFP4_DIFF_U(n_cjso_delta_m3);
+    LLAMA_NVFP4_DIFF_U(n_cjso_delta_m2);
+    LLAMA_NVFP4_DIFF_U(n_cjso_delta_m1);
+    LLAMA_NVFP4_DIFF_U(n_cjso_delta_0);
+    LLAMA_NVFP4_DIFF_U(n_cjso_delta_p1);
+    LLAMA_NVFP4_DIFF_U(n_cjso_delta_p2);
+    LLAMA_NVFP4_DIFF_U(n_cjso_delta_p3);
+    LLAMA_NVFP4_DIFF_U(n_cjso_delta_p4);
+    LLAMA_NVFP4_DIFF_U(n_cjso_delta_other);
+    LLAMA_NVFP4_DIFF_U(n_rsf_tensors);
+    LLAMA_NVFP4_DIFF_U(n_rsf_0875);
+    LLAMA_NVFP4_DIFF_U(n_rsf_09375);
+    LLAMA_NVFP4_DIFF_U(n_rsf_1000);
+    LLAMA_NVFP4_DIFF_U(n_rsf_10625);
+    LLAMA_NVFP4_DIFF_U(n_rsf_1125);
+    LLAMA_NVFP4_DIFF_D(rsf_sample_error_baseline);
+    LLAMA_NVFP4_DIFF_D(rsf_sample_error_selected);
+#undef LLAMA_NVFP4_DIFF_U
+#undef LLAMA_NVFP4_DIFF_D
+    return out;
+}
+
+static void llama_nvfp4_log_runtime_config(const char * prefix, bool relevant) {
+    if (!relevant) {
+        return;
+    }
+    LLAMA_LOG_INFO("%s: NVFP4 env/config:\n", prefix);
+    LLAMA_LOG_INFO("%s:   GGML_NVFP4_SEARCH_ALGO=%s -> %s\n", prefix,
+            llama_env_or_unset("GGML_NVFP4_SEARCH_ALGO"),
+            ggml_nvfp4_search_algo_name(ggml_nvfp4_get_search_algo()));
+    LLAMA_LOG_INFO("%s:   GGML_NVFP4_CJSO_RADIUS=%s -> %d\n", prefix,
+            llama_env_or_unset("GGML_NVFP4_CJSO_RADIUS"), ggml_nvfp4_cjso_radius());
+    LLAMA_LOG_INFO("%s:   GGML_NVFP4_RICH_SCALE_SEARCH=%s -> %d\n", prefix,
+            llama_env_or_unset("GGML_NVFP4_RICH_SCALE_SEARCH"), ggml_nvfp4_rich_scale_search_enabled());
+    LLAMA_LOG_INFO("%s:   GGML_NVFP4_RSF_LITE=%s -> %d\n", prefix,
+            llama_env_or_unset("GGML_NVFP4_RSF_LITE"), ggml_nvfp4_rsf_lite_enabled());
+    LLAMA_LOG_INFO("%s:   GGML_NVFP4_IMATRIX_SELECT_MODE=%s -> %s\n", prefix,
+            llama_env_or_unset("GGML_NVFP4_IMATRIX_SELECT_MODE"),
+            ggml_nvfp4_imatrix_select_mode_name(ggml_nvfp4_get_imatrix_select_mode()));
+    LLAMA_LOG_INFO("%s:   GGML_NVFP4_IMATRIX_ORDINARY_MSE_GUARD=%s -> %.6g\n", prefix,
+            llama_env_or_unset("GGML_NVFP4_IMATRIX_ORDINARY_MSE_GUARD"),
+            (double) ggml_nvfp4_imatrix_ordinary_mse_guard());
+    LLAMA_LOG_INFO("%s:   GGML_CUDA_NVFP4_ACTIVITY_ADAPTIVE=%s\n", prefix,
+            llama_env_or_unset("GGML_CUDA_NVFP4_ACTIVITY_ADAPTIVE"));
+    LLAMA_LOG_INFO("%s:   candidates: %s\n", prefix, ggml_nvfp4_adaptive_candidates());
+}
+
+static void llama_nvfp4_log_tensor_debug(
+        const char * prefix,
+        const char * tensor_name,
+        int64_t slice,
+        const void * quantized_data,
+        int64_t nrows,
+        int64_t n_per_row,
+        float rsf_multiplier,
+        const ggml_nvfp4_scale_stats & stats) {
+    std::array<uint64_t, 256> scale_hist = {};
+    std::array<uint64_t, 16> q_hist = {};
+    uint8_t scale_min = 255;
+    uint8_t scale_max = 0;
+
+    const int64_t blocks_per_row = n_per_row / QK_NVFP4;
+    const int64_t n_blocks = nrows * blocks_per_row;
+    const block_nvfp4 * blocks = (const block_nvfp4 *) quantized_data;
+    uint64_t q_nonzero = 0;
+    uint64_t q_saturated = 0;
+
+    for (int64_t bi = 0; bi < n_blocks; ++bi) {
+        const block_nvfp4 & block = blocks[bi];
+        for (int s = 0; s < QK_NVFP4 / QK_NVFP4_SUB; ++s) {
+            const uint8_t sc = block.d[s];
+            scale_hist[sc]++;
+            scale_min = std::min(scale_min, sc);
+            scale_max = std::max(scale_max, sc);
+        }
+        for (int j = 0; j < QK_NVFP4 / 2; ++j) {
+            const uint8_t q0 = block.qs[j] & 0x0f;
+            const uint8_t q1 = block.qs[j] >> 4;
+            q_hist[q0]++;
+            q_hist[q1]++;
+            q_nonzero += (q0 != 0 && q0 != 8) ? 1 : 0;
+            q_nonzero += (q1 != 0 && q1 != 8) ? 1 : 0;
+            q_saturated += (q0 == 7 || q0 == 15) ? 1 : 0;
+            q_saturated += (q1 == 7 || q1 == 15) ? 1 : 0;
+        }
+    }
+
+    std::vector<std::pair<int, uint64_t>> top_scales;
+    top_scales.reserve(256);
+    for (int i = 0; i < 256; ++i) {
+        if (scale_hist[i] != 0) {
+            top_scales.push_back({ i, scale_hist[i] });
+        }
+    }
+    std::sort(top_scales.begin(), top_scales.end(), [](const auto & a, const auto & b) {
+        return a.second != b.second ? a.second > b.second : a.first < b.first;
+    });
+
+    const double total_subblocks = (double) std::max<uint64_t>(stats.n_subblocks, 1);
+    const double total_q = (double) std::max<int64_t>(n_blocks * QK_NVFP4, 1);
+    const double avg_candidates = stats.n_subblocks > 0 ?
+            (double) stats.candidate_count_total / (double) stats.n_subblocks : 0.0;
+    const double p6 = 100.0 * (double) stats.n_m6 / total_subblocks;
+    const double p5 = 100.0 * (double) stats.n_m5 / total_subblocks;
+    const double p4 = 100.0 * (double) stats.n_m4 / total_subblocks;
+    const double p3 = 100.0 * (double) stats.n_slot3 / total_subblocks;
+    const double p2 = 100.0 * (double) stats.n_slot2 / total_subblocks;
+    const double p15 = 100.0 * (double) stats.n_slot15 / total_subblocks;
+    const double p1 = 100.0 * (double) stats.n_slot1 / total_subblocks;
+    const double p_other = 100.0 * (double) stats.n_slot_other / total_subblocks;
+    const double source_rich_pct = 100.0 * (double) stats.n_source_rich / total_subblocks;
+    const double source_cjso_ord_pct = 100.0 * (double) stats.n_source_cjso_ordinary / total_subblocks;
+    const double source_cjso_wgt_pct = 100.0 * (double) stats.n_source_cjso_weighted / total_subblocks;
+    const double source_both_pct = 100.0 * (double) stats.n_source_both / total_subblocks;
+    const double source_fallback_pct = 100.0 * (double) stats.n_source_fallback / total_subblocks;
+    const double ordinary_ratio = stats.mse_m6 > 0.0 ? stats.mse_selected / stats.mse_m6 : 1.0;
+    const double weighted_ratio = stats.weighted_mse_m6 > 0.0 ? stats.weighted_mse_selected / stats.weighted_mse_m6 : 1.0;
+    const double weighted_total = (double) std::max<uint64_t>(stats.n_weighted_subblocks, 1);
+    const double ordinary_best_pct = 100.0 * (double) stats.n_ordinary_best_selected / weighted_total;
+    const double weighted_best_pct = 100.0 * (double) stats.n_weighted_best_selected / weighted_total;
+    const double knee_pct = 100.0 * (double) stats.n_knee_selected / weighted_total;
+
+    LLAMA_LOG_INFO("%s: NVFP4 debug tensor: %s slice=%lld\n", prefix, tensor_name, (long long) slice);
+    LLAMA_LOG_INFO("%s:   nrow=%lld n_per_row=%lld row_size=%zu total_subblocks=%llu\n", prefix,
+            (long long) nrows, (long long) n_per_row, ggml_row_size(GGML_TYPE_NVFP4, n_per_row),
+            (unsigned long long) stats.n_subblocks);
+    LLAMA_LOG_INFO("%s:   RSF multiplier=%.6g search_algo=%s cjso_radius=%d select_mode=%s\n", prefix,
+            (double) rsf_multiplier,
+            ggml_nvfp4_search_algo_name(ggml_nvfp4_get_search_algo()),
+            ggml_nvfp4_cjso_radius(),
+            ggml_nvfp4_imatrix_select_mode_name(ggml_nvfp4_get_imatrix_select_mode()));
+    LLAMA_LOG_INFO("%s:   candidates: %s\n", prefix, ggml_nvfp4_adaptive_candidates());
+    LLAMA_LOG_INFO("%s:   slot distribution: 6=%.3f%%, 5=%.3f%%, 4=%.3f%%, 3=%.3f%%, 2=%.3f%%, 1.5=%.3f%%, 1=%.3f%%, other=%.3f%%\n",
+            prefix, p6, p5, p4, p3, p2, p15, p1, p_other);
+    LLAMA_LOG_INFO("%s:   source distribution: rich=%.3f%%, cjso_ord=%.3f%%, cjso_weighted=%.3f%%, both=%.3f%%, fallback=%.3f%%\n",
+            prefix, source_rich_pct, source_cjso_ord_pct, source_cjso_wgt_pct, source_both_pct, source_fallback_pct);
+    LLAMA_LOG_INFO("%s:   avg candidates=%.3f selected ordinary ratio=%.9g weighted ratio=%.9g\n",
+            prefix, avg_candidates, ordinary_ratio, weighted_ratio);
+    if (stats.n_weighted_subblocks > 0) {
+        LLAMA_LOG_INFO("%s:   two-objective selected: ordinary_best=%.3f%% weighted_best=%.3f%% knee=%.3f%%\n",
+                prefix, ordinary_best_pct, weighted_best_pct, knee_pct);
+    }
+    LLAMA_LOG_INFO("%s:   scale code min=%u max=%u q_nonzero=%.3f%% q_saturated=%.3f%%\n", prefix,
+            (unsigned) scale_min, (unsigned) scale_max,
+            100.0 * (double) q_nonzero / total_q,
+            100.0 * (double) q_saturated / total_q);
+
+    std::string top_line;
+    const int n_top = std::min<int>(20, (int) top_scales.size());
+    for (int i = 0; i < n_top; ++i) {
+        char item[64];
+        snprintf(item, sizeof(item), "%s%d:%llu", i == 0 ? "" : ",",
+                top_scales[i].first, (unsigned long long) top_scales[i].second);
+        top_line += item;
+    }
+    LLAMA_LOG_INFO("%s:   top scale codes: %s\n", prefix, top_line.empty() ? "(none)" : top_line.c_str());
+
+    std::string q_line;
+    for (int i = 0; i < 16; ++i) {
+        char item[64];
+        snprintf(item, sizeof(item), "%s%d:%llu", i == 0 ? "" : ",", i, (unsigned long long) q_hist[i]);
+        q_line += item;
+    }
+    LLAMA_LOG_INFO("%s:   q nibble histogram: %s\n", prefix, q_line.c_str());
 }
 
 static const uint32_t LLAMA_QUANT_WHT_SIGNS1_256_BITS[8] = {
@@ -1571,6 +1812,7 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
     ggml_nvfp4_reset_scale_stats();
     if (nvfp4_mode_relevant) {
         LLAMA_LOG_INFO("%s: NVFP4 scale mode: %s\n", __func__, llama_nvfp4_scale_mode_name(params->nvfp4_scale_mode));
+        llama_nvfp4_log_runtime_config(__func__, true);
     }
 
     // mmap consistently increases speed on Linux, and also increases speed on Windows with
@@ -1649,6 +1891,8 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
         gguf_set_val_str(ctx_out.get(), "general.quantization.nvfp4_scale_mode", llama_nvfp4_scale_mode_name(params->nvfp4_scale_mode));
         if (params->nvfp4_scale_mode == LLAMA_NVFP4_SCALE_MODE_ADAPTIVE) {
             gguf_set_val_str(ctx_out.get(), "general.quantization.nvfp4_adaptive_candidates", ggml_nvfp4_adaptive_candidates());
+            gguf_set_val_str(ctx_out.get(), "general.quantization.nvfp4_search_algo", ggml_nvfp4_search_algo_name(ggml_nvfp4_get_search_algo()));
+            gguf_set_val_u32(ctx_out.get(), "general.quantization.nvfp4_cjso_radius", ggml_nvfp4_cjso_radius());
             if (imatrix_data) {
                 gguf_set_val_str(ctx_out.get(), "general.quantization.nvfp4_adaptive_criterion", ggml_nvfp4_imatrix_select_criterion());
                 if (ggml_nvfp4_get_imatrix_select_mode() == GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD) {
@@ -1662,12 +1906,16 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
             }
         } else {
             gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_adaptive_candidates");
+            gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_search_algo");
+            gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_cjso_radius");
             gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_adaptive_criterion");
             gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_imatrix_guard");
         }
     } else {
         gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_scale_mode");
         gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_adaptive_candidates");
+        gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_search_algo");
+        gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_cjso_radius");
         gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_adaptive_criterion");
         gguf_remove_key(ctx_out.get(), "general.quantization.nvfp4_imatrix_guard");
     }
@@ -2048,10 +2296,20 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
                     }
 
                     llama_nvfp4_rsf_override_scope nvfp4_rsf_scope;
+                    float nvfp4_rsf_multiplier = 1.0f;
                     if (new_type == GGML_TYPE_NVFP4 &&
                             params->nvfp4_scale_mode == LLAMA_NVFP4_SCALE_MODE_ADAPTIVE &&
                             ggml_nvfp4_rsf_lite_enabled()) {
-                        nvfp4_rsf_scope.set(ggml_nvfp4_choose_rsf_multiplier(quant_data_03, nrows, n_per_row, imatrix_03));
+                        nvfp4_rsf_multiplier = ggml_nvfp4_choose_rsf_multiplier(quant_data_03, nrows, n_per_row, imatrix_03);
+                        nvfp4_rsf_scope.set(nvfp4_rsf_multiplier);
+                    }
+
+                    const bool nvfp4_debug_tensor =
+                            new_type == GGML_TYPE_NVFP4 &&
+                            llama_nvfp4_debug_tensor_match(metadata[i].name.c_str());
+                    ggml_nvfp4_scale_stats nvfp4_debug_stats_before = {};
+                    if (nvfp4_debug_tensor) {
+                        ggml_nvfp4_get_scale_stats(&nvfp4_debug_stats_before);
                     }
 
                     if (new_type == GGML_TYPE_NVFP4) {
@@ -2070,6 +2328,15 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
 
                     if (new_type == GGML_TYPE_NVFP4) {
                         ggml_nvfp4_set_debug_context(nullptr, nullptr, 0);
+                    }
+                    if (nvfp4_debug_tensor) {
+                        ggml_nvfp4_scale_stats nvfp4_debug_stats_after = {};
+                        ggml_nvfp4_get_scale_stats(&nvfp4_debug_stats_after);
+                        const ggml_nvfp4_scale_stats nvfp4_debug_stats =
+                                llama_nvfp4_scale_stats_subtract(nvfp4_debug_stats_after, nvfp4_debug_stats_before);
+                        llama_nvfp4_log_tensor_debug(
+                                __func__, metadata[i].name.c_str(), i03, new_data_03, nrows, n_per_row,
+                                nvfp4_rsf_multiplier, nvfp4_debug_stats);
                     }
                 }
                 LLAMA_LOG_INFO("size = %8.2f MiB -> %8.2f MiB\n", tensor_size/1024.0/1024.0, new_size/1024.0/1024.0);
@@ -2101,6 +2368,7 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
             const double p4 = 100.0 * (double) stats.n_m4 / (double) stats.n_subblocks;
             const double p5 = 100.0 * (double) stats.n_m5 / (double) stats.n_subblocks;
             const double p6 = 100.0 * (double) stats.n_m6 / (double) stats.n_subblocks;
+            const double p_other = 100.0 * (double) stats.n_slot_other / (double) stats.n_subblocks;
             const double ratio = stats.mse_m6 > 0.0 ? stats.mse_selected / stats.mse_m6 : 1.0;
             const bool weighted = stats.n_weighted_subblocks > 0;
             const double weighted_ratio = stats.weighted_mse_m6 > 0.0 ? stats.weighted_mse_selected / stats.weighted_mse_m6 : 1.0;
@@ -2111,14 +2379,19 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
             const double guard_fallback_pct = weighted ? 100.0 * (double) stats.n_weighted_guard_fallback / (double) stats.n_weighted_subblocks : 0.0;
             const bool rich = ggml_nvfp4_rich_scale_search_enabled() != 0;
             const bool rsf = ggml_nvfp4_rsf_lite_enabled() != 0;
+            const auto search_algo = ggml_nvfp4_get_search_algo();
+            const bool has_cjso = search_algo == GGML_NVFP4_SEARCH_CJSO || search_algo == GGML_NVFP4_SEARCH_RICH_CJSO;
             const ggml_nvfp4_imatrix_select_mode select_mode = weighted ?
                     ggml_nvfp4_get_imatrix_select_mode() : GGML_NVFP4_IMATRIX_SELECT_TWO_OBJECTIVE;
             LLAMA_LOG_INFO("%s: NVFP4 adaptive:\n", __func__);
             LLAMA_LOG_INFO("%s:   candidates: %s\n", __func__, ggml_nvfp4_adaptive_candidates());
+            LLAMA_LOG_INFO("%s:   search algo: %s\n", __func__, ggml_nvfp4_search_algo_name(search_algo));
+            LLAMA_LOG_INFO("%s:   CJSO radius: %d\n", __func__, ggml_nvfp4_cjso_radius());
             LLAMA_LOG_INFO("%s:   rich scale search: %s\n", __func__, rich ? "enabled" : "disabled");
+            const double avg_candidates = stats.n_subblocks > 0 ?
+                    (double) stats.candidate_count_total / (double) stats.n_subblocks : 0.0;
+            LLAMA_LOG_INFO("%s:   avg candidates after dedup: %.3f\n", __func__, avg_candidates);
             if (rich) {
-                const double avg_candidates = stats.n_subblocks > 0 ?
-                        (double) stats.candidate_count_total / (double) stats.n_subblocks : 0.0;
                 const double p_top1 = stats.n_subblocks > 0 ? 100.0 * (double) stats.n_anchor_top1 / (double) stats.n_subblocks : 0.0;
                 const double p_slot1 = stats.n_subblocks > 0 ? 100.0 * (double) stats.n_slot1 / (double) stats.n_subblocks : 0.0;
                 const double p_slot15 = stats.n_subblocks > 0 ? 100.0 * (double) stats.n_slot15 / (double) stats.n_subblocks : 0.0;
@@ -2127,15 +2400,43 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
                 LLAMA_LOG_INFO("%s:   rich anchor: top1 maxabs\n", __func__);
                 LLAMA_LOG_INFO("%s:   rich slots: 6,5,4,3,2,1.5,1\n", __func__);
                 LLAMA_LOG_INFO("%s:   rich slot code_radius: %d\n", __func__, ggml_nvfp4_rich_scale_code_radius());
-                LLAMA_LOG_INFO("%s:   rich avg candidates after dedup: %.3f\n", __func__, avg_candidates);
                 LLAMA_LOG_INFO("%s:   rich selected anchor top1: %.3f%%\n", __func__, p_top1);
-                LLAMA_LOG_INFO("%s:   slot distribution: 6=%.3f%%, 5=%.3f%%, 4=%.3f%%, 3=%.3f%%, 2=%.3f%%, 1.5=%.3f%%, 1=%.3f%%\n",
-                        __func__, p6, p5, p4, p_slot3, p_slot2, p_slot15, p_slot1);
+                LLAMA_LOG_INFO("%s:   slot distribution: 6=%.3f%%, 5=%.3f%%, 4=%.3f%%, 3=%.3f%%, 2=%.3f%%, 1.5=%.3f%%, 1=%.3f%%, other=%.3f%%\n",
+                        __func__, p6, p5, p4, p_slot3, p_slot2, p_slot15, p_slot1, p_other);
+            }
+            if (has_cjso) {
+                const double source_rich_pct = 100.0 * (double) stats.n_source_rich / (double) stats.n_subblocks;
+                const double source_cjso_ord_pct = 100.0 * (double) stats.n_source_cjso_ordinary / (double) stats.n_subblocks;
+                const double source_cjso_wgt_pct = 100.0 * (double) stats.n_source_cjso_weighted / (double) stats.n_subblocks;
+                const double source_both_pct = 100.0 * (double) stats.n_source_both / (double) stats.n_subblocks;
+                const double source_fallback_pct = 100.0 * (double) stats.n_source_fallback / (double) stats.n_subblocks;
+                const uint64_t total_cjso_selected =
+                        stats.n_source_cjso_ordinary + stats.n_source_cjso_weighted + stats.n_source_both;
+                const double cjso_denom = (double) std::max<uint64_t>(total_cjso_selected, 1);
+                LLAMA_LOG_INFO("%s:   CJSO ordinary anchor candidate count: %llu\n",
+                        __func__, (unsigned long long) stats.n_cjso_ordinary_candidates);
+                LLAMA_LOG_INFO("%s:   CJSO weighted anchor candidate count: %llu\n",
+                        __func__, (unsigned long long) stats.n_cjso_weighted_candidates);
+                LLAMA_LOG_INFO("%s:   source distribution: rich=%.3f%%, cjso_ord=%.3f%%, cjso_weighted=%.3f%%, both=%.3f%%, fallback=%.3f%%\n",
+                        __func__, source_rich_pct, source_cjso_ord_pct, source_cjso_wgt_pct, source_both_pct, source_fallback_pct);
+                LLAMA_LOG_INFO("%s:   CJSO selected delta distribution: -4=%.3f%%, -3=%.3f%%, -2=%.3f%%, -1=%.3f%%, 0=%.3f%%, +1=%.3f%%, +2=%.3f%%, +3=%.3f%%, +4=%.3f%%, other=%.3f%%\n",
+                        __func__,
+                        100.0 * (double) stats.n_cjso_delta_m4 / cjso_denom,
+                        100.0 * (double) stats.n_cjso_delta_m3 / cjso_denom,
+                        100.0 * (double) stats.n_cjso_delta_m2 / cjso_denom,
+                        100.0 * (double) stats.n_cjso_delta_m1 / cjso_denom,
+                        100.0 * (double) stats.n_cjso_delta_0  / cjso_denom,
+                        100.0 * (double) stats.n_cjso_delta_p1 / cjso_denom,
+                        100.0 * (double) stats.n_cjso_delta_p2 / cjso_denom,
+                        100.0 * (double) stats.n_cjso_delta_p3 / cjso_denom,
+                        100.0 * (double) stats.n_cjso_delta_p4 / cjso_denom,
+                        100.0 * (double) stats.n_cjso_delta_other / cjso_denom);
             }
             LLAMA_LOG_INFO("%s:   RSF-lite: %s\n", __func__, rsf ? "enabled" : "disabled");
             if (rsf) {
                 const double rsf_ratio = stats.rsf_sample_error_baseline > 0.0 ?
                         stats.rsf_sample_error_selected / stats.rsf_sample_error_baseline : 1.0;
+                LLAMA_LOG_INFO("%s:   RSF multipliers: 0.875,0.9375,1.0,1.0625,1.125\n", __func__);
                 LLAMA_LOG_INFO("%s:   RSF tensors: %llu\n", __func__, (unsigned long long) stats.n_rsf_tensors);
                 LLAMA_LOG_INFO("%s:   RSF multiplier counts: 0.875=%llu, 0.9375=%llu, 1.0=%llu, 1.0625=%llu, 1.125=%llu\n",
                         __func__,
@@ -2171,6 +2472,7 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
             LLAMA_LOG_INFO("%s:   M=4 selected: %llu (%.3f%%)\n", __func__, (unsigned long long) stats.n_m4, p4);
             LLAMA_LOG_INFO("%s:   M=5 selected: %llu (%.3f%%)\n", __func__, (unsigned long long) stats.n_m5, p5);
             LLAMA_LOG_INFO("%s:   M=6 selected: %llu (%.3f%%)\n", __func__, (unsigned long long) stats.n_m6, p6);
+            LLAMA_LOG_INFO("%s:   non-slot selected: %llu (%.3f%%)\n", __func__, (unsigned long long) stats.n_slot_other, p_other);
             if (weighted) {
                 if (select_mode == GGML_NVFP4_IMATRIX_SELECT_WEIGHTED_GUARD) {
                     LLAMA_LOG_INFO("%s:   weighted accepted: %llu (%.3f%%)\n", __func__,
