@@ -443,6 +443,253 @@ template <ggml_type type, int J, bool fallback> static __device__ __forceinline_
     }
 }
 
+template <ggml_type type, int J, bool fallback> static __device__ __forceinline__ void ggml_cuda_mmq_load_tiles_pq_0(
+        const char * __restrict__ x, int * __restrict__ x_tile, const int kbx0, const int i_max, const int stride) {
+    constexpr int warp_size = ggml_cuda_get_physical_warp_size();
+    constexpr int nwarps    = ggml_cuda_mmq_get_nthreads(type, J, fallback) / warp_size;
+    constexpr int I         = ggml_cuda_mmq_get_I(type, J, fallback);
+
+    constexpr tile_x_sizes txs = mmq_get_dp4a_tile_x_sizes(type, I);
+    int   * x_qs = (int   *)  x_tile;
+    float * x_df = (float *) (x_qs + txs.qs);
+
+    constexpr int threads_per_row = 32;
+    constexpr int nrows = warp_size / threads_per_row;
+    const int txi = warp_size > threads_per_row ? threadIdx.x % threads_per_row : threadIdx.x;
+    const int kbx  = txi / QI8_0;
+    const int kqsx = txi % QI8_0;
+
+#pragma unroll
+    for (int i0 = 0; i0 < I; i0 += nrows*nwarps) {
+        int i = i0 + (nrows == 1 ? threadIdx.y : threadIdx.y*nrows + threadIdx.x/threads_per_row);
+
+        if (fallback) {
+            i = min(i, i_max);
+        }
+
+        int qs0;
+        int qs1;
+
+        if constexpr (type == GGML_TYPE_PQ2_0) {
+            const block_pq2 * bxi = (const block_pq2 *) x + kbx0 + i*stride + kbx;
+            const uint8_t qb0 = bxi[0].qs[kqsx];
+            const uint8_t qb1 = bxi[MMQ_TILE_NE_K/QI8_0].qs[kqsx];
+            const int q4_0 = ((qb0 & 0x03u) <<  0)
+                           | ((qb0 & 0x0Cu) <<  2)
+                           | ((qb0 & 0x30u) <<  4)
+                           | ((qb0 & 0xC0u) <<  6);
+            const int q4_1 = ((qb1 & 0x03u) <<  0)
+                           | ((qb1 & 0x0Cu) <<  2)
+                           | ((qb1 & 0x30u) <<  4)
+                           | ((qb1 & 0xC0u) <<  6);
+            const int2 vp = get_int_from_table_16(q4_0 | (q4_1 << 16), PQ_TQ_DP4A_VAL_2BIT);
+            qs0 = __byte_perm(vp.x, vp.y, 0x5140);
+            qs1 = __byte_perm(vp.x, vp.y, 0x7362);
+        } else if constexpr (type == GGML_TYPE_PQ3_0) {
+            const block_pq3 * bxi = (const block_pq3 *) x + kbx0 + i*stride + kbx;
+            const uint8_t signs0 = (bxi[0].signs[kqsx >> 1] >> (4 * (kqsx & 1))) & 0x0Fu;
+            const uint8_t signs1 = (bxi[MMQ_TILE_NE_K/QI8_0].signs[kqsx >> 1] >> (4 * (kqsx & 1))) & 0x0Fu;
+            const uint8_t qb0 = bxi[0].qs[kqsx];
+            const uint8_t qb1 = bxi[MMQ_TILE_NE_K/QI8_0].qs[kqsx];
+            const int q4_0 = ((((qb0 >> 0) & 0x03u) | ((signs0 & 0x01u) << 2)) <<  0)
+                           | ((((qb0 >> 2) & 0x03u) | ((signs0 & 0x02u) << 1)) <<  4)
+                           | ((((qb0 >> 4) & 0x03u) |  (signs0 & 0x04u))       <<  8)
+                           | ((((qb0 >> 6) & 0x03u) | ((signs0 & 0x08u) >> 1)) << 12);
+            const int q4_1 = ((((qb1 >> 0) & 0x03u) | ((signs1 & 0x01u) << 2)) <<  0)
+                           | ((((qb1 >> 2) & 0x03u) | ((signs1 & 0x02u) << 1)) <<  4)
+                           | ((((qb1 >> 4) & 0x03u) |  (signs1 & 0x04u))       <<  8)
+                           | ((((qb1 >> 6) & 0x03u) | ((signs1 & 0x08u) >> 1)) << 12);
+            const int2 vp = get_int_from_table_16(q4_0 | (q4_1 << 16), PQ_TQ_DP4A_VAL_3BIT_16);
+            qs0 = __byte_perm(vp.x, vp.y, 0x5140);
+            qs1 = __byte_perm(vp.x, vp.y, 0x7362);
+        } else {
+            const block_pq4 * bxi = (const block_pq4 *) x + kbx0 + i*stride;
+            const uint16_t * q16_0 = (const uint16_t *) bxi[0].qs;
+            const uint16_t * q16_1 = (const uint16_t *) bxi[1].qs;
+            const int2 vp = get_int_from_table_16((int) q16_0[txi] | ((int) q16_1[txi] << 16), PQ_TQ_DP4A_VAL_4BIT);
+            qs0 = __byte_perm(vp.x, vp.y, 0x5140);
+            qs1 = __byte_perm(vp.x, vp.y, 0x7362);
+        }
+
+        x_qs[i*(2*MMQ_TILE_NE_K + 1) + 0             + txi] = qs0;
+        x_qs[i*(2*MMQ_TILE_NE_K + 1) + MMQ_TILE_NE_K + txi] = qs1;
+    }
+
+    constexpr int blocks_per_tile_x_row = 2*MMQ_TILE_NE_K / QI8_0;
+    constexpr int rows_per_warp = warp_size / blocks_per_tile_x_row;
+    const int kbxd = threadIdx.x % blocks_per_tile_x_row;
+
+#pragma unroll
+    for (int i0 = 0; i0 < I; i0 += nwarps * rows_per_warp) {
+        int i = i0 + threadIdx.y * rows_per_warp + threadIdx.x / blocks_per_tile_x_row;
+
+        if (fallback) {
+            i = min(i, i_max);
+        }
+
+        float d;
+        if constexpr (type == GGML_TYPE_PQ2_0) {
+            const block_pq2 * bxi = (const block_pq2 *) x + kbx0 + i*stride + kbxd;
+            d = __half2float(bxi->norm) * PQ_TQ_DP4A_INV_SCALE_2BIT;
+        } else if constexpr (type == GGML_TYPE_PQ3_0) {
+            const block_pq3 * bxi = (const block_pq3 *) x + kbx0 + i*stride + kbxd;
+            d = __half2float(bxi->norm) * PQ_TQ_DP4A_INV_SCALE_3BIT;
+        } else {
+            const block_pq4 * bxi = (const block_pq4 *) x + kbx0 + i*stride + kbxd/4;
+            d = __half2float(bxi->norm) * PQ_TQ_DP4A_INV_SCALE_4BIT;
+        }
+
+        x_df[i*(2*MMQ_TILE_NE_K/QI8_0) + i/(QI8_0/2) + kbxd] = d;
+    }
+}
+
+template <ggml_type type> struct ggml_cuda_mmq_pq_K_block_traits;
+
+template <> struct ggml_cuda_mmq_pq_K_block_traits<GGML_TYPE_PQ2_K> {
+    using block_type = block_pq2_K;
+};
+
+template <> struct ggml_cuda_mmq_pq_K_block_traits<GGML_TYPE_PQ3_K> {
+    using block_type = block_pq3_K;
+};
+
+template <> struct ggml_cuda_mmq_pq_K_block_traits<GGML_TYPE_PQ4_K> {
+    using block_type = block_pq4_K;
+};
+
+template <ggml_type type> static __device__ __forceinline__ float ggml_cuda_mmq_pq_K_inv_scale() {
+    if constexpr (type == GGML_TYPE_PQ2_K) {
+        return PQK_DP4A_INV_SCALE_2BIT;
+    } else if constexpr (type == GGML_TYPE_PQ3_K) {
+        return PQK_DP4A_INV_SCALE_3BIT;
+    } else {
+        return PQK_DP4A_INV_SCALE_4BIT;
+    }
+}
+
+template <ggml_type type> static __device__ __forceinline__ float ggml_cuda_mmq_pq_K_local_scale(const uint8_t qscale) {
+    if constexpr (type == GGML_TYPE_PQ2_K) {
+        return PQ2_K_LOCAL_SCALE_LUT[qscale];
+    } else if constexpr (type == GGML_TYPE_PQ3_K) {
+        return PQ3_K_LOCAL_SCALE_LUT[qscale];
+    } else {
+        return PQ4_K_LOCAL_SCALE_LUT[qscale];
+    }
+}
+
+template <ggml_type type, int J, bool fallback> static __device__ __forceinline__ void ggml_cuda_mmq_load_tiles_pq_K(
+        const char * __restrict__ x, int * __restrict__ x_tile, const int kbx0, const int i_max, const int stride) {
+    constexpr int warp_size = ggml_cuda_get_physical_warp_size();
+    constexpr int nwarps    = ggml_cuda_mmq_get_nthreads(type, J, fallback) / warp_size;
+    constexpr int I         = ggml_cuda_mmq_get_I(type, J, fallback);
+
+    constexpr tile_x_sizes txs = mmq_get_dp4a_tile_x_sizes(type, I);
+    int   * x_qs = (int   *)  x_tile;
+    half2 * x_d  = (half2 *) (x_qs + txs.qs);
+
+    constexpr int threads_per_row = 32;
+    constexpr int nrows = warp_size / threads_per_row;
+    const int txi = warp_size > threads_per_row ? threadIdx.x % threads_per_row : threadIdx.x;
+
+#pragma unroll
+    for (int i0 = 0; i0 < I; i0 += nrows*nwarps) {
+        int i = i0 + (nrows == 1 ? threadIdx.y : threadIdx.y*nrows + threadIdx.x/threads_per_row);
+
+        if (fallback) {
+            i = min(i, i_max);
+        }
+
+        int qs0;
+        int qs1;
+
+        if constexpr (type == GGML_TYPE_PQ2_K) {
+            const block_pq2_K * bxi = (const block_pq2_K *) x + kbx0 + i*stride;
+            const uint8_t qb0 = bxi->qs[txi];
+            const uint8_t qb1 = bxi->qs[MMQ_TILE_NE_K + txi];
+            const int q4_0 = ((qb0 & 0x03u) <<  0)
+                           | ((qb0 & 0x0Cu) <<  2)
+                           | ((qb0 & 0x30u) <<  4)
+                           | ((qb0 & 0xC0u) <<  6);
+            const int q4_1 = ((qb1 & 0x03u) <<  0)
+                           | ((qb1 & 0x0Cu) <<  2)
+                           | ((qb1 & 0x30u) <<  4)
+                           | ((qb1 & 0xC0u) <<  6);
+            const int2 vp = get_int_from_table_16(q4_0 | (q4_1 << 16), PQK_DP4A_VAL_2BIT);
+            qs0 = __byte_perm(vp.x, vp.y, 0x5140);
+            qs1 = __byte_perm(vp.x, vp.y, 0x7362);
+        } else if constexpr (type == GGML_TYPE_PQ3_K) {
+            const block_pq3_K * bxi = (const block_pq3_K *) x + kbx0 + i*stride;
+            const int elem0 = 4*txi;
+            const int elem1 = 128 + 4*txi;
+            const uint8_t high0 = (bxi->hmask[elem0 >> 3] >> (elem0 & 7)) & 0x0Fu;
+            const uint8_t high1 = (bxi->hmask[elem1 >> 3] >> (elem1 & 7)) & 0x0Fu;
+            const uint8_t qb0 = bxi->qs[txi];
+            const uint8_t qb1 = bxi->qs[MMQ_TILE_NE_K + txi];
+            const int q4_0 = ((((qb0 >> 0) & 0x03u) | ((high0 & 0x01u) << 2)) <<  0)
+                           | ((((qb0 >> 2) & 0x03u) | ((high0 & 0x02u) << 1)) <<  4)
+                           | ((((qb0 >> 4) & 0x03u) |  (high0 & 0x04u))       <<  8)
+                           | ((((qb0 >> 6) & 0x03u) | ((high0 & 0x08u) >> 1)) << 12);
+            const int q4_1 = ((((qb1 >> 0) & 0x03u) | ((high1 & 0x01u) << 2)) <<  0)
+                           | ((((qb1 >> 2) & 0x03u) | ((high1 & 0x02u) << 1)) <<  4)
+                           | ((((qb1 >> 4) & 0x03u) |  (high1 & 0x04u))       <<  8)
+                           | ((((qb1 >> 6) & 0x03u) | ((high1 & 0x08u) >> 1)) << 12);
+            const int2 vp = get_int_from_table_16(q4_0 | (q4_1 << 16), PQK_DP4A_VAL_3BIT_16);
+            qs0 = __byte_perm(vp.x, vp.y, 0x5140);
+            qs1 = __byte_perm(vp.x, vp.y, 0x7362);
+        } else {
+            const block_pq4_K * bxi = (const block_pq4_K *) x + kbx0 + i*stride;
+            const uint16_t * q16 = (const uint16_t *) bxi->qs;
+            const int2 vp = get_int_from_table_16((int) q16[txi] | ((int) q16[MMQ_TILE_NE_K + txi] << 16), PQK_DP4A_VAL_4BIT);
+            qs0 = __byte_perm(vp.x, vp.y, 0x5140);
+            qs1 = __byte_perm(vp.x, vp.y, 0x7362);
+        }
+
+        x_qs[i*(2*MMQ_TILE_NE_K + 1) + 0             + txi] = qs0;
+        x_qs[i*(2*MMQ_TILE_NE_K + 1) + MMQ_TILE_NE_K + txi] = qs1;
+    }
+
+    constexpr int scale_pairs_per_row = (type == GGML_TYPE_PQ2_K ? GGML_PQ2_K_SUBBLOCK_COUNT :
+                                        (type == GGML_TYPE_PQ3_K ? GGML_PQ3_K_SUBBLOCK_COUNT : GGML_PQ4_K_SUBBLOCK_COUNT)) / 2;
+    constexpr int subblocks_per_band = type == GGML_TYPE_PQ2_K ? GGML_PQ2_K_SUBBLOCKS_PER_BAND :
+                                      (type == GGML_TYPE_PQ3_K ? GGML_PQ3_K_SUBBLOCKS_PER_BAND : GGML_PQ4_K_SUBBLOCKS_PER_BAND);
+    constexpr int scale_rows_per_warp = warp_size / scale_pairs_per_row;
+    const int ksp = threadIdx.x % scale_pairs_per_row;
+
+#pragma unroll
+    for (int i0 = 0; i0 < I; i0 += nwarps*scale_rows_per_warp) {
+        int i = i0 + threadIdx.y*scale_rows_per_warp + threadIdx.x/scale_pairs_per_row;
+
+        if (fallback) {
+            i = min(i, i_max);
+        }
+
+        const int sub0 = 2*ksp;
+        const int band = sub0 / subblocks_per_band;
+
+        float dbase;
+        uint8_t qscale_pair;
+        if constexpr (type == GGML_TYPE_PQ2_K) {
+            const block_pq2_K * bxi = (const block_pq2_K *) x + kbx0 + i*stride;
+            dbase = __half2float(bxi->d[band]) * ggml_cuda_mmq_pq_K_inv_scale<type>();
+            qscale_pair = bxi->scales[ksp];
+        } else if constexpr (type == GGML_TYPE_PQ3_K) {
+            const block_pq3_K * bxi = (const block_pq3_K *) x + kbx0 + i*stride;
+            dbase = __half2float(bxi->d[band]) * ggml_cuda_mmq_pq_K_inv_scale<type>();
+            qscale_pair = bxi->scales[ksp];
+        } else {
+            const block_pq4_K * bxi = (const block_pq4_K *) x + kbx0 + i*stride;
+            dbase = __half2float(bxi->d[band]) * ggml_cuda_mmq_pq_K_inv_scale<type>();
+            qscale_pair = bxi->scales[ksp];
+        }
+
+        const half2 d_pair = make_half2(
+            dbase * ggml_cuda_mmq_pq_K_local_scale<type>(qscale_pair & 0x0Fu),
+            dbase * ggml_cuda_mmq_pq_K_local_scale<type>(qscale_pair >> 4));
+
+        x_d[i*(MMQ_TILE_NE_K/2 + 1) + ksp] = d_pair;
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 
 template <ggml_type type, int J, bool fallback> static __device__ __forceinline__ void ggml_cuda_mmq_load_tiles_q2_K(

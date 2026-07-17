@@ -61,6 +61,13 @@ static mmq_q8_1_ds_layout mmq_get_q8_1_ds_layout(const ggml_type type_x) {
     switch (type_x) {
         case GGML_TYPE_Q1_0:
             return MMQ_Q8_1_DS_LAYOUT_D4;
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:
+        case GGML_TYPE_PQ2_K:
+        case GGML_TYPE_PQ3_K:
+        case GGML_TYPE_PQ4_K:
+            return MMQ_Q8_1_DS_LAYOUT_D4;
         case GGML_TYPE_Q4_0:
         case GGML_TYPE_Q4_1:
             return MMQ_Q8_1_DS_LAYOUT_DS4;
@@ -159,6 +166,25 @@ static_assert(ggml_cuda_mmq_get_sram_stride(GGML_CUDA_MMQ_SRAM_LAYOUT_NVFP4) % 8
 
 static_assert(ggml_cuda_mmq_get_sram_stride(GGML_CUDA_MMQ_SRAM_LAYOUT_FP4) == ggml_cuda_mmq_get_sram_stride(GGML_CUDA_MMQ_SRAM_LAYOUT_Q8_1), "Wrong tile size for MXFP4");
 
+// PolarQuant MMQ support is experimental. PQ2_K in particular is expected to
+// have larger numerical error than the regular K-quants, especially with f32 activations.
+static constexpr __host__ __device__ bool ggml_cuda_mmq_type_is_pq_0(const ggml_type type) {
+    return type == GGML_TYPE_PQ2_0 || type == GGML_TYPE_PQ3_0 || type == GGML_TYPE_PQ4_0;
+}
+
+static constexpr __host__ __device__ bool ggml_cuda_mmq_type_is_pq_K(const ggml_type type) {
+    return type == GGML_TYPE_PQ2_K || type == GGML_TYPE_PQ3_K || type == GGML_TYPE_PQ4_K;
+}
+
+static constexpr __host__ __device__ bool ggml_cuda_mmq_type_is_pq(const ggml_type type) {
+    return ggml_cuda_mmq_type_is_pq_0(type) || ggml_cuda_mmq_type_is_pq_K(type);
+}
+
+static constexpr __host__ __device__ ggml_type ggml_cuda_mmq_config_lookup_type(const ggml_type type) {
+    return ggml_cuda_mmq_type_is_pq_0(type) ? GGML_TYPE_Q8_0 :
+           ggml_cuda_mmq_type_is_pq_K(type) ? GGML_TYPE_Q3_K : type;
+}
+
 // Config options for the MMQ kernel.
 // Should not affect results, only speed/register pressure/shared memory use.
 struct ggml_cuda_mmq_config {
@@ -186,6 +212,12 @@ struct ggml_cuda_mmq_config {
 
     // TODO transition all combinations of GPUs and quantizations to the MMA data layout.
     __host__ int use_mma_data_layout(const int cc) const {
+        // Keep PQ on the DP4A layout for now. The older PQ_K MMQ path was validated
+        // with this layout, while the MMA layout has not been made safe for these
+        // experimental formats yet.
+        if (ggml_cuda_mmq_type_is_pq(type)) {
+            return false;
+        }
         if (amd_mfma_available(cc) || amd_wmma_available(cc) || turing_mma_available(cc)) {
             return true;
         }
@@ -193,6 +225,10 @@ struct ggml_cuda_mmq_config {
     }
 
     constexpr __device__ bool use_mma_data_layout() const {
+        // See the host-side use_mma_data_layout() note above.
+        if (ggml_cuda_mmq_type_is_pq(type)) {
+            return false;
+        }
 #if defined(AMD_MFMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE)
         return true;
 #else
@@ -222,41 +258,58 @@ struct ggml_cuda_mmq_config {
 
 #undef CASE
 
+static constexpr __host__ __device__ ggml_cuda_mmq_config ggml_cuda_mmq_retype_config(ggml_cuda_mmq_config config, const ggml_type type) {
+    if (config.type != GGML_TYPE_COUNT) {
+        config.type = type;
+    }
+    return config;
+}
+
 static __host__ ggml_cuda_mmq_config ggml_cuda_mmq_get_config(const ggml_type type, const int J, const bool fallback, const int cc) {
+    const ggml_type lookup_type = ggml_cuda_mmq_config_lookup_type(type);
+    ggml_cuda_mmq_config config = ggml_cuda_mmq_config(GGML_TYPE_COUNT, 256, 1, 128, 64, GGML_CUDA_MMQ_SRAM_LAYOUT_Q8_0, 256, false, true);
+
     if (GGML_CUDA_CC_IS_AMD(cc)) {
         if (GGML_CUDA_CC_IS_CDNA(cc)) {
-            return ggml_cuda_mmq_get_config_cdna(type, J, fallback);
+            config = ggml_cuda_mmq_get_config_cdna(lookup_type, J, fallback);
+            return ggml_cuda_mmq_retype_config(config, type);
         }
         if (amd_wmma_available(cc)) {
-            return ggml_cuda_mmq_get_config_rdna4(type, J, fallback);
+            config = ggml_cuda_mmq_get_config_rdna4(lookup_type, J, fallback);
+            return ggml_cuda_mmq_retype_config(config, type);
         }
-        return ggml_cuda_mmq_get_config_rdna2(type, J, fallback);
+        config = ggml_cuda_mmq_get_config_rdna2(lookup_type, J, fallback);
+        return ggml_cuda_mmq_retype_config(config, type);
     }
     if (blackwell_mma_available(cc)) {
-        return ggml_cuda_mmq_get_config_blackwell(type, J, fallback);
+        config = ggml_cuda_mmq_get_config_blackwell(lookup_type, J, fallback);
+        return ggml_cuda_mmq_retype_config(config, type);
     }
     if (ggml_cuda_highest_compiled_arch(cc) >= GGML_CUDA_CC_VOLTA) {
-        return ggml_cuda_mmq_get_config_ampere(type, J, fallback);
+        config = ggml_cuda_mmq_get_config_ampere(lookup_type, J, fallback);
+        return ggml_cuda_mmq_retype_config(config, type);
     }
-    return ggml_cuda_mmq_get_config_pascal(type, J, fallback);
+    config = ggml_cuda_mmq_get_config_pascal(lookup_type, J, fallback);
+    return ggml_cuda_mmq_retype_config(config, type);
 }
 
 static constexpr __device__ ggml_cuda_mmq_config ggml_cuda_mmq_get_config(ggml_type type, int J, bool fallback) {
+    const ggml_type lookup_type = ggml_cuda_mmq_config_lookup_type(type);
 #ifdef GGML_USE_HIP
 #ifdef CDNA
-    return ggml_cuda_mmq_get_config_cdna(type, J, fallback);
+    return ggml_cuda_mmq_retype_config(ggml_cuda_mmq_get_config_cdna(lookup_type, J, fallback), type);
 #elif defined(AMD_WMMA_AVAILABLE)
-    return ggml_cuda_mmq_get_config_rdna4(type, J, fallback);
+    return ggml_cuda_mmq_retype_config(ggml_cuda_mmq_get_config_rdna4(lookup_type, J, fallback), type);
 #else
-    return ggml_cuda_mmq_get_config_rdna2(type, J, fallback);
+    return ggml_cuda_mmq_retype_config(ggml_cuda_mmq_get_config_rdna2(lookup_type, J, fallback), type);
 #endif // CDNA
 #else
 #ifdef BLACKWELL_MMA_AVAILABLE
-    return ggml_cuda_mmq_get_config_blackwell(type, J, fallback);
+    return ggml_cuda_mmq_retype_config(ggml_cuda_mmq_get_config_blackwell(lookup_type, J, fallback), type);
 #elif __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
-    return ggml_cuda_mmq_get_config_ampere(type, J, fallback);
+    return ggml_cuda_mmq_retype_config(ggml_cuda_mmq_get_config_ampere(lookup_type, J, fallback), type);
 #else
-    return ggml_cuda_mmq_get_config_pascal(type, J, fallback);
+    return ggml_cuda_mmq_retype_config(ggml_cuda_mmq_get_config_pascal(lookup_type, J, fallback), type);
 #endif // BLACKWELL_MMA_AVAILABLE
 #endif // GGML_USE_HIP
     GGML_UNUSED_VARS(type, J, fallback);
@@ -363,6 +416,7 @@ static constexpr __device__ int ggml_cuda_mmq_get_rows_per_warp(ggml_type type, 
 #define MMQ_DP4A_TXS_Q4_1    tile_x_sizes{I*MMQ_TILE_NE_K   + I, I*MMQ_TILE_NE_K/QI4_1   + I/QI4_1,     0}
 #define MMQ_DP4A_TXS_Q8_0    tile_x_sizes{I*MMQ_TILE_NE_K*2 + I, I*MMQ_TILE_NE_K*2/QI8_0 + I/(QI8_0/2), 0}
 #define MMQ_DP4A_TXS_Q8_0_16 tile_x_sizes{I*MMQ_TILE_NE_K*2 + I, I*MMQ_TILE_NE_K*4/QI8_0 + I/(QI8_0/4), 0}
+#define MMQ_DP4A_TXS_PQ_K    tile_x_sizes{I*MMQ_TILE_NE_K*2 + I, I*(MMQ_TILE_NE_K/2 + 1),                 0}
 #define MMQ_DP4A_TXS_Q8_1    tile_x_sizes{I*MMQ_TILE_NE_K*2 + I, I*MMQ_TILE_NE_K*2/QI8_1 + I/(QI8_1/2), 0}
 #define MMQ_DP4A_TXS_Q2_K    tile_x_sizes{I*MMQ_TILE_NE_K*2 + I, I*MMQ_TILE_NE_K         + I,           0}
 #define MMQ_DP4A_TXS_Q3_K    tile_x_sizes{I*MMQ_TILE_NE_K*2 + I, I,                                     I*MMQ_TILE_NE_K/8 + I/8}
@@ -373,6 +427,12 @@ static constexpr __device__ int ggml_cuda_mmq_get_rows_per_warp(ggml_type type, 
 static constexpr __host__ __device__ tile_x_sizes mmq_get_dp4a_tile_x_sizes(ggml_type type, int I) {
     switch (type) {
         case GGML_TYPE_Q1_0:    return MMQ_DP4A_TXS_Q8_0;
+        case GGML_TYPE_PQ2_0:
+        case GGML_TYPE_PQ3_0:
+        case GGML_TYPE_PQ4_0:   return MMQ_DP4A_TXS_Q8_0;
+        case GGML_TYPE_PQ2_K:
+        case GGML_TYPE_PQ3_K:
+        case GGML_TYPE_PQ4_K:   return MMQ_DP4A_TXS_PQ_K;
         case GGML_TYPE_Q4_0:    return MMQ_DP4A_TXS_Q4_0;
         case GGML_TYPE_Q4_1:    return MMQ_DP4A_TXS_Q4_1;
         case GGML_TYPE_Q5_0:    return MMQ_DP4A_TXS_Q8_0;
@@ -506,6 +566,22 @@ static constexpr __device__ ggml_cuda_mmq_util_funcs ggml_cuda_mmq_get_util_func
                     VDR_Q1_0_Q8_1_MMQ,
                     ggml_cuda_mmq_load_tiles_q1_0<type, J, fallback>,
                     ggml_cuda_mmq_vec_dot_q8_0_q8_1_dp4a<type, J, fallback>,
+                    ggml_cuda_mmq_write_back_dp4a<type, J, fallback>);
+            case GGML_TYPE_PQ2_0:
+            case GGML_TYPE_PQ3_0:
+            case GGML_TYPE_PQ4_0:
+                return ggml_cuda_mmq_util_funcs(
+                    VDR_Q8_0_Q8_1_MMQ,
+                    ggml_cuda_mmq_load_tiles_pq_0<type, J, fallback>,
+                    ggml_cuda_mmq_vec_dot_q8_0_q8_1_dp4a<type, J, fallback>,
+                    ggml_cuda_mmq_write_back_dp4a<type, J, fallback>);
+            case GGML_TYPE_PQ2_K:
+            case GGML_TYPE_PQ3_K:
+            case GGML_TYPE_PQ4_K:
+                return ggml_cuda_mmq_util_funcs(
+                    VDR_Q8_0_Q8_1_MMQ,
+                    ggml_cuda_mmq_load_tiles_pq_K<type, J, fallback>,
+                    ggml_cuda_mmq_vec_dot_q8_0_8_q8_1_dp4a<type, J, fallback>,
                     ggml_cuda_mmq_write_back_dp4a<type, J, fallback>);
             case GGML_TYPE_Q4_0:
                 return ggml_cuda_mmq_util_funcs(
@@ -1473,6 +1549,12 @@ extern DECL_MMQ_CASE(GGML_TYPE_Q5_1);
 extern DECL_MMQ_CASE(GGML_TYPE_Q8_0);
 extern DECL_MMQ_CASE(GGML_TYPE_MXFP4);
 extern DECL_MMQ_CASE(GGML_TYPE_NVFP4);
+extern DECL_MMQ_CASE(GGML_TYPE_PQ2_0);
+extern DECL_MMQ_CASE(GGML_TYPE_PQ3_0);
+extern DECL_MMQ_CASE(GGML_TYPE_PQ4_0);
+extern DECL_MMQ_CASE(GGML_TYPE_PQ2_K);
+extern DECL_MMQ_CASE(GGML_TYPE_PQ3_K);
+extern DECL_MMQ_CASE(GGML_TYPE_PQ4_K);
 extern DECL_MMQ_CASE(GGML_TYPE_Q2_K);
 extern DECL_MMQ_CASE(GGML_TYPE_Q3_K);
 extern DECL_MMQ_CASE(GGML_TYPE_Q4_K);
