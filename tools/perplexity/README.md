@@ -32,6 +32,54 @@ In addition to the KL divergence the following statistics are calculated with `-
 * The root mean square of the change in token probabilities. If you were to assume that the quantization simply causes Gaussian noise on the token probabilities then this would be the standard deviation of said noise. The uncertainty on the value is calculated that the change in token probabilities follows a Gaussian distribution. Related discussion: https://github.com/ggml-org/llama.cpp/discussions/2875 .
 * Same top p: Percentage of how often the token was assigned the highest probabilities by both models. The uncertainty is calculated from the Gaussian approximation of the binomial distribution.
 
+## MoQ dynamic tensor sweep
+
+`llama-perplexity` can run a local experimental Mixture-of-Quantization tensor sweep without reloading the base model for each candidate. It loads the base GGUF once, opens a BF16/F16/F32 source GGUF for tensor data, dynamically quantizes selected tensor groups, replaces the corresponding loaded model tensor pointers, evaluates KLD/PPL against a reused base logits file, and restores the original tensors.
+
+With the disk cache enabled, MoQ sweep uses a two-stage execution model. The first CPU stage enumerates all tensor/qtype pairs needed by the sweep, deduplicates them across overlapping groups, and builds the disk tensor cache in parallel using the normal `--threads-batch`/`--threads` settings capped at 16 worker threads. The second GPU/eval stage only loads cached blobs, uploads replacement tensors, applies batch/diff replacement, and evaluates KLD/PPL. Runtime quantization during the eval stage is only used when `--moq-disable-disk-cache` is set.
+
+Example:
+
+```bash
+llama-perplexity \
+  -m base_quant.gguf \
+  -f wikitext-2-raw-v1/wikitext-2-raw/wiki.test.raw \
+  --moq-dynamic-sweep \
+  --moq-source-bf16 source_bf16.gguf \
+  --moq-imatrix imatrix.gguf \
+  --moq-base-logits base_logits.dat \
+  --moq-groups tools/perplexity/moq_groups.example.json \
+  --moq-candidates IQ4_XS,Q4_K,Q5_K,Q6_K,Q8_0,BF16 \
+  --moq-cache-dir temp/moq_tensor_cache \
+  --moq-mem-cache-mb 8192 \
+  --moq-chunks 64 \
+  --moq-output temp/moq_sweep \
+  --moq-dynamic-backend same \
+  --moq-replace-mode diff \
+  --moq-sweep-order group_major \
+  --moq-base-logits-mode mmap \
+  --moq-cuda-graphs auto \
+  --moq-kld-overlap off \
+  --moq-logits-buffer-mode context \
+  --moq-profile-level 0
+```
+
+Use `--moq-list-qtypes` to print the dynamic sweep qtype support table. The current single-tensor dynamic path supports `Q2_K`, `Q3_K`, `Q4_K`, `Q5_K`, `Q6_K`, `Q8_0`, `Q4_0`, `Q4_1`, `Q5_0`, `Q5_1`, `IQ1_S`, `IQ1_M`, `IQ2_XXS`, `IQ2_XS`, `IQ2_S`, `IQ3_XXS`, `IQ3_S`, `IQ4_NL`, `IQ4_XS`, `F16`, `BF16`, and `F32`. Mixture ftypes such as `IQ2_M` and `IQ3_M` are recognized by the parser but reported as unsupported because they do not map to a single GGML tensor type. Unsupported candidates are recorded in `failed_candidates.csv` instead of crashing the sweep.
+
+`--moq-imatrix` accepts GGUF and legacy dat imatrix files and passes matching tensor entries to the quantizer; qtypes that require imatrix fail cleanly if the needed data is absent. `--moq-dynamic-backend cpu` creates CPU replacement tensors for correctness-oriented runs; `same` allocates the replacement tensor with the original tensor buffer type when possible and is the default. MoQ mode forces Flash Attention on for the high-speed path. CUDA graphs are controlled by `--moq-cuda-graphs auto|on|off`; `off` sets `GGML_CUDA_DISABLE_GRAPHS=1`, while `auto` and `on` leave CUDA graphs enabled and rely on graph invalidation after dynamic tensor replacement.
+
+Base logits can be accessed with `--moq-base-logits-mode stream|mmap|preload`. `stream` seeks and reads log-probs from the file during each evaluation. `mmap` maps the base logits file once and is the default. `preload` copies the whole base logits file into memory once, which can reduce eval-side I/O at the cost of a large startup allocation.
+
+`--moq-profile-level 0|1|2` controls KLD profiling. Level 1 records candidate-level eval timing and writes `eval_profile_summary.txt`; level 2 additionally writes per-chunk `chunk_timing.csv` with base-logit read, batch build, decode, logits access/copy, CPU `process_logits`, sort, and total timing. The same profiling path can be used with ordinary `--kl-divergence` by setting `--moq-profile-level > 0` and `--moq-output DIR`.
+
+`--moq-kld-overlap on|off` controls an experimental pipeline that decodes on the main thread and processes KLD on a background worker queue while the next chunk is decoded. `--moq-logits-buffer-mode context|copy|ring` controls logits ownership: `context` is the serial path that reads `llama_context` logits directly, `copy` copies each chunk's full-vocab logits to an owned CPU buffer before queueing work, and `ring` binds stable logits ring slots as the decode output buffer so workers can hold logits without an extra CPU-to-CPU full-vocab copy. `--moq-kld-ring N` limits in-flight KLD chunks, `--moq-logits-ring N` controls stable decode-output ring slots, `--moq-logits-ring-pinned on|off` attempts to allocate those slots from the accelerator host buffer type (CUDA pinned host memory when available), and `--moq-kld-workers N|auto` controls CPU queue workers. Ring mode currently requires a single decode batch for each chunk group and falls back to copy mode otherwise. It writes overlap timing fields, including `logits_copy_ms`, `kld_queue_wait_ms`, `kld_worker_ms`, `kld_join_ms`, `kld_ring_wait_ms`, `logits_ring_pinned_enabled`, and `logits_alloc_mode`; level 2 also writes `chunk_timing_overlap.csv` and `chunk_timing_ring.csv`.
+
+Replacement can run in `--moq-replace-mode restore_each` or `diff`. The default `restore_each` restores tensors after every candidate. `diff` keeps the previous assignment active and only replaces/restores tensors whose desired state changed; `--moq-diff-check-interval N` periodically restores all tensors and re-runs the base KLD check. Batch replacement is used for group updates, with missing tensors failing the whole batch unless `--moq-skip-missing-tensors` is set.
+
+The tensor cache has a memory LRU layer over the disk cache. `--moq-mem-cache-mb 0` or `--moq-disable-mem-cache` disables memory caching; `--moq-disable-disk-cache` disables disk caching and falls back to per-candidate runtime quantization; `--moq-cache-policy lru` is the current policy. Cache keys include source model hash, tensor name, qtype, imatrix hash, and quantizer version. `cache_stats.json` and `sweep_summary.txt` include CPU prequant task counts, ready/built/failed counts, bytes written, thread count, and prequant timing.
+
+Output files are written under `--moq-output`, including `sweep_results.csv`, `sweep_results.json`, `sweep_timing.csv`, `sweep_summary.txt`, `cache_stats.json`, `failed_candidates.csv`, `failed_candidates.txt`, `elasticity_table.csv`, `elasticity_table.json`, `elasticity_summary.txt`, `group_rankings.csv`, and `qtype_rankings.csv`. Elasticity loss defaults to `mean_kld + 0.30*p999_kld` and can be changed with `--moq-loss-mean-weight`, `--moq-loss-p999-weight`, `--moq-loss-p99-weight`, `--moq-loss-ppl-weight`, and `--moq-loss-max-weight`.
+
 ## LLaMA 3 8b Scoreboard
 
 | Revision | f364eb6f           |

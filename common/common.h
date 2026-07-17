@@ -523,6 +523,42 @@ struct common_params {
 
     bool   kl_divergence    = false; // compute KL divergence
 
+    bool        moq_dynamic_sweep   = false; // dynamically quantize and replace selected model tensors during perplexity KLD evaluation
+    bool        moq_list_qtypes     = false; // list qtypes supported by dynamic MoQ sweep
+    bool        moq_skip_missing_tensors = false; // skip missing tensor slots/source tensors instead of failing the whole candidate
+    bool        moq_disable_disk_cache = false; // disable dynamic tensor disk cache
+    bool        moq_disable_mem_cache  = false; // disable dynamic tensor memory cache
+    bool        moq_prebuild_cache = true; // prebuild dynamic tensor disk cache before GPU sweep/validation
+    std::string moq_source_bf16     = "";    // BF16/F16/F32 GGUF tensor source for dynamic MoQ sweep
+    std::string moq_imatrix         = "";    // optional imatrix GGUF/dat file for dynamic MoQ quantization
+    std::string moq_groups          = "";    // JSON file containing tensor groups for dynamic MoQ sweep
+    std::string moq_candidates      = "";    // comma-separated qtypes for dynamic MoQ sweep
+    std::string moq_recipe          = "";    // recipe JSON to validate by replacing all tensors at once
+    std::string moq_recipe_list     = "";    // text file containing recipe JSON paths to validate
+    std::string moq_cache_dir       = "temp/moq_tensor_cache";
+    std::string moq_output          = "temp/moq_sweep";
+    std::string moq_dynamic_backend = "same"; // cpu | same
+    std::string moq_replace_mode    = "restore_each"; // restore_each | diff
+    std::string moq_cache_policy    = "lru";  // lru
+    std::string moq_sweep_order     = "group_major"; // group_major | qtype_major | size_ascending | custom
+    std::string moq_cuda_graphs     = "auto"; // auto | on | off
+    std::string moq_base_logits_mode = "mmap"; // stream | mmap | preload
+    std::string moq_kld_overlap     = "off";  // on | off
+    std::string moq_logits_buffer_mode = "context"; // context | copy | ring
+    std::string moq_logits_ring_pinned = "off"; // on | off
+    int32_t     moq_chunks          = -1;    // max chunks to process in dynamic MoQ sweep (-1 = all chunks in base logits)
+    int32_t     moq_profile_level   = 0;     // 0 = summary only, 1 = candidate eval profile, 2 = chunk profile
+    int32_t     moq_kld_ring        = 8;     // max in-flight KLD chunks when overlap is enabled
+    int32_t     moq_logits_ring     = 4;     // stable logits output ring slots for MoQ KLD overlap
+    int32_t     moq_kld_workers     = 0;     // 0 = auto
+    int32_t     moq_diff_check_interval = 0; // force base check every N candidates in diff mode (0 = disabled)
+    int32_t     moq_mem_cache_mb    = 8192;  // dynamic quantized tensor blob memory cache limit
+    double      moq_loss_mean_weight = 1.0;
+    double      moq_loss_p999_weight = 0.30;
+    double      moq_loss_p99_weight  = 0.0;
+    double      moq_loss_ppl_weight  = 0.0;
+    double      moq_loss_max_weight  = 0.0;
+
     bool check             = false; // check rather than generate results for llama-results
 
     bool usage             = false; // print usage

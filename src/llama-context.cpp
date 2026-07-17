@@ -651,6 +651,14 @@ void llama_context::sched_reserve() {
             __func__, (t_end_us - t_start_us)/1000.0, ggml_backend_sched_get_n_copies(sched.get()));
 }
 
+void llama_context::invalidate_graph() {
+    synchronize();
+    if (gf_res_prev) {
+        gf_res_prev->reset();
+    }
+    sched_need_reserve = true;
+}
+
 void llama_context::synchronize() {
     if (!sched) {
         return;
@@ -791,6 +799,20 @@ float * llama_context::get_logits() {
     output_reorder();
 
     return logits.data;
+}
+
+bool llama_context::set_logits_output_buffer(float * data, size_t capacity_floats) {
+    if (data == nullptr || capacity_floats == 0) {
+        LLAMA_LOG_ERROR("%s: invalid external logits output buffer\n", __func__);
+        return false;
+    }
+
+    logits_output_external = {data, capacity_floats};
+    return true;
+}
+
+void llama_context::clear_logits_output_buffer() {
+    logits_output_external = {nullptr, 0};
 }
 
 int64_t llama_context::output_resolve_row(int32_t i) const {
@@ -2092,6 +2114,16 @@ uint32_t llama_context::output_reserve(int32_t n_outputs) {
 
     logits = has_logits ? buffer_view<float>{output_base, logits.size} : buffer_view<float>{nullptr, 0};
     offset += logits.size * sizeof(float);
+
+    if (has_logits && logits_output_external.data != nullptr) {
+        if (logits_output_external.size < logits.size) {
+            LLAMA_LOG_ERROR("%s: external logits output buffer too small: need %zu floats, got %zu\n",
+                    __func__, logits.size, logits_output_external.size);
+            logits = {nullptr, 0};
+            return 0;
+        }
+        logits = {logits_output_external.data, logits.size};
+    }
 
     embd = has_embd ? buffer_view<float>{(float *) (base + offset), embd.size} : buffer_view<float>{nullptr, 0};
     offset += embd.size * sizeof(float);
@@ -3633,6 +3665,14 @@ float * llama_get_logits_ith(llama_context * ctx, int32_t i) {
     }
 
     return res;
+}
+
+bool llama_set_logits_output_buffer(llama_context * ctx, float * data, size_t capacity_floats) {
+    return ctx->set_logits_output_buffer(data, capacity_floats);
+}
+
+void llama_clear_logits_output_buffer(llama_context * ctx) {
+    ctx->clear_logits_output_buffer();
 }
 
 float * llama_get_embeddings(llama_context * ctx) {

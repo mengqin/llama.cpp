@@ -653,7 +653,7 @@ static bool common_params_parse_ex(int argc, char ** argv, common_params_context
 
     // model is required (except for server)
     // TODO @ngxson : maybe show a list of available models in CLI in this case
-    if (params.model.path.empty() && ctx_arg.ex != LLAMA_EXAMPLE_SERVER && !skip_model_download && !params.usage && !params.completion) {
+    if (params.model.path.empty() && ctx_arg.ex != LLAMA_EXAMPLE_SERVER && !skip_model_download && !params.usage && !params.completion && !params.moq_list_qtypes) {
         throw std::invalid_argument("error: --model is required\n");
     }
 
@@ -2153,6 +2153,302 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         "set logits file",
         [](common_params & params, const std::string & value) {
             params.logits_file = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-dynamic-sweep"},
+        "run MoQ dynamic tensor sweep inside llama-perplexity",
+        [](common_params & params) {
+            params.moq_dynamic_sweep = true;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-list-qtypes"},
+        "list qtypes recognized by MoQ dynamic tensor sweep and exit",
+        [](common_params & params) {
+            params.moq_list_qtypes = true;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-source-bf16"}, "FNAME",
+        "BF16/F16/F32 GGUF source model for MoQ dynamic tensor quantization",
+        [](common_params & params, const std::string & value) {
+            params.moq_source_bf16 = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-imatrix"}, "FNAME",
+        "imatrix GGUF/dat file for MoQ dynamic tensor quantization",
+        [](common_params & params, const std::string & value) {
+            params.moq_imatrix = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-base-logits"}, "FNAME",
+        "base logits/log-probability file to reuse for MoQ KLD evaluation",
+        [](common_params & params, const std::string & value) {
+            params.logits_file = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-groups"}, "FNAME",
+        "JSON file describing MoQ tensor groups",
+        [](common_params & params, const std::string & value) {
+            params.moq_groups = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-candidates"}, "LIST",
+        "comma-separated MoQ candidate qtypes, e.g. Q4_K,Q5_K,Q8_0,BF16,IQ4_XS",
+        [](common_params & params, const std::string & value) {
+            params.moq_candidates = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-recipe"}, "FNAME",
+        "MoQ recipe JSON to validate by applying all recipe groups at once",
+        [](common_params & params, const std::string & value) {
+            params.moq_recipe = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-recipe-list"}, "FNAME",
+        "text file containing MoQ recipe JSON paths to validate",
+        [](common_params & params, const std::string & value) {
+            params.moq_recipe_list = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-cache-dir"}, "DIR",
+        string_format("directory for cached dynamic MoQ tensors (default: %s)", params.moq_cache_dir.c_str()),
+        [](common_params & params, const std::string & value) {
+            params.moq_cache_dir = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-mem-cache-mb"}, "N",
+        string_format("memory cache limit for dynamic MoQ tensor blobs in MiB (default: %d, 0 = disabled)", params.moq_mem_cache_mb),
+        [](common_params & params, int value) {
+            params.moq_mem_cache_mb = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-disable-disk-cache"},
+        "disable dynamic MoQ tensor disk cache",
+        [](common_params & params) {
+            params.moq_disable_disk_cache = true;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-disable-mem-cache"},
+        "disable dynamic MoQ tensor memory cache",
+        [](common_params & params) {
+            params.moq_disable_mem_cache = true;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-prebuild-cache"},
+        "prebuild dynamic MoQ tensor disk cache before evaluation (default behavior when disk cache is enabled)",
+        [](common_params & params) {
+            params.moq_prebuild_cache = true;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-cache-policy"}, "{lru}",
+        string_format("memory cache policy for dynamic MoQ tensor blobs (default: %s)", params.moq_cache_policy.c_str()),
+        [](common_params & params, const std::string & value) {
+            if (value != "lru") {
+                throw std::invalid_argument("invalid --moq-cache-policy, expected lru");
+            }
+            params.moq_cache_policy = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-profile-level"}, "N",
+        string_format("MoQ KLD profiling level: 0=summary, 1=candidate timing, 2=chunk timing (default: %d)", params.moq_profile_level),
+        [](common_params & params, int value) {
+            if (value < 0 || value > 2) {
+                throw std::invalid_argument("invalid --moq-profile-level, expected 0, 1, or 2");
+            }
+            params.moq_profile_level = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-cuda-graphs"}, "{auto,on,off}",
+        string_format("CUDA graphs policy for MoQ dynamic sweep (default: %s)", params.moq_cuda_graphs.c_str()),
+        [](common_params & params, const std::string & value) {
+            if (value != "auto" && value != "on" && value != "off") {
+                throw std::invalid_argument("invalid --moq-cuda-graphs, expected auto, on, or off");
+            }
+            params.moq_cuda_graphs = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-base-logits-mode"}, "{stream,mmap,preload}",
+        string_format("base logits access mode for MoQ/profiled KLD evaluation (default: %s)", params.moq_base_logits_mode.c_str()),
+        [](common_params & params, const std::string & value) {
+            if (value != "stream" && value != "mmap" && value != "preload") {
+                throw std::invalid_argument("invalid --moq-base-logits-mode, expected stream, mmap, or preload");
+            }
+            params.moq_base_logits_mode = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-kld-overlap"}, "{on,off}",
+        string_format("overlap GPU decode with CPU KLD processing in MoQ/profiled KLD evaluation (default: %s)", params.moq_kld_overlap.c_str()),
+        [](common_params & params, const std::string & value) {
+            if (value != "on" && value != "off") {
+                throw std::invalid_argument("invalid --moq-kld-overlap, expected on or off");
+            }
+            params.moq_kld_overlap = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-kld-ring"}, "N",
+        string_format("max in-flight chunks for MoQ KLD overlap buffers (default: %d)", params.moq_kld_ring),
+        [](common_params & params, int value) {
+            if (value <= 0) {
+                throw std::invalid_argument("invalid --moq-kld-ring, expected positive integer");
+            }
+            params.moq_kld_ring = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-logits-buffer-mode"}, "{context,copy,ring}",
+        string_format("logits ownership mode for MoQ KLD evaluation (default: %s)", params.moq_logits_buffer_mode.c_str()),
+        [](common_params & params, const std::string & value) {
+            if (value != "context" && value != "copy" && value != "ring") {
+                throw std::invalid_argument("invalid --moq-logits-buffer-mode, expected context, copy, or ring");
+            }
+            params.moq_logits_buffer_mode = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-logits-ring"}, "N",
+        string_format("stable logits output ring slots for MoQ KLD overlap ring mode (default: %d)", params.moq_logits_ring),
+        [](common_params & params, int value) {
+            if (value <= 0) {
+                throw std::invalid_argument("invalid --moq-logits-ring, expected positive integer");
+            }
+            params.moq_logits_ring = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-logits-ring-pinned"}, "{on,off}",
+        string_format("use pinned/page-locked host memory for MoQ logits ring slots when available (default: %s)", params.moq_logits_ring_pinned.c_str()),
+        [](common_params & params, const std::string & value) {
+            if (value != "on" && value != "off") {
+                throw std::invalid_argument("invalid --moq-logits-ring-pinned, expected on or off");
+            }
+            params.moq_logits_ring_pinned = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-kld-workers"}, "N|auto",
+        "worker threads for MoQ KLD overlap CPU queue (default: auto)",
+        [](common_params & params, const std::string & value) {
+            if (value == "auto") {
+                params.moq_kld_workers = 0;
+                return;
+            }
+            const int n = std::stoi(value);
+            if (n <= 0) {
+                throw std::invalid_argument("invalid --moq-kld-workers, expected positive integer or auto");
+            }
+            params.moq_kld_workers = n;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-output"}, "DIR",
+        string_format("directory for MoQ sweep output files (default: %s)", params.moq_output.c_str()),
+        [](common_params & params, const std::string & value) {
+            params.moq_output = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-chunks"}, "N",
+        string_format("max chunks to process for MoQ KLD evaluation (default: %d, -1 = all base-logit chunks)", params.moq_chunks),
+        [](common_params & params, int value) {
+            params.moq_chunks = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-dynamic-backend"}, "{cpu,same}",
+        string_format("backend for dynamic MoQ tensors (default: %s)", params.moq_dynamic_backend.c_str()),
+        [](common_params & params, const std::string & value) {
+            if (value != "cpu" && value != "same") {
+                throw std::invalid_argument("invalid --moq-dynamic-backend, expected cpu or same");
+            }
+            params.moq_dynamic_backend = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-replace-mode"}, "{restore_each,diff}",
+        string_format("tensor replacement strategy for MoQ sweep (default: %s)", params.moq_replace_mode.c_str()),
+        [](common_params & params, const std::string & value) {
+            if (value != "restore_each" && value != "diff") {
+                throw std::invalid_argument("invalid --moq-replace-mode, expected restore_each or diff");
+            }
+            params.moq_replace_mode = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-skip-missing-tensors"},
+        "skip missing tensors in MoQ groups with warnings instead of failing the candidate",
+        [](common_params & params) {
+            params.moq_skip_missing_tensors = true;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-diff-check-interval"}, "N",
+        string_format("in diff mode, force restore_all and base KLD check every N candidates (default: %d, 0 = disabled)", params.moq_diff_check_interval),
+        [](common_params & params, int value) {
+            params.moq_diff_check_interval = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-sweep-order"}, "{group_major,qtype_major,size_ascending,custom}",
+        string_format("MoQ candidate traversal order (default: %s)", params.moq_sweep_order.c_str()),
+        [](common_params & params, const std::string & value) {
+            if (value != "group_major" && value != "qtype_major" && value != "size_ascending" && value != "custom") {
+                throw std::invalid_argument("invalid --moq-sweep-order");
+            }
+            params.moq_sweep_order = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-loss-mean-weight"}, "N",
+        string_format("mean KLD weight for MoQ elasticity loss (default: %.2f)", params.moq_loss_mean_weight),
+        [](common_params & params, const std::string & value) {
+            params.moq_loss_mean_weight = std::stod(value);
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-loss-p999-weight"}, "N",
+        string_format("p99.9 KLD weight for MoQ elasticity loss (default: %.2f)", params.moq_loss_p999_weight),
+        [](common_params & params, const std::string & value) {
+            params.moq_loss_p999_weight = std::stod(value);
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-loss-p99-weight"}, "N",
+        string_format("p99 KLD weight for MoQ elasticity loss (default: %.2f)", params.moq_loss_p99_weight),
+        [](common_params & params, const std::string & value) {
+            params.moq_loss_p99_weight = std::stod(value);
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-loss-ppl-weight"}, "N",
+        string_format("PPL weight for MoQ elasticity loss (default: %.2f)", params.moq_loss_ppl_weight),
+        [](common_params & params, const std::string & value) {
+            params.moq_loss_ppl_weight = std::stod(value);
+        }
+    ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
+    add_opt(common_arg(
+        {"--moq-loss-max-weight"}, "N",
+        string_format("max KLD weight for MoQ elasticity loss (default: %.2f)", params.moq_loss_max_weight),
+        [](common_params & params, const std::string & value) {
+            params.moq_loss_max_weight = std::stod(value);
         }
     ).set_examples({LLAMA_EXAMPLE_PERPLEXITY}));
     add_opt(common_arg(

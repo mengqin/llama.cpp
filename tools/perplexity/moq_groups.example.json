@@ -1,0 +1,28 @@
+{
+  "groups": [
+    {
+      "name": "single_attn_qkv_0",
+      "tensors": ["blk.0.attn_qkv.weight"]
+    },
+    {
+      "name": "single_ssm_beta_0",
+      "tensors": ["blk.0.ssm_beta.weight"]
+    },
+    {
+      "name": "all_ssm_beta",
+      "tensors": [
+        "blk.0.ssm_beta.weight",
+        "blk.1.ssm_beta.weight",
+        "blk.2.ssm_beta.weight"
+      ]
+    },
+    {
+      "name": "late_attn_qkv",
+      "tensors": [
+        "blk.52.attn_qkv.weight",
+        "blk.53.attn_qkv.weight",
+        "blk.54.attn_qkv.weight"
+      ]
+    }
+  ]
+}

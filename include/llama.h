@@ -1017,6 +1017,12 @@ extern "C" {
     // returns NULL for invalid ids.
     LLAMA_API float * llama_get_logits_ith(struct llama_context * ctx, int32_t i);
 
+    // Experimental: set an external host buffer for logits written by the next decode/encode calls.
+    // The buffer must remain valid until the caller clears/replaces it and all consumers are done.
+    // capacity_floats must be at least n_outputs * n_vocab for the evaluated batch.
+    LLAMA_API bool llama_set_logits_output_buffer(struct llama_context * ctx, float * data, size_t capacity_floats);
+    LLAMA_API void llama_clear_logits_output_buffer(struct llama_context * ctx);
+
     // Get all output token embeddings.
     // when pooling_type == LLAMA_POOLING_TYPE_NONE or when using a generative model,
     // the embeddings for which llama_batch.logits[i] != 0 are stored contiguously
